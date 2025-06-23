@@ -14,14 +14,22 @@ class Note: Identifiable, Hashable {
     var content: Data
     var createdAt: Date
     var updatedAt: Date
+    var cursorLocation: Int = 0
 
-    init(id: UUID = UUID(), content: Data = Data(), createdAt: Date? = nil, updatedAt: Date? = nil) {
+    init(
+        id: UUID = UUID(),
+        content: Data = Data(),
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil,
+        cursorLocation: Int = 0
+    ) {
         self.id = id
         self.content = content
 
         let now = Date()
         self.createdAt = createdAt ?? now
         self.updatedAt = updatedAt ?? now
+        self.cursorLocation = cursorLocation
     }
 
     static func == (lhs: Note, rhs: Note) -> Bool { lhs.id == rhs.id }
@@ -124,6 +132,8 @@ struct NoteView: View {
         } else {
             _noteText = State(initialValue: NSAttributedString(string: ""))
         }
+        
+        _selectedRange = State(initialValue: NSRange(location: note.cursorLocation, length: 0))
     }
 
     var body: some View {
@@ -131,6 +141,7 @@ struct NoteView: View {
             RichTextEditor(
                 text: $noteText,
                 selectedRange: $selectedRange,
+                note: note,
                 keyboard: keyboard,
                 onCoordinatorReady: { coordinator in
                     self.editorCoordinator = coordinator

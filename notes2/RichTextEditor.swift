@@ -56,6 +56,7 @@ enum NoteTextAttribute {
 struct RichTextEditor: UIViewRepresentable {
     @Binding var text: NSAttributedString
     @Binding var selectedRange: NSRange
+    var note: Note
 
     @StateObject var settings = AppSettings.shared
 
@@ -74,7 +75,6 @@ struct RichTextEditor: UIViewRepresentable {
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
                 self.parent.text = textView.attributedText
-                self.centerCursorInTextView()
             }
         }
 
@@ -83,9 +83,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.parent.selectedRange = textView.selectedRange
                 self.updateTypingAttributes()
                 if textView.selectedRange.length == 0 {
-                    self.centerCursorInTextView()
-
-                    UserDefaults.standard.set(textView.selectedRange.location, forKey: "noteCursorLocation")
+                    self.parent.note.cursorLocation = textView.selectedRange.location
                 }
             }
         }
