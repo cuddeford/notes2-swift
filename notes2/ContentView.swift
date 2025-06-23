@@ -125,6 +125,9 @@ struct NoteView: View {
                 keyboard: keyboard,
                 onCoordinatorReady: { coordinator in
                     self.editorCoordinator = coordinator
+                    if noteText.length == 0 {
+                        coordinator.toggleAttribute(.title1)
+                    }
                 },
             )
             .onChange(of: noteText) { oldValue, newValue in

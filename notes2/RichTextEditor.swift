@@ -136,6 +136,41 @@ struct RichTextEditor: UIViewRepresentable {
             let mutable = NSMutableAttributedString(attributedString: parent.text)
             var range = parent.selectedRange
 
+            // If text is empty, apply to typingAttributes instead
+            if mutable.length == 0, let textView = self.textView {
+                var attrs = textView.typingAttributes
+
+                switch attribute {
+                case .bold, .italic:
+                    let trait: UIFontDescriptor.SymbolicTraits = (attribute == .bold) ? .traitBold : .traitItalic
+                    let currentFont = (attrs[.font] as? UIFont) ?? UIFont.preferredFont(forTextStyle: .body)
+                    let newFont = currentFont.withToggledTrait(trait)
+                    attrs[.font] = newFont
+
+                case .underline:
+                    let isUnderlined = (attrs[.underlineStyle] as? Int ?? 0) != 0
+                    attrs[.underlineStyle] = isUnderlined ? 0 : NSUnderlineStyle.single.rawValue
+
+                case .title1, .title2, .body:
+                    let targetStyle: NoteTextStyle
+                    switch attribute {
+                    case .title1: targetStyle = .title1
+                    case .title2: targetStyle = .title2
+                    case .body: targetStyle = .body
+                    default: targetStyle = .body
+                    }
+                    var traits: UIFontDescriptor.SymbolicTraits = []
+                    if targetStyle == .title1 {
+                        traits.insert(.traitBold)
+                    }
+                    let newFont = UIFont.noteStyle(targetStyle, traits: traits)
+                    attrs[.font] = newFont
+                }
+
+                textView.typingAttributes = attrs
+                return
+            }
+
             // For headings, apply to paragraph if no selection
             if (attribute == .title1 || attribute == .title2 || attribute == .body), range.length == 0 {
                 range = paragraphRange(for: parent.text, at: range.location)
