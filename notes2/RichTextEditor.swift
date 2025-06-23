@@ -190,13 +190,17 @@ struct RichTextEditor: UIViewRepresentable {
 
                 mutable.enumerateAttribute(.font, in: range, options: []) { value, subrange, _ in
                     let currentFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .title1)
-                    let traits = currentFont.fontDescriptor.symbolicTraits
+                    var traits = currentFont.fontDescriptor.symbolicTraits
                     let newFont: UIFont
                     if isAlreadyStyle {
                         // Toggle off: revert to body
+                        traits.remove(.traitBold)
                         newFont = UIFont.noteStyle(.body, traits: traits)
                     } else {
                         // Toggle on: set to target style
+                        if targetStyle == .title1 {
+                            traits.insert(.traitBold)
+                        }
                         newFont = UIFont.noteStyle(targetStyle, traits: traits)
                     }
                     mutable.addAttribute(.font, value: newFont, range: subrange)
