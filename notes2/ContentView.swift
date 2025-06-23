@@ -45,11 +45,25 @@ extension Note {
         ) {
             let plain = attr.string.trimmingCharacters(in: .whitespacesAndNewlines)
             if let firstLine = plain.components(separatedBy: .newlines).first {
-                return firstLine.isEmpty ? "Untitled" : firstLine
+                return firstLine.isEmpty ? "" : firstLine
             }
         }
 
-        return "Untitled"
+        return ""
+    }
+
+    var plain: String {
+        if let attr = try? NSAttributedString(
+            data: self.content,
+            options: [.documentType: NSAttributedString.DocumentType.rtfd],
+            documentAttributes: nil
+        ) {
+            return attr.string.isEmpty
+                ? ""
+                : attr.string
+        }
+
+        return ""
     }
 }
 
@@ -58,15 +72,32 @@ struct ContentView: View {
     @Environment(\.modelContext) private var context
 
     @State private var path = NavigationPath()
-    
+
     var body: some View {
+        let groupedNotes = Dictionary(grouping: notes) { note in
+            Calendar.current.startOfDay(for: note.updatedAt)
+        }
+        let sortedDays = groupedNotes.keys.sorted(by: >)
+
         NavigationSplitView {
             NavigationStack(path: $path) {
                 List {
-                    ForEach(notes) { note in
-                        NavigationLink(value: note) {
-                            Text(note.firstLine)
-                                .padding()
+                    ForEach(sortedDays, id: \.self) { day in
+                        Section(header: Text(formattedDate(day))) {
+                            ForEach(groupedNotes[day] ?? []) { note in
+                                NavigationLink(value: note) {
+                                    VStack(alignment: .leading) {
+                                        Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
+                                            .font(.headline)
+                                            .italic(note.firstLine.isEmpty)
+                                            .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                                        Text(note.updatedAt, style: .time)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
                         }
                     }.onDelete(perform: deleteNotes)
                 }
@@ -102,12 +133,19 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
         }
     }
-    
+
     func deleteNotes(at offsets: IndexSet) {
         for index in offsets {
             let note = notes[index]
             context.delete(note)
         }
+    }
+
+    func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
     }
 }
 
@@ -132,7 +170,7 @@ struct NoteView: View {
         } else {
             _noteText = State(initialValue: NSAttributedString(string: ""))
         }
-        
+
         _selectedRange = State(initialValue: NSRange(location: note.cursorLocation, length: 0))
     }
 
@@ -148,7 +186,7 @@ struct NoteView: View {
                     if noteText.length == 0 {
                         coordinator.toggleAttribute(.title1)
                     }
-                    
+
                     // focus the editor
                     coordinator.textView?.becomeFirstResponder()
                 },
