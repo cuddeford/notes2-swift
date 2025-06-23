@@ -50,15 +50,17 @@ struct ContentView: View {
     @Environment(\.modelContext) private var context
 
     @State private var path = NavigationPath()
-
+    
     var body: some View {
         NavigationSplitView {
             NavigationStack(path: $path) {
-                List(notes) { note in
-                    NavigationLink(value: note) {
-                        Text(note.firstLine)
-                            .padding()
-                    }
+                List {
+                    ForEach(notes) { note in
+                        NavigationLink(value: note) {
+                            Text(note.firstLine)
+                                .padding()
+                        }
+                    }.onDelete(perform: deleteNotes)
                 }
                 .navigationTitle("Notes")
                 .navigationDestination(for: Note.self) { note in
@@ -90,6 +92,13 @@ struct ContentView: View {
         } detail: {
             Text("Select a note")
                 .foregroundStyle(.secondary)
+        }
+    }
+    
+    func deleteNotes(at offsets: IndexSet) {
+        for index in offsets {
+            let note = notes[index]
+            context.delete(note)
         }
     }
 }
