@@ -11,14 +11,12 @@ import SwiftData
 @Model
 class Note: Identifiable, Hashable {
     @Attribute(.unique) var id: UUID
-    var title: String
     var content: Data
     var createdAt: Date
     var updatedAt: Date
 
-    init(id: UUID = UUID(), title: String, content: Data = Data(), createdAt: Date? = nil, updatedAt: Date? = nil) {
+    init(id: UUID = UUID(), content: Data = Data(), createdAt: Date? = nil, updatedAt: Date? = nil) {
         self.id = id
-        self.title = title
         self.content = content
 
         let now = Date()
@@ -28,6 +26,23 @@ class Note: Identifiable, Hashable {
 
     static func == (lhs: Note, rhs: Note) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+extension Note {
+    var firstLine: String {
+        if let attr = try? NSAttributedString(
+            data: self.content,
+            options: [.documentType: NSAttributedString.DocumentType.rtfd],
+            documentAttributes: nil
+        ) {
+            let plain = attr.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let firstLine = plain.components(separatedBy: .newlines).first {
+                return firstLine.isEmpty ? "Untitled" : firstLine
+            }
+        }
+
+        return "Untitled"
+    }
 }
 
 struct ContentView: View {
@@ -41,7 +56,8 @@ struct ContentView: View {
             NavigationStack(path: $path) {
                 List(notes) { note in
                     NavigationLink(value: note) {
-                        Text(note.title)
+                        Text(note.firstLine)
+                            .padding()
                     }
                 }
                 .navigationTitle("Notes")
@@ -51,7 +67,7 @@ struct ContentView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
-                            let newNote = Note(title: "new note")
+                            let newNote = Note()
                             context.insert(newNote)
                             path.append(newNote)
                         } label: {
@@ -121,7 +137,6 @@ struct NoteView: View {
                 }
             }
         }
-        .navigationTitle(note.title)
         .toolbar {
             if keyboard.isKeyboardVisible {
                 ToolbarItem(placement: .navigationBarTrailing) {
