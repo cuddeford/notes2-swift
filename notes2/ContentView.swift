@@ -6,26 +6,33 @@
 //
 
 import SwiftUI
+import SwiftData
 
-struct Note: Identifiable, Hashable {
-    let id: UUID
-    let title: String
+@Model
+class Note: Identifiable, Hashable {
+    @Attribute(.unique) var id: UUID
+    var title: String
+    var content: Data
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(id: UUID = UUID(), title: String, content: Data = Data(), createdAt: Date? = nil, updatedAt: Date? = nil) {
+        self.id = id
+        self.title = title
+        self.content = content
+
+        let now = Date()
+        self.createdAt = createdAt ?? now
+        self.updatedAt = updatedAt ?? now
+    }
+
+    static func == (lhs: Note, rhs: Note) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 struct ContentView: View {
-    @State private var notes = [
-        Note(
-            id: UUID(uuidString: "7F9E71EF-BD32-4674-82F9-3AAA4C529A07")
-                ?? UUID(),
-            title: "First Note"
-        ),
-        Note(
-            id: UUID(uuidString: "C2B6D78D-554B-4919-93C5-4B7D52005F92")
-                ?? UUID(),
-            title: "Second Note"
-        ),
-    ]
-    @State private var selectedNote: Note?
+    @Query(sort: \Note.updatedAt, order: .reverse) var notes: [Note]
+    @Environment(\.modelContext) private var context
 
     @State private var path = NavigationPath()
 
@@ -40,6 +47,17 @@ struct ContentView: View {
                 .navigationTitle("Notes")
                 .navigationDestination(for: Note.self) { note in
                     NoteView(note: note)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            let newNote = Note(title: "new note")
+                            context.insert(newNote)
+                            path.append(newNote)
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
                 }
                 .onAppear {
                     if let idString = UserDefaults.standard.string(
@@ -61,7 +79,7 @@ struct ContentView: View {
 }
 
 struct NoteView: View {
-    let note: Note
+    @Bindable var note: Note
 
     @State private var noteText: NSAttributedString
     @State private var selectedRange = NSRange(location: 0, length: 0)
@@ -70,8 +88,17 @@ struct NoteView: View {
     @StateObject var settings = AppSettings.shared
 
     init(note: Note) {
-        self.note = note
-        _noteText = State(initialValue: loadNote(for: note))
+        self._note = Bindable(wrappedValue: note)
+
+        if let attr = try? NSAttributedString(
+            data: note.content,
+            options: [.documentType: NSAttributedString.DocumentType.rtfd],
+            documentAttributes: nil,
+        ) {
+            _noteText = State(initialValue: attr)
+        } else {
+            _noteText = State(initialValue: NSAttributedString(string: ""))
+        }
     }
 
     var body: some View {
@@ -84,9 +111,14 @@ struct NoteView: View {
                     self.editorCoordinator = coordinator
                 },
             )
-//                        .border(Color(.red), width: 2)
             .onChange(of: noteText) { oldValue, newValue in
-                saveNote(note, content: newValue)
+                if let data = try? newValue.data(
+                    from: NSRange(location: 0, length: newValue.length),
+                    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd],
+                ) {
+                    note.content = data
+                    note.updatedAt = Date()
+                }
             }
         }
         .navigationTitle(note.title)
@@ -110,18 +142,6 @@ struct NoteView: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            UserDefaults.standard.set(
-                note.id.uuidString,
-                forKey: "lastOpenedNoteID"
-            )
-            let savedLocation = UserDefaults.standard.integer(
-                forKey: "noteCursorLocation"
-            )
-            let safeLocation = min(savedLocation, noteText.length)
-            selectedRange = NSRange(
-                location: safeLocation,
-                length: 0
-            )
         }
     }
 }
