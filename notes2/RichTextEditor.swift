@@ -247,7 +247,6 @@ struct RichTextEditor: UIViewRepresentable {
             onTitle2: { context.coordinator.toggleAttribute(.title2) },
             onBody: { context.coordinator.toggleAttribute(.body) },
             settings: settings,
-            keyboard: keyboard,
         )
         let hostingController = UIHostingController(rootView: toolbar)
         hostingController.view.backgroundColor = .clear
@@ -285,7 +284,6 @@ struct RichTextEditor: UIViewRepresentable {
                 onTitle2: { context.coordinator.toggleAttribute(.title2) },
                 onBody: { context.coordinator.toggleAttribute(.body) },
                 settings: settings,
-                keyboard: keyboard,
             )
             hostingController.view.setNeedsLayout()
         }
