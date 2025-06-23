@@ -280,5 +280,28 @@ struct RichTextEditor: UIViewRepresentable {
             )
             hostingController.view.setNeedsLayout()
         }
+
+        // Automatically adjust the text container inset based on keyboard height
+        let baseInset: CGFloat = settings.padding
+        let extraWhitespace: CGFloat = 200
+        let keyboardHeight = keyboard.keyboardHeight
+
+        let bottomInset: CGFloat
+        if keyboardHeight > 0 {
+            bottomInset = keyboardHeight + baseInset
+        } else {
+            bottomInset = extraWhitespace
+        }
+
+        if uiView.textContainerInset.bottom != bottomInset {
+            UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseInOut]) {
+                uiView.textContainerInset = UIEdgeInsets(
+                    top: baseInset,
+                    left: baseInset,
+                    bottom: bottomInset,
+                    right: baseInset,
+                )
+            }
+        }
     }
 }
