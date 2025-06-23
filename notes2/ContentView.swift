@@ -100,7 +100,7 @@ struct NoteView: View {
     @State private var noteText: NSAttributedString
     @State private var selectedRange = NSRange(location: 0, length: 0)
     @State private var editorCoordinator: RichTextEditor.Coordinator?
-    @ObservedObject private var keyboard = KeyboardObserver()
+    @StateObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
 
     init(note: Note) {
@@ -142,12 +142,7 @@ struct NoteView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         UIApplication.shared.sendAction(
-                            #selector(
-                                UIResponder.resignFirstResponder
-                            ),
-                            to: nil,
-                            from: nil,
-                            for: nil
+                            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil,
                         )
                     }) {
                         Text("Done")
