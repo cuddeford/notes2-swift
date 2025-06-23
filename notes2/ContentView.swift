@@ -7,22 +7,72 @@
 
 import SwiftUI
 
-enum NoteTextAttribute {
-    case bold
-    case italic
-    case underline
-    case title1
-    case title2
-    case body
+struct Note: Identifiable, Hashable {
+    let id: UUID
+    let title: String
 }
 
 struct ContentView: View {
-    @State private var noteText = loadNote()
+    @State private var notes = [
+        Note(
+            id: UUID(uuidString: "7F9E71EF-BD32-4674-82F9-3AAA4C529A07")
+                ?? UUID(),
+            title: "First Note"
+        ),
+        Note(
+            id: UUID(uuidString: "C2B6D78D-554B-4919-93C5-4B7D52005F92")
+                ?? UUID(),
+            title: "Second Note"
+        ),
+    ]
+    @State private var selectedNote: Note?
+
+    @State private var path = NavigationPath()
+
+    var body: some View {
+        NavigationSplitView {
+            NavigationStack(path: $path) {
+                List(notes) { note in
+                    NavigationLink(value: note) {
+                        Text(note.title)
+                    }
+                }
+                .navigationTitle("Notes")
+                .navigationDestination(for: Note.self) { note in
+                    NoteView(note: note)
+                }
+                .onAppear {
+                    if let idString = UserDefaults.standard.string(
+                        forKey: "lastOpenedNoteID"
+                    ),
+                        let uuid = UUID(uuidString: idString),
+                        let note = notes.first(where: { $0.id == uuid })
+                    {
+                        path = NavigationPath()
+                        path.append(note)
+                    }
+                }
+            }
+        } detail: {
+            Text("Select a note")
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct NoteView: View {
+    let note: Note
+
+    @State private var noteText: NSAttributedString
     @State private var selectedRange = NSRange(location: 0, length: 0)
     @State private var editorCoordinator: RichTextEditor.Coordinator?
-    @StateObject private var keyboard = KeyboardObserver()
+    @ObservedObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
-    @State private var name = ""
+
+    init(note: Note) {
+        self.note = note
+        _noteText = State(initialValue: loadNote(for: note))
+    }
 
     var body: some View {
         ZStack {
@@ -34,102 +84,44 @@ struct ContentView: View {
                     self.editorCoordinator = coordinator
                 },
             )
-//            .border(Color(.red), width: 2)
+//                        .border(Color(.red), width: 2)
             .onChange(of: noteText) { oldValue, newValue in
-                saveNote(newValue)
+                saveNote(note, content: newValue)
+            }
+        }
+        .navigationTitle(note.title)
+        .toolbar {
+            if keyboard.isKeyboardVisible {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        UIApplication.shared.sendAction(
+                            #selector(
+                                UIResponder.resignFirstResponder
+                            ),
+                            to: nil,
+                            from: nil,
+                            for: nil
+                        )
+                    }) {
+                        Text("Done")
+                    }
+                }
             }
         }
         .ignoresSafeArea()
         .onAppear {
-            let savedLocation = UserDefaults.standard.integer(forKey: "noteCursorLocation")
+            UserDefaults.standard.set(
+                note.id.uuidString,
+                forKey: "lastOpenedNoteID"
+            )
+            let savedLocation = UserDefaults.standard.integer(
+                forKey: "noteCursorLocation"
+            )
             let safeLocation = min(savedLocation, noteText.length)
-            selectedRange = NSRange(location: safeLocation, length: 0)
-        }
-    }
-
-    func toggleAttribute(_ attribute: NoteTextAttribute) {
-        let mutable = NSMutableAttributedString(attributedString: noteText)
-        var range = selectedRange
-
-        // For headings, apply to paragraph if no selection
-        if (attribute == .title1 || attribute == .title2 || attribute == .body), range.length == 0 {
-            range = paragraphRange(for: noteText, at: range.location)
-        }
-
-        // For bold/italic/underline, apply to word if no selection
-        if (attribute == .bold || attribute == .italic || attribute == .underline), range.length == 0 {
-            range = wordRange(for: noteText, at: range.location)
-        }
-
-        guard range.length > 0 else { return }
-
-        switch attribute {
-        case .bold, .italic:
-            let trait: UIFontDescriptor.SymbolicTraits = (attribute == .bold) ? .traitBold : .traitItalic
-            mutable.enumerateAttribute(.font, in: range, options: []) { value, subrange, _ in
-                let currentFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .title1)
-                let newFont = currentFont.withToggledTrait(trait)
-                mutable.addAttribute(.font, value: newFont, range: subrange)
-            }
-
-        case .underline:
-            var isUnderlined = false
-            mutable.enumerateAttribute(.underlineStyle, in: range, options: []) { value, _, stop in
-                if let style = value as? Int, style != 0 {
-                    isUnderlined = true
-                    stop.pointee = true
-                }
-            }
-            let newStyle = isUnderlined ? 0 : NSUnderlineStyle.single.rawValue
-            mutable.addAttribute(.underlineStyle, value: newStyle, range: range)
-
-        case .title1, .title2, .body:
-            let targetStyle: NoteTextStyle
-            switch attribute {
-            case .title1: targetStyle = .title1
-            case .title2: targetStyle = .title2
-            case .body: targetStyle = .body
-            default: targetStyle = .body
-            }
-
-            // Check if all selected text is already the target style
-            var isAlreadyStyle = true
-            mutable.enumerateAttribute(.font, in: range, options: []) { value, _, stop in
-                let currentFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .title1)
-                let expectedFont = UIFont.noteStyle(targetStyle, traits: currentFont.fontDescriptor.symbolicTraits)
-                if currentFont.pointSize != expectedFont.pointSize {
-                    isAlreadyStyle = false
-                    stop.pointee = true
-                }
-            }
-
-            mutable.enumerateAttribute(.font, in: range, options: []) { value, subrange, _ in
-                let currentFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .title1)
-                let traits = currentFont.fontDescriptor.symbolicTraits
-                let newFont: UIFont
-                if isAlreadyStyle {
-                    // Toggle off: revert to body
-                    newFont = UIFont.noteStyle(.body, traits: traits)
-                } else {
-                    // Toggle on: set to target style
-                    newFont = UIFont.noteStyle(targetStyle, traits: traits)
-                }
-                mutable.addAttribute(.font, value: newFont, range: subrange)
-            }
-        }
-
-        noteText = mutable
-        editorCoordinator?.updateTypingAttributes()
-    }
-}
-
-extension View {
-    @ViewBuilder
-    func conditionalPadding(_ edges: Edge.Set, _ condition: Bool) -> some View {
-        if condition {
-            self.padding(edges)
-        } else {
-            self
+            selectedRange = NSRange(
+                location: safeLocation,
+                length: 0
+            )
         }
     }
 }

@@ -7,22 +7,22 @@
 
 import SwiftUI
 
-func saveNote(_ note: NSAttributedString) {
-    let data = try? note.data(
-        from: NSRange(location: 0, length: note.length),
+func saveNote(_ note: Note, content: NSAttributedString) {
+    let data = try? content.data(
+        from: NSRange(location: 0, length: content.length),
         documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd]
     )
-    UserDefaults.standard.set(data, forKey: "noteData")
+    UserDefaults.standard.set(data, forKey: "noteData-\(note.id.uuidString)")
 }
 
-func loadNote() -> NSAttributedString {
-    if let data = UserDefaults.standard.data(forKey: "noteData"),
-       let note = try? NSAttributedString(
+func loadNote(for note: Note) -> NSAttributedString {
+    if let data = UserDefaults.standard.data(forKey: "noteData-\(note.id.uuidString)"),
+       let content = try? NSAttributedString(
            data: data,
            options: [.documentType: NSAttributedString.DocumentType.rtfd],
            documentAttributes: nil
        ) {
-        return note
+        return content
     }
     return NSAttributedString(string: "")
 }

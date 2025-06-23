@@ -44,6 +44,15 @@ extension NSString {
     }
 }
 
+enum NoteTextAttribute {
+    case bold
+    case italic
+    case underline
+    case title1
+    case title2
+    case body
+}
+
 struct RichTextEditor: UIViewRepresentable {
     @Binding var text: NSAttributedString
     @Binding var selectedRange: NSRange
