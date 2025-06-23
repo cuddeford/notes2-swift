@@ -137,6 +137,9 @@ struct NoteView: View {
                     if noteText.length == 0 {
                         coordinator.toggleAttribute(.title1)
                     }
+                    
+                    // focus the editor
+                    coordinator.textView?.becomeFirstResponder()
                 },
             )
             .onChange(of: noteText) { oldValue, newValue in
