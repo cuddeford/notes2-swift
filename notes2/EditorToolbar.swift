@@ -32,31 +32,31 @@ struct EditorToolbar: View {
                         )
                 }
 
-                Button(action: {
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                    onItalic()
-                }) {
-                    Image(systemName: "italic")
-                        .padding(16)
-                        .background(
-                            Circle()
-                                .fill(Color(.systemGray5))
-                        )
-                }
-
-                Button(action: {
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                    onUnderline()
-                }) {
-                    Image(systemName: "underline")
-                        .padding(16)
-                        .background(
-                            Circle()
-                                .fill(Color(.systemGray5))
-                        )
-                }
+//                Button(action: {
+//                    let generator = UIImpactFeedbackGenerator(style: .light)
+//                    generator.impactOccurred()
+//                    onItalic()
+//                }) {
+//                    Image(systemName: "italic")
+//                        .padding(16)
+//                        .background(
+//                            Circle()
+//                                .fill(Color(.systemGray5))
+//                        )
+//                }
+//
+//                Button(action: {
+//                    let generator = UIImpactFeedbackGenerator(style: .light)
+//                    generator.impactOccurred()
+//                    onUnderline()
+//                }) {
+//                    Image(systemName: "underline")
+//                        .padding(16)
+//                        .background(
+//                            Circle()
+//                                .fill(Color(.systemGray5))
+//                        )
+//                }
 
             }
             .padding(8)
