@@ -23,44 +23,20 @@ struct ContentView: View {
     @StateObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
     @State private var name = ""
-    
+
     var body: some View {
         ZStack {
-            RichTextEditor(text: $noteText, selectedRange: $selectedRange, onCoordinatorReady: { coordinator in
-                self.editorCoordinator = coordinator
-            })
+            RichTextEditor(
+                text: $noteText,
+                selectedRange: $selectedRange,
+                keyboard: keyboard,
+                onCoordinatorReady: { coordinator in
+                    self.editorCoordinator = coordinator
+                },
+            )
 //            .border(Color(.red), width: 2)
             .onChange(of: noteText) { oldValue, newValue in
                 saveNote(newValue)
-            }
-            
-            if keyboard.isKeyboardVisible {
-                HStack {
-                    HStack {
-                        Button(action: { toggleAttribute(.bold) }) { Image(systemName: "bold") }
-                        Button(action: { toggleAttribute(.italic) }) { Image(systemName: "italic") }
-                        Button(action: { toggleAttribute(.underline) }) { Image(systemName: "underline") }
-                        Spacer()
-                        Button("-") { settings.paragraphSpacing -= 1 }
-                        Text(String(settings.paragraphSpacing))
-                        Button("+") { settings.paragraphSpacing += 1 }
-                        Spacer()
-                        Button(action: { toggleAttribute(.title1) }) { Text("h1") }
-                        Button(action: { toggleAttribute(.title2) }) { Text("h2") }
-                        Button(action: { toggleAttribute(.body) }) { Text("body") }
-                    }
-                    .padding()
-                    .background(Color(hue: 1.0, saturation: 0.0, brightness: 0.942))
-                    .cornerRadius(25)
-                    .transition(
-                        .asymmetric(
-                            insertion: .push(from: .bottom),
-                            removal: .push(from: .top),
-                        )
-                    )
-                }
-                .padding(.horizontal)
-                .padding(.bottom)
             }
         }
         .ignoresSafeArea()
@@ -70,7 +46,7 @@ struct ContentView: View {
             selectedRange = NSRange(location: safeLocation, length: 0)
         }
     }
-    
+
     func toggleAttribute(_ attribute: NoteTextAttribute) {
         let mutable = NSMutableAttributedString(attributedString: noteText)
         var range = selectedRange

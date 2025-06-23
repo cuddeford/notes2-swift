@@ -47,13 +47,16 @@ extension NSString {
 struct RichTextEditor: UIViewRepresentable {
     @Binding var text: NSAttributedString
     @Binding var selectedRange: NSRange
-    
+
     @StateObject var settings = AppSettings.shared
+
+    var keyboard: KeyboardObserver
 
     class Coordinator: NSObject, UITextViewDelegate {
         var parent: RichTextEditor
         weak var textView: UITextView?
         private var debounceWorkItem: DispatchWorkItem?
+        var toolbarHostingController: UIHostingController<EditorToolbar>?
 
         init(_ parent: RichTextEditor) {
             self.parent = parent
@@ -72,12 +75,12 @@ struct RichTextEditor: UIViewRepresentable {
                 self.updateTypingAttributes()
                 if textView.selectedRange.length == 0 {
                     self.centerCursorInTextView()
-                    
+
                     UserDefaults.standard.set(textView.selectedRange.location, forKey: "noteCursorLocation")
                 }
             }
         }
-        
+
         func updateTypingAttributes() {
             guard let textView = textView else { return }
             let loc = max(0, min(textView.selectedRange.location - 1, textView.attributedText.length - 1))
@@ -86,10 +89,10 @@ struct RichTextEditor: UIViewRepresentable {
                 textView.typingAttributes = attrs
             }
         }
-        
+
         func centerCursorInTextView() {
             return
-            
+
             guard let textView = textView else { return }
             guard let selectedTextRange = textView.selectedTextRange else { return }
 
@@ -107,7 +110,7 @@ struct RichTextEditor: UIViewRepresentable {
                 textView.setContentOffset(CGPoint(x: 0, y: finalOffsetY), animated: true)
             }
         }
-        
+
         func printRawString(_ textView: UITextView) {
             print("---")
             textView.attributedText.enumerateAttributes(
@@ -119,6 +122,81 @@ struct RichTextEditor: UIViewRepresentable {
             }
             print("---")
         }
+
+        func toggleAttribute(_ attribute: NoteTextAttribute) {
+            let mutable = NSMutableAttributedString(attributedString: parent.text)
+            var range = parent.selectedRange
+
+            // For headings, apply to paragraph if no selection
+            if (attribute == .title1 || attribute == .title2 || attribute == .body), range.length == 0 {
+                range = paragraphRange(for: parent.text, at: range.location)
+            }
+
+            // For bold/italic/underline, apply to word if no selection
+            if (attribute == .bold || attribute == .italic || attribute == .underline), range.length == 0 {
+                range = wordRange(for: parent.text, at: range.location)
+            }
+
+            guard range.length > 0 else { return }
+
+            switch attribute {
+            case .bold, .italic:
+                let trait: UIFontDescriptor.SymbolicTraits = (attribute == .bold) ? .traitBold : .traitItalic
+                mutable.enumerateAttribute(.font, in: range, options: []) { value, subrange, _ in
+                    let currentFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .title1)
+                    let newFont = currentFont.withToggledTrait(trait)
+                    mutable.addAttribute(.font, value: newFont, range: subrange)
+                }
+
+            case .underline:
+                var isUnderlined = false
+                mutable.enumerateAttribute(.underlineStyle, in: range, options: []) { value, _, stop in
+                    if let style = value as? Int, style != 0 {
+                        isUnderlined = true
+                        stop.pointee = true
+                    }
+                }
+                let newStyle = isUnderlined ? 0 : NSUnderlineStyle.single.rawValue
+                mutable.addAttribute(.underlineStyle, value: newStyle, range: range)
+
+            case .title1, .title2, .body:
+                let targetStyle: NoteTextStyle
+                switch attribute {
+                case .title1: targetStyle = .title1
+                case .title2: targetStyle = .title2
+                case .body: targetStyle = .body
+                default: targetStyle = .body
+                }
+
+                // Check if all selected text is already the target style
+                var isAlreadyStyle = true
+                mutable.enumerateAttribute(.font, in: range, options: []) { value, _, stop in
+                    let currentFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .title1)
+                    let expectedFont = UIFont.noteStyle(targetStyle, traits: currentFont.fontDescriptor.symbolicTraits)
+                    if currentFont.pointSize != expectedFont.pointSize {
+                        isAlreadyStyle = false
+                        stop.pointee = true
+                    }
+                }
+
+                mutable.enumerateAttribute(.font, in: range, options: []) { value, subrange, _ in
+                    let currentFont = (value as? UIFont) ?? UIFont.preferredFont(forTextStyle: .title1)
+                    let traits = currentFont.fontDescriptor.symbolicTraits
+                    let newFont: UIFont
+                    if isAlreadyStyle {
+                        // Toggle off: revert to body
+                        newFont = UIFont.noteStyle(.body, traits: traits)
+                    } else {
+                        // Toggle on: set to target style
+                        newFont = UIFont.noteStyle(targetStyle, traits: traits)
+                    }
+                    mutable.addAttribute(.font, value: newFont, range: subrange)
+                }
+            }
+
+            parent.text = mutable
+            self.updateTypingAttributes()
+        }
     }
 
     var onCoordinatorReady: ((Coordinator) -> Void)? = nil
@@ -127,7 +205,7 @@ struct RichTextEditor: UIViewRepresentable {
         DispatchQueue.main.async {
             self.onCoordinatorReady?(coordinator)
         }
-        
+
         return coordinator
     }
 
@@ -136,17 +214,39 @@ struct RichTextEditor: UIViewRepresentable {
         textView.isEditable = true
         textView.isScrollEnabled = true
         textView.alwaysBounceVertical = true
-        textView.textContainerInset = UIEdgeInsets(top: settings.padding, left: settings.padding, bottom: 125, right: settings.padding)
+        textView.textContainerInset = UIEdgeInsets(
+            top: settings.padding,
+            left: settings.padding,
+            bottom: 200,
+            right: settings.padding
+        )
         textView.keyboardDismissMode = .interactive
         textView.font = UIFont.preferredFont(forTextStyle: .title1)
         textView.delegate = context.coordinator
         textView.allowsEditingTextAttributes = true
-//        textView.borderStyle =
-        
+
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacing = settings.paragraphSpacing
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
-        
+
+        // --- Add the SwiftUI toolbar as inputAccessoryView ---
+        let toolbar = EditorToolbar(
+            onBold: { context.coordinator.toggleAttribute(.bold) },
+            onItalic: { context.coordinator.toggleAttribute(.italic) },
+            onUnderline: { context.coordinator.toggleAttribute(.underline) },
+            onTitle1: { context.coordinator.toggleAttribute(.title1) },
+            onTitle2: { context.coordinator.toggleAttribute(.title2) },
+            onBody: { context.coordinator.toggleAttribute(.body) },
+            settings: settings,
+            keyboard: keyboard,
+        )
+        let hostingController = UIHostingController(rootView: toolbar)
+        hostingController.view.backgroundColor = .clear
+        hostingController.view.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60)
+        textView.inputAccessoryView = hostingController.view
+        context.coordinator.toolbarHostingController = hostingController
+        // -----------------------------------------------------
+
         context.coordinator.textView = textView
         return textView
     }
@@ -159,11 +259,26 @@ struct RichTextEditor: UIViewRepresentable {
             mutable.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: mutable.length))
             uiView.attributedText = mutable
         }
-        
+
         if uiView.selectedRange != selectedRange {
             uiView.selectedRange = selectedRange
         }
-        
+
         context.coordinator.updateTypingAttributes()
+
+        // Update the toolbar if settings changed
+        if let hostingController = context.coordinator.toolbarHostingController {
+            hostingController.rootView = EditorToolbar(
+                onBold: { context.coordinator.toggleAttribute(.bold) },
+                onItalic: { context.coordinator.toggleAttribute(.italic) },
+                onUnderline: { context.coordinator.toggleAttribute(.underline) },
+                onTitle1: { context.coordinator.toggleAttribute(.title1) },
+                onTitle2: { context.coordinator.toggleAttribute(.title2) },
+                onBody: { context.coordinator.toggleAttribute(.body) },
+                settings: settings,
+                keyboard: keyboard,
+            )
+            hostingController.view.setNeedsLayout()
+        }
     }
 }
