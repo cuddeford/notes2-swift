@@ -104,7 +104,12 @@ struct EditorToolbar: View {
                             .fill(.ultraThinMaterial)
                     )
                 }
-                .transition(.move(edge: .trailing))
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .trailing).animation(.easeInOut(duration: 0.4)).combined(with: .opacity.animation(.easeInOut(duration: 0.2).delay(0.2))),
+                        removal: .move(edge: .trailing).animation(.easeInOut(duration: 0.4)).combined(with: .opacity.animation(.easeInOut(duration: 0.2)))
+                    )
+                )
             }
 
             Spacer() // Always present to push the toggle button to the right
@@ -116,13 +121,15 @@ struct EditorToolbar: View {
                     isExpanded.toggle()
                 }
             }) {
-                Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.left.circle.fill")
-                    .font(.title2)
-                    .padding(8)
+                Image(systemName: "chevron.down.circle.fill")
+                    .font(.title)
+                    .padding(0)
                     .background(
                         Circle()
                             .fill(.ultraThinMaterial)
                     )
+                    .opacity(isExpanded ? 1 : 0.5)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
         }
         .padding(.horizontal)
