@@ -72,13 +72,15 @@ struct ContentView: View {
     @Environment(\.modelContext) private var context
 
     @State private var path = NavigationPath()
-    @State private var recentsExpanded = true
-    @State private var historicalExpanded: [Date: Bool] = [:]
+    @AppStorage("recentsExpanded") private var recentsExpanded = true
+    @AppStorage("historyExpanded") private var historyExpanded = true
+    @State private var historicalExpanded: [String: Bool] = [:]
 
     private func binding(for day: Date) -> Binding<Bool> {
-        .init(
-            get: { self.historicalExpanded[day, default: true] },
-            set: { self.historicalExpanded[day] = $0 }
+        let key = ISO8601DateFormatter().string(from: day)
+        return .init(
+            get: { self.historicalExpanded[key, default: true] },
+            set: { self.historicalExpanded[key] = $0 }
         )
     }
 
@@ -114,31 +116,41 @@ struct ContentView: View {
                         Text("Recent")
                     }
 
-                    ForEach(sortedDays, id: \.self) { day in
-                        Section(isExpanded: binding(for: day)) {
-                            ForEach(groupedNotes[day] ?? []) { note in
-                                NavigationLink(value: note) {
-                                    VStack(alignment: .leading) {
-                                        Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
-                                            .font(.headline)
-                                            .italic(note.firstLine.isEmpty)
-                                            .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                        Text(note.createdAt, style: .time)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                    DisclosureGroup("History", isExpanded: $historyExpanded) {
+                        ForEach(sortedDays, id: \.self) { day in
+                            Section(isExpanded: binding(for: day)) {
+                                ForEach(groupedNotes[day] ?? []) { note in
+                                    NavigationLink(value: note) {
+                                        VStack(alignment: .leading) {
+                                            Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
+                                                .font(.headline)
+                                                .italic(note.firstLine.isEmpty)
+                                                .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                                            Text(note.createdAt, style: .time)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
-                            }
-                            .padding(.vertical, 4)
-                        } header: {
-                            HStack {
-                                Text(formattedDate(day))
-                                Spacer()
-                                Text(relativeDate(day))
-                                    .foregroundStyle(.secondary)
+                                .onDelete { indexSet in
+                                    if let notesForDay = groupedNotes[day] {
+                                        for index in indexSet {
+                                            let note = notesForDay[index]
+                                            context.delete(note)
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            } header: {
+                                HStack {
+                                    Text(formattedDate(day))
+                                    Spacer()
+                                    Text(relativeDate(day))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
-                    }.onDelete(perform: deleteNotes)
+                    }
                 }
                 .navigationTitle("Notes")
                 .navigationDestination(for: Note.self) { note in
@@ -165,18 +177,22 @@ struct ContentView: View {
                         path = NavigationPath()
                         path.append(note)
                     }
+
+                    if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
+                        if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
+                            self.historicalExpanded = decoded
+                        }
+                    }
+                }
+                .onChange(of: historicalExpanded) { oldValue, newValue in
+                    if let encoded = try? JSONEncoder().encode(newValue) {
+                        UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
+                    }
                 }
             }
         } detail: {
             Text("Select a note")
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    func deleteNotes(at offsets: IndexSet) {
-        for index in offsets {
-            let note = notes[index]
-            context.delete(note)
         }
     }
 
