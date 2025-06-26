@@ -149,7 +149,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                .navigationTitle("Notes")
+                .navigationTitle("Notes2")
                 .navigationDestination(for: Note.self) { note in
                     NoteView(note: note)
                 }
