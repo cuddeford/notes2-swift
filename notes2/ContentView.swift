@@ -123,7 +123,7 @@ struct ContentView: View {
                         }
                     }
 
-                    DisclosureGroup("History", isExpanded: $historyExpanded) {
+                    Section(isExpanded: $historyExpanded) {
                         ForEach(sortedDays, id: \.self) { day in
                             Section(isExpanded: binding(for: day)) {
                                 ForEach(groupedNotes[day] ?? []) { note in
