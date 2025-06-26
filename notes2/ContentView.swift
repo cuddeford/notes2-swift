@@ -15,6 +15,7 @@ class Note: Identifiable, Hashable {
     var createdAt: Date
     var updatedAt: Date
     var cursorLocation: Int = 0
+    var isPinned: Bool = false
 
     init(
         id: UUID = UUID(),
@@ -74,6 +75,7 @@ struct ContentView: View {
     @State private var path = NavigationPath()
     @AppStorage("recentsExpanded") private var recentsExpanded = true
     @AppStorage("historyExpanded") private var historyExpanded = true
+    @AppStorage("pinnedExpanded") private var pinnedExpanded = true
     @State private var historicalExpanded: [String: Bool] = [:]
 
     private func binding(for day: Date) -> Binding<Bool> {
@@ -91,10 +93,36 @@ struct ContentView: View {
         let sortedDays = groupedNotes.keys.sorted(by: >)
 
         let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
+        let pinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
 
         NavigationSplitView {
             NavigationStack(path: $path) {
                 List {
+                    Section(isExpanded: $pinnedExpanded) {
+                        ForEach(pinnedNotes) { note in
+                            NavigationLink(value: note) {
+                                VStack(alignment: .leading) {
+                                    Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
+                                        .font(.headline)
+                                        .italic(note.firstLine.isEmpty)
+                                        .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                                    Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .onLongPressGesture {
+                                note.isPinned.toggle()
+                                let impactMed = UIImpactFeedbackGenerator(style: .heavy)
+                                impactMed.impactOccurred()
+                            }
+                        }
+                        .onDelete(perform: deletePinnedNotes)
+                        .padding(.vertical, 4)
+                    } header: {
+                        Text("Pinned")
+                    }
+
                     Section(isExpanded: $recentsExpanded) {
                         ForEach(recentNotes) { note in
                             NavigationLink(value: note) {
@@ -108,6 +136,11 @@ struct ContentView: View {
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
+                            }
+                            .onLongPressGesture {
+                                note.isPinned.toggle()
+                                let impactMed = UIImpactFeedbackGenerator(style: .heavy)
+                                impactMed.impactOccurred()
                             }
                         }
                         .onDelete(perform: deleteRecentNotes)
@@ -130,6 +163,11 @@ struct ContentView: View {
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
+                                    }
+                                    .onLongPressGesture {
+                                        note.isPinned.toggle()
+                                        let impactMed = UIImpactFeedbackGenerator(style: .heavy)
+                                        impactMed.impactOccurred()
                                     }
                                 }
                                 .onDelete { indexSet in
@@ -200,6 +238,14 @@ struct ContentView: View {
         let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
         for index in offsets {
             let note = recentNotes[index]
+            context.delete(note)
+        }
+    }
+
+    func deletePinnedNotes(at offsets: IndexSet) {
+        let pinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
+        for index in offsets {
+            let note = pinnedNotes[index]
             context.delete(note)
         }
     }
