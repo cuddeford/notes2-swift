@@ -93,7 +93,7 @@ struct ContentView: View {
                                         .font(.headline)
                                         .italic(note.firstLine.isEmpty)
                                         .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                    Text(note.updatedAt, style: .time)
+                                    Text("\(relativeDate(note.updatedAt)) at \(note.updatedAt, style: .time)")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
