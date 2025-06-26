@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NoteRow: View {
+    @Environment(\.modelContext) private var context
     @Bindable var note: Note
 
     var body: some View {
@@ -22,6 +23,15 @@ struct NoteRow: View {
                 Label("Pin", systemImage: note.isPinned ? "pin.slash.fill" : "pin.fill")
             }
             .tint(.orange)
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                context.delete(note)
+                let impactMed = UIImpactFeedbackGenerator(style: .heavy)
+                impactMed.impactOccurred()
+            } label: {
+                Label("Delete", systemImage: "trash.fill")
+            }
         }
     }
 }

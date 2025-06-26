@@ -106,7 +106,6 @@ struct ContentView: View {
                                     NoteRow(note: note)
                                 }
                             }
-                            .onDelete(perform: deletePinnedNotes)
                         } header: {
                             Label("Pinned", systemImage: "pin.fill")
                         }
@@ -119,7 +118,6 @@ struct ContentView: View {
                                     NoteRow(note: note)
                                 }
                             }
-                            .onDelete(perform: deleteRecentNotes)
                         } header: {
                             Label("Recents", systemImage: "clock.fill")
                         }
@@ -131,14 +129,6 @@ struct ContentView: View {
                                 ForEach(groupedNotes[day] ?? []) { note in
                                     NavigationLink(value: note) {
                                         NoteRow(note: note)
-                                    }
-                                }
-                                .onDelete { indexSet in
-                                    if let notesForDay = groupedNotes[day] {
-                                        for index in indexSet {
-                                            let note = notesForDay[index]
-                                            context.delete(note)
-                                        }
                                     }
                                 }
                             } header: {
@@ -195,22 +185,6 @@ struct ContentView: View {
         } detail: {
             Text("Select a note")
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    func deleteRecentNotes(at offsets: IndexSet) {
-        let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
-        for index in offsets {
-            let note = recentNotes[index]
-            context.delete(note)
-        }
-    }
-
-    func deletePinnedNotes(at offsets: IndexSet) {
-        let pinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
-        for index in offsets {
-            let note = pinnedNotes[index]
-            context.delete(note)
         }
     }
 }
