@@ -278,6 +278,7 @@ struct NoteView: View {
             }
         }
         .ignoresSafeArea()
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
         }
     }
