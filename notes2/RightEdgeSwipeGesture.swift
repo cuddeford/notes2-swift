@@ -4,6 +4,7 @@ import UIKit
 struct RightEdgeSwipeGesture: UIViewRepresentable {
     @Binding var gestureState: UIGestureRecognizer.State
     @Binding var translation: CGSize
+    @Binding var location: CGPoint
     var onEnded: () -> Void
 
     func makeUIView(context: Context) -> UIView {
@@ -32,6 +33,10 @@ struct RightEdgeSwipeGesture: UIViewRepresentable {
             let translationPoint = gesture.translation(in: gesture.view)
             parent.translation = CGSize(width: translationPoint.x, height: translationPoint.y)
 
+            if gesture.state == .began {
+                parent.location = gesture.location(in: gesture.view)
+            }
+
             if gesture.state == .ended {
                 // Only trigger onEnded if the swipe was significant and to the left
                 if parent.translation.width < -50 {
@@ -43,7 +48,7 @@ struct RightEdgeSwipeGesture: UIViewRepresentable {
 }
 
 extension View {
-    func onRightEdgeSwipe(gestureState: Binding<UIGestureRecognizer.State>, translation: Binding<CGSize>, onEnded: @escaping () -> Void) -> some View {
-        self.overlay(RightEdgeSwipeGesture(gestureState: gestureState, translation: translation, onEnded: onEnded))
+    func onRightEdgeSwipe(gestureState: Binding<UIGestureRecognizer.State>, translation: Binding<CGSize>, location: Binding<CGPoint>, onEnded: @escaping () -> Void) -> some View {
+        self.overlay(RightEdgeSwipeGesture(gestureState: gestureState, translation: translation, location: location, onEnded: onEnded))
     }
 }

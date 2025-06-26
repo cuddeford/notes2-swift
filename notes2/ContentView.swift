@@ -211,6 +211,7 @@ struct NoteView: View {
 
     @State private var rightEdgeGestureState: UIGestureRecognizer.State = .possible
     @State private var rightEdgeGestureTranslation: CGSize = .zero
+    @State private var rightEdgeGestureLocation: CGPoint = .zero
 
     init(note: Note, path: Binding<NavigationPath>) {
         self._path = path
@@ -243,7 +244,7 @@ struct NoteView: View {
                     }
 
                     // focus the editor
-                    coordinator.textView?.becomeFirstResponder()
+                    // coordinator.textView?.becomeFirstResponder()
                 },
             )
             .onChange(of: noteText) { oldValue, newValue in
@@ -264,7 +265,7 @@ struct NoteView: View {
         .onDisappear {
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
         }
-        .onRightEdgeSwipe(gestureState: $rightEdgeGestureState, translation: $rightEdgeGestureTranslation) {
+        .onRightEdgeSwipe(gestureState: $rightEdgeGestureState, translation: $rightEdgeGestureTranslation, location: $rightEdgeGestureLocation) {
             let newNote = Note()
             context.insert(newNote)
 
@@ -275,13 +276,14 @@ struct NoteView: View {
         }
 
         if rightEdgeGestureState == .changed || rightEdgeGestureState == .began {
-            NewNoteIndicatorView(translation: rightEdgeGestureTranslation)
+            NewNoteIndicatorView(translation: rightEdgeGestureTranslation, location: rightEdgeGestureLocation)
         }
     }
 }
 
 struct NewNoteIndicatorView: View {
     var translation: CGSize
+    var location: CGPoint
 
     @State private var lastWillCreateNote: Bool = false
 
@@ -289,21 +291,25 @@ struct NewNoteIndicatorView: View {
         let willCreateNote = translation.width < -50
         let backgroundColor = willCreateNote ? Color.green : Color.red
 
-        Text("New Note")
-            .font(.headline)
-            .padding()
-            .background(backgroundColor)
-            .foregroundColor(.white)
-            .cornerRadius(10)
-            .offset(x: translation.width - 100) // Adjust offset to position it correctly
-            .animation(.interactiveSpring(), value: translation)
-            .transition(.opacity)
-            .onChange(of: willCreateNote) { oldValue, newValue in
-                if oldValue != newValue {
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
+        GeometryReader { geometry in
+            Text("New Note")
+                .font(.headline)
+                .padding()
+                .background(backgroundColor)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+                .frame(maxWidth: .infinity, alignment: .trailing) // Push to the right
+                .offset(x: translation.width) // Keep X as is
+                .offset(y: location.y - geometry.size.height / 2) // Adjust Y using geometry.size.height
+                .animation(.interactiveSpring(), value: translation)
+                .transition(.opacity)
+                .onChange(of: willCreateNote) { oldValue, newValue in
+                    if oldValue != newValue {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                    }
                 }
-            }
+        }
     }
 }
 
