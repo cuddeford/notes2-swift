@@ -31,7 +31,7 @@ struct EditorToolbar: View {
                                 .padding(16)
                                 .background(
                                     Circle()
-                                        .fill(Color(.systemGray5))
+                                        .fill(.ultraThinMaterial)
                                 )
                         }
 
@@ -44,7 +44,7 @@ struct EditorToolbar: View {
                                 .padding(16)
                                 .background(
                                     Circle()
-                                        .fill(Color(.systemGray5))
+                                        .fill(.ultraThinMaterial)
                                 )
                         }
 
@@ -57,16 +57,10 @@ struct EditorToolbar: View {
                                 .padding(16)
                                 .background(
                                     Circle()
-                                        .fill(Color(.systemGray5))
+                                        .fill(.ultraThinMaterial)
                                 )
                         }
-
                     }
-                    .padding(8)
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                    )
 
                     Spacer()
 
@@ -81,7 +75,7 @@ struct EditorToolbar: View {
                                 .padding(16)
                                 .background(
                                     Circle()
-                                        .fill(Color(.systemGray5))
+                                        .fill(.ultraThinMaterial)
                                 )
                         }
                         Button(action: {
@@ -93,21 +87,18 @@ struct EditorToolbar: View {
                                 .padding(10)
                                 .background(
                                     Rectangle()
-                                        .fill(Color(.systemGray5))
+                                        .fill(.ultraThinMaterial)
                                         .cornerRadius(25)
                                 )
                         }
                     }
-                    .padding(8)
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                    )
                 }
                 .transition(
                     .asymmetric(
-                        insertion: .move(edge: .trailing).animation(.easeInOut(duration: 0.4)).combined(with: .opacity.animation(.easeInOut(duration: 0.2).delay(0.2))),
-                        removal: .move(edge: .trailing).animation(.easeInOut(duration: 0.4)).combined(with: .opacity.animation(.easeInOut(duration: 0.2)))
+                        insertion: .move(edge: .trailing).animation(.easeInOut(duration: 0.4))
+                            .combined(with: .opacity.animation(.easeInOut(duration: 0.2).delay(0.2))),
+                        removal: .move(edge: .trailing).animation(.easeInOut(duration: 0.4))
+                            .combined(with: .opacity.animation(.easeInOut(duration: 0.2)))
                     )
                 )
             }
@@ -122,8 +113,7 @@ struct EditorToolbar: View {
                 }
             }) {
                 Image(systemName: "chevron.down.circle.fill")
-                    .font(.title)
-                    .padding(0)
+                    .padding(16)
                     .background(
                         Circle()
                             .fill(.ultraThinMaterial)
