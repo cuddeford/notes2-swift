@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import UIKit
 
 @Model
 class Note: Identifiable, Hashable {
@@ -151,7 +152,8 @@ struct ContentView: View {
                 .animation(.default, value: historicalExpanded)
                 .navigationTitle("Notes2")
                 .navigationDestination(for: Note.self) { note in
-                    NoteView(note: note)
+                    NoteView(note: note, path: $path)
+                        .environment(\.modelContext, context)
                 }
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -198,6 +200,8 @@ struct ContentView: View {
 
 struct NoteView: View {
     @Bindable var note: Note
+    @Binding var path: NavigationPath
+    @Environment(\.modelContext) private var context: ModelContext
 
     @State private var noteText: NSAttributedString
     @State private var selectedRange = NSRange(location: 0, length: 0)
@@ -205,7 +209,8 @@ struct NoteView: View {
     @StateObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
 
-    init(note: Note) {
+    init(note: Note, path: Binding<NavigationPath>) {
+        self._path = path
         self._note = Bindable(wrappedValue: note)
 
         if let attr = try? NSAttributedString(
@@ -255,6 +260,15 @@ struct NoteView: View {
         }
         .onDisappear {
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
+        }
+        .onRightEdgeSwipe {
+            let newNote = Note()
+            context.insert(newNote)
+
+            $path.wrappedValue.removeLast()
+            DispatchQueue.main.async {
+                $path.wrappedValue.append(newNote)
+            }
         }
     }
 }
