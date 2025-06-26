@@ -3,7 +3,9 @@ import SwiftUI
 import UIKit
 
 struct RightEdgeSwipeGesture: UIViewRepresentable {
-    var onSwipe: () -> Void
+    @Binding var gestureState: UIGestureRecognizer.State
+    @Binding var translation: CGSize
+    var onEnded: () -> Void
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
@@ -27,15 +29,22 @@ struct RightEdgeSwipeGesture: UIViewRepresentable {
         }
 
         @objc func handleSwipe(gesture: UIScreenEdgePanGestureRecognizer) {
+            parent.gestureState = gesture.state
+            let translationPoint = gesture.translation(in: gesture.view)
+            parent.translation = CGSize(width: translationPoint.x, height: translationPoint.y)
+
             if gesture.state == .ended {
-                parent.onSwipe()
+                // Only trigger onEnded if the swipe was significant and to the left
+                if parent.translation.width < -50 {
+                    parent.onEnded()
+                }
             }
         }
     }
 }
 
 extension View {
-    func onRightEdgeSwipe(perform action: @escaping () -> Void) -> some View {
-        self.overlay(RightEdgeSwipeGesture(onSwipe: action))
+    func onRightEdgeSwipe(gestureState: Binding<UIGestureRecognizer.State>, translation: Binding<CGSize>, onEnded: @escaping () -> Void) -> some View {
+        self.overlay(RightEdgeSwipeGesture(gestureState: gestureState, translation: translation, onEnded: onEnded))
     }
 }

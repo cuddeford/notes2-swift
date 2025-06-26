@@ -209,6 +209,9 @@ struct NoteView: View {
     @StateObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
 
+    @State private var rightEdgeGestureState: UIGestureRecognizer.State = .possible
+    @State private var rightEdgeGestureTranslation: CGSize = .zero
+
     init(note: Note, path: Binding<NavigationPath>) {
         self._path = path
         self._note = Bindable(wrappedValue: note)
@@ -261,7 +264,7 @@ struct NoteView: View {
         .onDisappear {
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
         }
-        .onRightEdgeSwipe {
+        .onRightEdgeSwipe(gestureState: $rightEdgeGestureState, translation: $rightEdgeGestureTranslation) {
             let newNote = Note()
             context.insert(newNote)
 
@@ -270,6 +273,37 @@ struct NoteView: View {
                 $path.wrappedValue.append(newNote)
             }
         }
+
+        if rightEdgeGestureState == .changed || rightEdgeGestureState == .began {
+            NewNoteIndicatorView(translation: rightEdgeGestureTranslation)
+        }
+    }
+}
+
+struct NewNoteIndicatorView: View {
+    var translation: CGSize
+
+    @State private var lastWillCreateNote: Bool = false
+
+    var body: some View {
+        let willCreateNote = translation.width < -50
+        let backgroundColor = willCreateNote ? Color.green : Color.red
+
+        Text("New Note")
+            .font(.headline)
+            .padding()
+            .background(backgroundColor)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .offset(x: translation.width - 100) // Adjust offset to position it correctly
+            .animation(.interactiveSpring(), value: translation)
+            .transition(.opacity)
+            .onChange(of: willCreateNote) { oldValue, newValue in
+                if oldValue != newValue {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                }
+            }
     }
 }
 
