@@ -102,10 +102,9 @@ struct ContentView: View {
                     if !pinnedNotes.isEmpty {
                         Section(isExpanded: $pinnedExpanded) {
                             ForEach(pinnedNotes) { note in
-                                NoteRow(note: note)
+                                NoteRow(note: note, navigateAction: { note in path.append(note) })
                             }
                             .onDelete(perform: deletePinnedNotes)
-                            .padding(.vertical, 4)
                         } header: {
                             Label("Pinned", systemImage: "pin.fill")
                         }
@@ -114,10 +113,9 @@ struct ContentView: View {
                     if !recentNotes.isEmpty {
                         Section(isExpanded: $recentsExpanded) {
                             ForEach(recentNotes) { note in
-                                NoteRow(note: note)
+                                NoteRow(note: note, navigateAction: { note in path.append(note) })
                             }
                             .onDelete(perform: deleteRecentNotes)
-                            .padding(.vertical, 4)
                         } header: {
                             Label("Recents", systemImage: "clock.fill")
                         }
@@ -127,7 +125,7 @@ struct ContentView: View {
                         ForEach(sortedDays, id: \.self) { day in
                             Section(isExpanded: binding(for: day)) {
                                 ForEach(groupedNotes[day] ?? []) { note in
-                                    NoteRow(note: note)
+                                    NoteRow(note: note, navigateAction: { note in path.append(note) })
                                 }
                                 .onDelete { indexSet in
                                     if let notesForDay = groupedNotes[day] {
@@ -137,7 +135,6 @@ struct ContentView: View {
                                         }
                                     }
                                 }
-                                .padding(.vertical, 4)
                             } header: {
                                 HStack {
                                     Text(day.formattedDate())
