@@ -98,55 +98,59 @@ struct ContentView: View {
         NavigationSplitView {
             NavigationStack(path: $path) {
                 List {
-                    Section(isExpanded: $pinnedExpanded) {
-                        ForEach(pinnedNotes) { note in
-                            NavigationLink(value: note) {
-                                VStack(alignment: .leading) {
-                                    Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
-                                        .font(.headline)
-                                        .italic(note.firstLine.isEmpty)
-                                        .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                    Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                    if !pinnedNotes.isEmpty {
+                        Section(isExpanded: $pinnedExpanded) {
+                            ForEach(pinnedNotes) { note in
+                                NavigationLink(value: note) {
+                                    VStack(alignment: .leading) {
+                                        Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
+                                            .font(.headline)
+                                            .italic(note.firstLine.isEmpty)
+                                            .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                                        Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .onLongPressGesture {
+                                    note.isPinned.toggle()
+                                    let impactMed = UIImpactFeedbackGenerator(style: .heavy)
+                                    impactMed.impactOccurred()
                                 }
                             }
-                            .onLongPressGesture {
-                                note.isPinned.toggle()
-                                let impactMed = UIImpactFeedbackGenerator(style: .heavy)
-                                impactMed.impactOccurred()
-                            }
+                            .onDelete(perform: deletePinnedNotes)
+                            .padding(.vertical, 4)
+                        } header: {
+                            Text("Pinned")
                         }
-                        .onDelete(perform: deletePinnedNotes)
-                        .padding(.vertical, 4)
-                    } header: {
-                        Text("Pinned")
                     }
 
-                    Section(isExpanded: $recentsExpanded) {
-                        ForEach(recentNotes) { note in
-                            NavigationLink(value: note) {
-                                VStack(alignment: .leading) {
-                                    Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
-                                        .font(.headline)
-                                        .italic(note.firstLine.isEmpty)
-                                        .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                    // note.createdAt is correct here. DO NOT use note.updatedAt
-                                    Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                    if !recentNotes.isEmpty {
+                        Section(isExpanded: $recentsExpanded) {
+                            ForEach(recentNotes) { note in
+                                NavigationLink(value: note) {
+                                    VStack(alignment: .leading) {
+                                        Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
+                                            .font(.headline)
+                                            .italic(note.firstLine.isEmpty)
+                                            .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                                        // note.createdAt is correct here. DO NOT use note.updatedAt
+                                        Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .onLongPressGesture {
+                                    note.isPinned.toggle()
+                                    let impactMed = UIImpactFeedbackGenerator(style: .heavy)
+                                    impactMed.impactOccurred()
                                 }
                             }
-                            .onLongPressGesture {
-                                note.isPinned.toggle()
-                                let impactMed = UIImpactFeedbackGenerator(style: .heavy)
-                                impactMed.impactOccurred()
-                            }
+                            .onDelete(perform: deleteRecentNotes)
+                            .padding(.vertical, 4)
+                        } header: {
+                            Text("Recents")
                         }
-                        .onDelete(perform: deleteRecentNotes)
-                        .padding(.vertical, 4)
-                    } header: {
-                        Text("Recent")
                     }
 
                     DisclosureGroup("History", isExpanded: $historyExpanded) {
