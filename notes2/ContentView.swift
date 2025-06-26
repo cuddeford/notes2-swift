@@ -107,7 +107,7 @@ struct ContentView: View {
                             .onDelete(perform: deletePinnedNotes)
                             .padding(.vertical, 4)
                         } header: {
-                            Text("Pinned")
+                            Label("Pinned", systemImage: "pin.fill")
                         }
                     }
 
@@ -119,7 +119,7 @@ struct ContentView: View {
                             .onDelete(perform: deleteRecentNotes)
                             .padding(.vertical, 4)
                         } header: {
-                            Text("Recents")
+                            Label("Recents", systemImage: "clock.fill")
                         }
                     }
 
@@ -147,6 +147,8 @@ struct ContentView: View {
                                 }
                             }
                         }
+                    } header: {
+                        Label("History", systemImage: "calendar")
                     }
                 }
                 .navigationTitle("Notes2")
