@@ -144,6 +144,10 @@ struct ContentView: View {
                         Label("History", systemImage: "calendar")
                     }
                 }
+                .animation(.default, value: pinnedExpanded)
+                .animation(.default, value: recentsExpanded)
+                .animation(.default, value: historyExpanded)
+                .animation(.default, value: historicalExpanded)
                 .navigationTitle("Notes2")
                 .navigationDestination(for: Note.self) { note in
                     NoteView(note: note)
