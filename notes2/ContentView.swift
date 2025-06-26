@@ -105,7 +105,7 @@ struct ContentView: View {
                     }
                     
                     ForEach(sortedDays, id: \.self) { day in
-                        Section(header: Text(formattedDate(day))) {
+                        Section {
                             ForEach(groupedNotes[day] ?? []) { note in
                                 NavigationLink(value: note) {
                                     VStack(alignment: .leading) {
@@ -120,6 +120,13 @@ struct ContentView: View {
                                 }
                             }
                             .padding(.vertical, 4)
+                        } header: {
+                            HStack {
+                                Text(formattedDate(day))
+                                Spacer()
+                                Text(relativeDate(day))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }.onDelete(perform: deleteNotes)
                 }
@@ -168,6 +175,29 @@ struct ContentView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: date)
+    }
+
+    func relativeDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "Today"
+        }
+        if calendar.isDateInYesterday(date) {
+            return "Yesterday"
+        }
+
+        let now = Date()
+        let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))!
+
+        if date >= startOfWeek {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
+            return formatter.string(from: date)
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
+            return "Last \(formatter.string(from: date))"
+        }
     }
 }
 
