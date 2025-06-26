@@ -160,7 +160,10 @@ struct ContentView: View {
                             context.insert(newNote)
                             path.append(newNote)
                         } label: {
-                            Image(systemName: "plus")
+                            HStack {
+                                Image(systemName: "plus")
+                                Text("New note")
+                            }
                         }
                     }
                 }
