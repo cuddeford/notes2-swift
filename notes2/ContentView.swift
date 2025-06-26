@@ -73,6 +73,14 @@ struct ContentView: View {
 
     @State private var path = NavigationPath()
     @State private var recentsExpanded = true
+    @State private var historicalExpanded: [Date: Bool] = [:]
+
+    private func binding(for day: Date) -> Binding<Bool> {
+        .init(
+            get: { self.historicalExpanded[day, default: true] },
+            set: { self.historicalExpanded[day] = $0 }
+        )
+    }
 
     var body: some View {
         let groupedNotes = Dictionary(grouping: notes) { note in
@@ -93,6 +101,7 @@ struct ContentView: View {
                                         .font(.headline)
                                         .italic(note.firstLine.isEmpty)
                                         .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                                    // note.createdAt is correct here. DO NOT use note.updatedAt
                                     Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -106,7 +115,7 @@ struct ContentView: View {
                     }
 
                     ForEach(sortedDays, id: \.self) { day in
-                        Section {
+                        Section(isExpanded: binding(for: day)) {
                             ForEach(groupedNotes[day] ?? []) { note in
                                 NavigationLink(value: note) {
                                     VStack(alignment: .leading) {
