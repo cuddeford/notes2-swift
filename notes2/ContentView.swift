@@ -99,6 +99,7 @@ struct ContentView: View {
                                 }
                             }
                         }
+                        .onDelete(perform: deleteRecentNotes)
                         .padding(.vertical, 4)
                     } header: {
                         Text("Recent")
@@ -166,6 +167,14 @@ struct ContentView: View {
     func deleteNotes(at offsets: IndexSet) {
         for index in offsets {
             let note = notes[index]
+            context.delete(note)
+        }
+    }
+
+    func deleteRecentNotes(at offsets: IndexSet) {
+        let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
+        for index in offsets {
+            let note = recentNotes[index]
             context.delete(note)
         }
     }
