@@ -19,22 +19,6 @@ struct EditorToolbar: View {
 
     var body: some View {
         HStack {
-            Button(action: {
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
-                withAnimation(.easeInOut) {
-                    isExpanded.toggle()
-                }
-            }) {
-                Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.up.circle.fill")
-                    .font(.title2)
-                    .padding(8)
-                    .background(
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                    )
-            }
-
             if isExpanded {
                 HStack {
                     Button(action: {
@@ -120,6 +104,22 @@ struct EditorToolbar: View {
                         .fill(.ultraThinMaterial)
                 )
                 .transition(.scale.combined(with: .opacity))
+            }
+
+            Button(action: {
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                withAnimation(.easeInOut) {
+                    isExpanded.toggle()
+                }
+            }) {
+                Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.left.circle.fill")
+                    .font(.title2)
+                    .padding(8)
+                    .background(
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                    )
             }
         }
         .padding(.horizontal)
