@@ -79,7 +79,7 @@ struct ContentView: View {
             Calendar.current.startOfDay(for: note.createdAt)
         }
         let sortedDays = groupedNotes.keys.sorted(by: >)
-        
+
         let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
 
         NavigationSplitView {
@@ -93,7 +93,7 @@ struct ContentView: View {
                                         .font(.headline)
                                         .italic(note.firstLine.isEmpty)
                                         .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                    Text("\(relativeDate(note.updatedAt)) at \(note.updatedAt, style: .time)")
+                                    Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -104,7 +104,7 @@ struct ContentView: View {
                     } header: {
                         Text("Recent")
                     }
-                    
+
                     ForEach(sortedDays, id: \.self) { day in
                         Section {
                             ForEach(groupedNotes[day] ?? []) { note in
