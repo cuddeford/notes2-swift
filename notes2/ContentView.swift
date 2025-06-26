@@ -68,14 +68,14 @@ extension Note {
 }
 
 struct ContentView: View {
-    @Query(sort: \Note.updatedAt, order: .reverse) var notes: [Note]
+    @Query(sort: \Note.createdAt, order: .reverse) var notes: [Note]
     @Environment(\.modelContext) private var context
 
     @State private var path = NavigationPath()
 
     var body: some View {
         let groupedNotes = Dictionary(grouping: notes) { note in
-            Calendar.current.startOfDay(for: note.updatedAt)
+            Calendar.current.startOfDay(for: note.createdAt)
         }
         let sortedDays = groupedNotes.keys.sorted(by: >)
 
@@ -91,7 +91,7 @@ struct ContentView: View {
                                             .font(.headline)
                                             .italic(note.firstLine.isEmpty)
                                             .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                        Text(note.updatedAt, style: .time)
+                                        Text(note.createdAt, style: .time)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
