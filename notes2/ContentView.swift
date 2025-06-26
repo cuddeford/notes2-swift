@@ -72,16 +72,38 @@ struct ContentView: View {
     @Environment(\.modelContext) private var context
 
     @State private var path = NavigationPath()
+    @State private var recentsExpanded = true
 
     var body: some View {
         let groupedNotes = Dictionary(grouping: notes) { note in
             Calendar.current.startOfDay(for: note.createdAt)
         }
         let sortedDays = groupedNotes.keys.sorted(by: >)
+        
+        let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
 
         NavigationSplitView {
             NavigationStack(path: $path) {
                 List {
+                    Section(isExpanded: $recentsExpanded) {
+                        ForEach(recentNotes) { note in
+                            NavigationLink(value: note) {
+                                VStack(alignment: .leading) {
+                                    Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
+                                        .font(.headline)
+                                        .italic(note.firstLine.isEmpty)
+                                        .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                                    Text(note.updatedAt, style: .time)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } header: {
+                        Text("Recent")
+                    }
+                    
                     ForEach(sortedDays, id: \.self) { day in
                         Section(header: Text(formattedDate(day))) {
                             ForEach(groupedNotes[day] ?? []) { note in
