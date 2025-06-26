@@ -102,7 +102,9 @@ struct ContentView: View {
                     if !pinnedNotes.isEmpty {
                         Section(isExpanded: $pinnedExpanded) {
                             ForEach(pinnedNotes) { note in
-                                NoteRow(note: note)
+                                NavigationLink(value: note) {
+                                    NoteRow(note: note)
+                                }
                             }
                             .onDelete(perform: deletePinnedNotes)
                         } header: {
@@ -113,7 +115,9 @@ struct ContentView: View {
                     if !recentNotes.isEmpty {
                         Section(isExpanded: $recentsExpanded) {
                             ForEach(recentNotes) { note in
-                                NoteRow(note: note)
+                                NavigationLink(value: note) {
+                                    NoteRow(note: note)
+                                }
                             }
                             .onDelete(perform: deleteRecentNotes)
                         } header: {
@@ -125,7 +129,9 @@ struct ContentView: View {
                         ForEach(sortedDays, id: \.self) { day in
                             Section(isExpanded: binding(for: day)) {
                                 ForEach(groupedNotes[day] ?? []) { note in
-                                    NoteRow(note: note)
+                                    NavigationLink(value: note) {
+                                        NoteRow(note: note)
+                                    }
                                 }
                                 .onDelete { indexSet in
                                     if let notesForDay = groupedNotes[day] {
