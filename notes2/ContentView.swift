@@ -78,6 +78,7 @@ struct ContentView: View {
     @AppStorage("historyExpanded") private var historyExpanded = true
     @AppStorage("pinnedExpanded") private var pinnedExpanded = true
     @State private var historicalExpanded: [String: Bool] = [:]
+    @State private var hasRestoredLastOpenedNote = false
 
     private func binding(for day: Date) -> Binding<Bool> {
         let key = ISO8601DateFormatter().string(from: day)
@@ -163,26 +164,25 @@ struct ContentView: View {
                         }
                     }
                 }
-                .onAppear {
-                    if let idString = UserDefaults.standard.string(
-                        forKey: "lastOpenedNoteID"
-                    ),
-                        let uuid = UUID(uuidString: idString),
-                        let note = notes.first(where: { $0.id == uuid })
-                    {
-                        path = NavigationPath()
-                        path.append(note)
-                    }
-
-                    if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
-                        if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
-                            self.historicalExpanded = decoded
-                        }
-                    }
-                }
                 .onChange(of: historicalExpanded) { oldValue, newValue in
                     if let encoded = try? JSONEncoder().encode(newValue) {
                         UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
+                    }
+                }
+            }
+            .task {
+                guard !hasRestoredLastOpenedNote else { return }
+                hasRestoredLastOpenedNote = true
+
+                if let idString = UserDefaults.standard.string(forKey: "lastOpenedNoteID"),
+                let uuid = UUID(uuidString: idString),
+                let note = notes.first(where: { $0.id == uuid }) {
+                    path.append(note)
+                }
+
+                if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
+                    if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
+                        self.historicalExpanded = decoded
                     }
                 }
             }
@@ -245,23 +245,13 @@ struct NoteView: View {
                 }
             }
         }
-        // .toolbar {
-        //     if keyboard.isKeyboardVisible {
-        //         ToolbarItem(placement: .navigationBarTrailing) {
-        //             Button(action: {
-        //                 // hide the keyboard
-        //                 UIApplication.shared.sendAction(
-        //                     #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil,
-        //                 )
-        //             }) {
-        //                 Text("Done")
-        //             }
-        //         }
-        //     }
-        // }
         .ignoresSafeArea()
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
+            UserDefaults.standard.set(note.id.uuidString, forKey: "lastOpenedNoteID")
+        }
+        .onDisappear {
+            UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
         }
     }
 }
