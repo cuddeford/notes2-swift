@@ -39,7 +39,7 @@ struct RightEdgeSwipeGesture: UIViewRepresentable {
 
             if gesture.state == .ended {
                 // Only trigger onEnded if the swipe was significant and to the left
-                if parent.translation.width < -50 {
+                if parent.translation.width < -100 {
                     parent.onEnded()
                 }
             }

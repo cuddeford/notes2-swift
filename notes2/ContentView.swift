@@ -288,7 +288,7 @@ struct NewNoteIndicatorView: View {
     @State private var lastWillCreateNote: Bool = false
 
     var body: some View {
-        let willCreateNote = translation.width < -50
+        let willCreateNote = translation.width < -100
         let backgroundColor = willCreateNote ? Color.green : Color.red
 
         GeometryReader { geometry in
@@ -300,7 +300,7 @@ struct NewNoteIndicatorView: View {
                 .cornerRadius(10)
                 .frame(maxWidth: .infinity, alignment: .trailing) // Push to the right
                 .offset(x: translation.width) // Keep X as is
-                .offset(y: location.y - geometry.size.height / 2) // Adjust Y using geometry.size.height
+                .offset(y: location.y - 500) // Adjust Y using geometry.size.height
                 .animation(.interactiveSpring(), value: translation)
                 .transition(.opacity)
                 .onChange(of: willCreateNote) { oldValue, newValue in
