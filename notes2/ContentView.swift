@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 @Model
 class Note: Identifiable, Hashable {
@@ -101,22 +102,7 @@ struct ContentView: View {
                     if !pinnedNotes.isEmpty {
                         Section(isExpanded: $pinnedExpanded) {
                             ForEach(pinnedNotes) { note in
-                                NavigationLink(value: note) {
-                                    VStack(alignment: .leading) {
-                                        Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
-                                            .font(.headline)
-                                            .italic(note.firstLine.isEmpty)
-                                            .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                        Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .onLongPressGesture {
-                                    note.isPinned.toggle()
-                                    let impactMed = UIImpactFeedbackGenerator(style: .heavy)
-                                    impactMed.impactOccurred()
-                                }
+                                NoteRow(note: note)
                             }
                             .onDelete(perform: deletePinnedNotes)
                             .padding(.vertical, 4)
@@ -128,23 +114,7 @@ struct ContentView: View {
                     if !recentNotes.isEmpty {
                         Section(isExpanded: $recentsExpanded) {
                             ForEach(recentNotes) { note in
-                                NavigationLink(value: note) {
-                                    VStack(alignment: .leading) {
-                                        Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
-                                            .font(.headline)
-                                            .italic(note.firstLine.isEmpty)
-                                            .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                        // note.createdAt is correct here. DO NOT use note.updatedAt
-                                        Text("\(relativeDate(note.createdAt)) at \(note.createdAt, style: .time)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .onLongPressGesture {
-                                    note.isPinned.toggle()
-                                    let impactMed = UIImpactFeedbackGenerator(style: .heavy)
-                                    impactMed.impactOccurred()
-                                }
+                                NoteRow(note: note)
                             }
                             .onDelete(perform: deleteRecentNotes)
                             .padding(.vertical, 4)
@@ -157,22 +127,7 @@ struct ContentView: View {
                         ForEach(sortedDays, id: \.self) { day in
                             Section(isExpanded: binding(for: day)) {
                                 ForEach(groupedNotes[day] ?? []) { note in
-                                    NavigationLink(value: note) {
-                                        VStack(alignment: .leading) {
-                                            Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
-                                                .font(.headline)
-                                                .italic(note.firstLine.isEmpty)
-                                                .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-                                            Text(note.createdAt, style: .time)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .onLongPressGesture {
-                                        note.isPinned.toggle()
-                                        let impactMed = UIImpactFeedbackGenerator(style: .heavy)
-                                        impactMed.impactOccurred()
-                                    }
+                                    NoteRow(note: note)
                                 }
                                 .onDelete { indexSet in
                                     if let notesForDay = groupedNotes[day] {
@@ -185,9 +140,9 @@ struct ContentView: View {
                                 .padding(.vertical, 4)
                             } header: {
                                 HStack {
-                                    Text(formattedDate(day))
+                                    Text(day.formattedDate())
                                     Spacer()
-                                    Text(relativeDate(day))
+                                    Text(day.relativeDate())
                                         .foregroundStyle(.secondary)
                                 }
                             }
@@ -251,36 +206,6 @@ struct ContentView: View {
         for index in offsets {
             let note = pinnedNotes[index]
             context.delete(note)
-        }
-    }
-
-    func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
-    }
-
-    func relativeDate(_ date: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            return "Today"
-        }
-        if calendar.isDateInYesterday(date) {
-            return "Yesterday"
-        }
-
-        let now = Date()
-        let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))!
-
-        if date >= startOfWeek {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEEE"
-            return formatter.string(from: date)
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEEE"
-            return "Last \(formatter.string(from: date))"
         }
     }
 }
