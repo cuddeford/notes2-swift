@@ -106,6 +106,8 @@ struct EditorToolbar: View {
                 .transition(.scale.combined(with: .opacity))
             }
 
+            Spacer() // Always present to push the toggle button to the right
+
             Button(action: {
                 let generator = UIImpactFeedbackGenerator(style: .light)
                 generator.impactOccurred()
