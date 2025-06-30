@@ -142,7 +142,7 @@ struct ContentView: View {
                     }
                 }
                 if isListDragging {
-                    LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation)
+                    LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: recentNotes.first?.firstLine ?? "untitled")
                 }
             }
             .gesture(

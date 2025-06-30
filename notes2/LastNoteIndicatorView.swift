@@ -11,6 +11,7 @@ import UIKit
 struct LastNoteIndicatorView: View {
     var translation: CGSize
     var location: CGPoint
+    var noteFirstLine: String
 
     @State private var lastWillCreateNote: Bool = false
 
@@ -24,7 +25,7 @@ struct LastNoteIndicatorView: View {
             .first?.windows
             .filter({$0.isKeyWindow}).first?.safeAreaInsets.top ?? 0
 
-        Text("Go to last edited note")
+        Text(noteFirstLine)
             .font(.headline)
             .padding()
             .background(backgroundColor)
