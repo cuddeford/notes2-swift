@@ -12,27 +12,20 @@ import UIKit
 
 @Model
 class Note: Identifiable, Hashable {
-    @Attribute(.unique) var id: UUID
-    var content: Data
-    var createdAt: Date
-    var updatedAt: Date
+    var id: UUID = UUID()
+    var content: Data = Data()
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
     var cursorLocation: Int = 0
     var isPinned: Bool = false
 
-    init(
-        id: UUID = UUID(),
-        content: Data = Data(),
-        createdAt: Date? = nil,
-        updatedAt: Date? = nil,
-        cursorLocation: Int = 0
-    ) {
+    init(id: UUID = UUID(), content: Data = Data(), createdAt: Date = Date(), updatedAt: Date = Date(), cursorLocation: Int = 0, isPinned: Bool = false) {
         self.id = id
         self.content = content
-
-        let now = Date()
-        self.createdAt = createdAt ?? now
-        self.updatedAt = updatedAt ?? now
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.cursorLocation = cursorLocation
+        self.isPinned = isPinned
     }
 
     static func == (lhs: Note, rhs: Note) -> Bool { lhs.id == rhs.id }
