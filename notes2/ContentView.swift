@@ -81,6 +81,10 @@ struct ContentView: View {
     @State private var historicalExpanded: [String: Bool] = [:]
     @State private var hasRestoredLastOpenedNote = false
 
+    @State private var listDragOffset: CGSize = .zero
+    @State private var listDragLocation: CGPoint = .zero
+    @State private var isListDragging = false
+
     private func binding(for day: Date) -> Binding<Bool> {
         let key = ISO8601DateFormatter().string(from: day)
         return .init(
@@ -99,102 +103,166 @@ struct ContentView: View {
         let pinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
 
         NavigationSplitView {
-            NavigationStack(path: $path) {
-                List {
-                    if !pinnedNotes.isEmpty {
-                        Section(isExpanded: $pinnedExpanded) {
-                            ForEach(pinnedNotes) { note in
-                                NavigationLink(value: note) {
-                                    NoteRow(note: note)
-                                }
-                            }
-                        } header: {
-                            Label("Pinned", systemImage: "pin.fill")
-                        }
-                    }
-
-                    if !recentNotes.isEmpty {
-                        Section(isExpanded: $recentsExpanded) {
-                            ForEach(recentNotes) { note in
-                                NavigationLink(value: note) {
-                                    NoteRow(note: note)
-                                }
-                            }
-                        } header: {
-                            Label("Recents", systemImage: "clock.fill")
-                        }
-                    }
-
-                    Section(isExpanded: $historyExpanded) {
-                        ForEach(sortedDays, id: \.self) { day in
-                            Section(isExpanded: binding(for: day)) {
-                                ForEach(groupedNotes[day] ?? []) { note in
+            ZStack {
+                NavigationStack(path: $path) {
+                    List {
+                        if !pinnedNotes.isEmpty {
+                            Section(isExpanded: $pinnedExpanded) {
+                                ForEach(pinnedNotes) { note in
                                     NavigationLink(value: note) {
                                         NoteRow(note: note)
                                     }
                                 }
                             } header: {
+                                Label("Pinned", systemImage: "pin.fill")
+                            }
+                        }
+
+                        if !recentNotes.isEmpty {
+                            Section(isExpanded: $recentsExpanded) {
+                                ForEach(recentNotes) { note in
+                                    NavigationLink(value: note) {
+                                        NoteRow(note: note)
+                                    }
+                                }
+                            } header: {
+                                Label("Recents", systemImage: "clock.fill")
+                            }
+                        }
+
+                        Section(isExpanded: $historyExpanded) {
+                            ForEach(sortedDays, id: \.self) { day in
+                                Section(isExpanded: binding(for: day)) {
+                                    ForEach(groupedNotes[day] ?? []) { note in
+                                        NavigationLink(value: note) {
+                                            NoteRow(note: note)
+                                        }
+                                    }
+                                } header: {
+                                    HStack {
+                                        Text(day.formattedDate())
+                                        Spacer()
+                                        Text(day.relativeDate())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        } header: {
+                            Label("History", systemImage: "calendar")
+                        }
+                    }
+                    .animation(.default, value: pinnedExpanded)
+                    .animation(.default, value: recentsExpanded)
+                    .animation(.default, value: historyExpanded)
+                    .animation(.default, value: historicalExpanded)
+                    .navigationTitle("Notes2")
+                    .navigationDestination(for: Note.self) { note in
+                        NoteView(note: note, path: $path)
+                            .environment(\.modelContext, context)
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button {
+                                let newNote = Note()
+                                context.insert(newNote)
+                                path.append(newNote)
+                            } label: {
                                 HStack {
-                                    Text(day.formattedDate())
-                                    Spacer()
-                                    Text(day.relativeDate())
-                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "plus")
+                                    Text("New note")
                                 }
                             }
                         }
-                    } header: {
-                        Label("History", systemImage: "calendar")
                     }
-                }
-                .animation(.default, value: pinnedExpanded)
-                .animation(.default, value: recentsExpanded)
-                .animation(.default, value: historyExpanded)
-                .animation(.default, value: historicalExpanded)
-                .navigationTitle("Notes2")
-                .navigationDestination(for: Note.self) { note in
-                    NoteView(note: note, path: $path)
-                        .environment(\.modelContext, context)
-                }
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            let newNote = Note()
-                            context.insert(newNote)
-                            path.append(newNote)
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus")
-                                Text("New note")
-                            }
+                    .onChange(of: historicalExpanded) { oldValue, newValue in
+                        if let encoded = try? JSONEncoder().encode(newValue) {
+                            UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
                         }
                     }
                 }
-                .onChange(of: historicalExpanded) { oldValue, newValue in
-                    if let encoded = try? JSONEncoder().encode(newValue) {
-                        UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
+                .task {
+                    guard !hasRestoredLastOpenedNote else { return }
+                    hasRestoredLastOpenedNote = true
+
+                    if let idString = UserDefaults.standard.string(forKey: "lastOpenedNoteID"),
+                       let uuid = UUID(uuidString: idString),
+                       let note = notes.first(where: { $0.id == uuid }) {
+                        path.append(note)
+                    }
+
+                    if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
+                        if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
+                            self.historicalExpanded = decoded
+                        }
                     }
                 }
-            }
-            .task {
-                guard !hasRestoredLastOpenedNote else { return }
-                hasRestoredLastOpenedNote = true
-
-                if let idString = UserDefaults.standard.string(forKey: "lastOpenedNoteID"),
-                let uuid = UUID(uuidString: idString),
-                let note = notes.first(where: { $0.id == uuid }) {
-                    path.append(note)
+                if isListDragging {
+                    LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation)
                 }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 25, coordinateSpace: .global)
+                    .onChanged { value in
+                        // Only activate if the drag starts from the right edge of the screen
+                        if value.startLocation.x > UIScreen.main.bounds.width - 50 {
+                            // Set the location first
+                            listDragOffset = value.translation
+                            listDragLocation = value.location
 
-                if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
-                    if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
-                        self.historicalExpanded = decoded
+                            // Then animate the appearance if it's not already visible
+                            if !isListDragging {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isListDragging = true
+                                }
+                            }
+                        }
                     }
-                }
-            }
+                    .onEnded { value in
+                        if isListDragging, value.translation.width < -100 { // Swipe left
+                            if let lastEdited = recentNotes.first {
+                                path.append(lastEdited)
+                            }
+                        }
+                        // Reset drag state
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isListDragging = false
+                        }
+                        listDragOffset = .zero
+                        listDragLocation = .zero
+                    }
+            )
         } detail: {
             Text("Select a note")
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+struct LastNoteIndicatorView: View {
+    var translation: CGSize
+    var location: CGPoint
+
+    @State private var lastWillCreateNote: Bool = false
+
+    var body: some View {
+        let willCreateNote = translation.width < -100
+        let backgroundColor = willCreateNote ? Color.green : Color.red
+
+        Text("Go to last edited note")
+            .font(.headline)
+            .padding()
+            .background(backgroundColor)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .position(x: UIScreen.main.bounds.width + translation.width - 100, y: location.y - 50)
+            .animation(.interactiveSpring(), value: translation)
+            .transition(.opacity)
+            .onChange(of: willCreateNote) { oldValue, newValue in
+                if oldValue != newValue {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                }
+            }
     }
 }
 
