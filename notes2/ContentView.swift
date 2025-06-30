@@ -209,9 +209,8 @@ struct NoteView: View {
     @StateObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
 
-    @State private var rightEdgeGestureState: UIGestureRecognizer.State = .possible
-    @State private var rightEdgeGestureTranslation: CGSize = .zero
-    @State private var rightEdgeGestureLocation: CGPoint = .zero
+    @State private var dragOffset: CGSize = .zero
+    @State private var dragStartLocation: CGPoint = .zero
 
     init(note: Note, path: Binding<NavigationPath>) {
         self._path = path
@@ -244,7 +243,7 @@ struct NoteView: View {
                     }
 
                     // focus the editor
-                    // coordinator.textView?.becomeFirstResponder()
+                    coordinator.textView?.becomeFirstResponder()
                 },
             )
             .onChange(of: noteText) { oldValue, newValue in
@@ -256,6 +255,38 @@ struct NoteView: View {
                     note.updatedAt = Date()
                 }
             }
+
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: 50, height: geometry.size.height) // Only 50 points from the right edge
+                    .contentShape(Rectangle()) // Make the clear rectangle tappable
+                    .offset(x: geometry.size.width - 50) // Position it on the right edge
+                    .gesture(
+                        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+                            .onChanged { value in
+                                dragOffset = value.translation
+                                dragStartLocation = value.startLocation
+                            }
+                            .onEnded { value in
+                                if value.translation.width < -100 { // Swipe left
+                                    let newNote = Note()
+                                    context.insert(newNote)
+
+                                    $path.wrappedValue.removeLast()
+                                    DispatchQueue.main.async {
+                                        $path.wrappedValue.append(newNote)
+                                    }
+                                }
+                                dragOffset = .zero // Reset offset
+                                dragStartLocation = .zero // Reset location
+                            }
+                    )
+            }
+
+            if dragOffset != .zero {
+                NewNoteIndicatorView(translation: dragOffset, location: dragStartLocation)
+            }
         }
         .ignoresSafeArea()
         .toolbar(.hidden, for: .navigationBar)
@@ -265,18 +296,10 @@ struct NoteView: View {
         .onDisappear {
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
         }
-        .onRightEdgeSwipe(gestureState: $rightEdgeGestureState, translation: $rightEdgeGestureTranslation, location: $rightEdgeGestureLocation) {
-            let newNote = Note()
-            context.insert(newNote)
 
-            $path.wrappedValue.removeLast()
-            DispatchQueue.main.async {
-                $path.wrappedValue.append(newNote)
-            }
-        }
 
-        if rightEdgeGestureState == .changed || rightEdgeGestureState == .began {
-            NewNoteIndicatorView(translation: rightEdgeGestureTranslation, location: rightEdgeGestureLocation)
+        if dragOffset != .zero {
+            NewNoteIndicatorView(translation: dragOffset, location: dragStartLocation)
         }
     }
 }
