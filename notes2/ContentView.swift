@@ -248,13 +248,19 @@ struct LastNoteIndicatorView: View {
         let willCreateNote = translation.width < -100
         let backgroundColor = willCreateNote ? Color.green : Color.red
 
+        let topInset = UIApplication.shared.connectedScenes
+            .filter({$0.activationState == .foregroundActive})
+            .compactMap({$0 as? UIWindowScene})
+            .first?.windows
+            .filter({$0.isKeyWindow}).first?.safeAreaInsets.top ?? 0
+
         Text("Go to last edited note")
             .font(.headline)
             .padding()
             .background(backgroundColor)
             .foregroundColor(.white)
             .cornerRadius(10)
-            .position(x: UIScreen.main.bounds.width + translation.width - 100, y: location.y - 50)
+            .position(x: UIScreen.main.bounds.width + translation.width - 60, y: location.y - 150 - topInset)
             .animation(.interactiveSpring(), value: translation)
             .transition(.opacity)
             .onChange(of: willCreateNote) { oldValue, newValue in
@@ -337,7 +343,7 @@ struct NoteView: View {
                         // Set the location first
                         dragOffset = value.translation
                         dragLocation = value.location
-                        
+
                         // Then animate the appearance if it's not already visible
                         if !isDragging {
                             withAnimation(.easeInOut(duration: 0.2)) {
