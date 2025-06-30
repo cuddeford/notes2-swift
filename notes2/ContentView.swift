@@ -67,12 +67,12 @@ struct ContentView: View {
     @Query(sort: \Note.createdAt, order: .reverse) var notes: [Note]
     @Environment(\.modelContext) private var context
 
-    @State private var path = NavigationPath()
     @AppStorage("recentsExpanded") private var recentsExpanded = true
     @AppStorage("historyExpanded") private var historyExpanded = true
     @AppStorage("pinnedExpanded") private var pinnedExpanded = true
     @State private var historicalExpanded: [String: Bool] = [:]
     @State private var hasRestoredLastOpenedNote = false
+    @State private var selectedNoteID: UUID?
 
     @State private var listDragOffset: CGSize = .zero
     @State private var listDragLocation: CGPoint = .zero
@@ -95,16 +95,17 @@ struct ContentView: View {
         let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
         let pinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
 
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             ZStack {
-                NavigationStack(path: $path) {
-                    List {
+                NavigationStack {
+                    List(selection: $selectedNoteID) {
                         if !pinnedNotes.isEmpty {
                             Section(isExpanded: $pinnedExpanded) {
                                 ForEach(pinnedNotes) { note in
-                                    NavigationLink(value: note) {
+                                    NavigationLink(value: note.id) {
                                         NoteRow(note: note)
                                     }
+                                    .tag(note.id)
                                 }
                             } header: {
                                 Label("Pinned", systemImage: "pin.fill")
@@ -114,9 +115,10 @@ struct ContentView: View {
                         if !recentNotes.isEmpty {
                             Section(isExpanded: $recentsExpanded) {
                                 ForEach(recentNotes) { note in
-                                    NavigationLink(value: note) {
+                                    NavigationLink(value: note.id) {
                                         NoteRow(note: note)
                                     }
+                                    .tag(note.id)
                                 }
                             } header: {
                                 Label("Recents", systemImage: "clock.fill")
@@ -127,10 +129,11 @@ struct ContentView: View {
                             ForEach(sortedDays, id: \.self) { day in
                                 Section(isExpanded: binding(for: day)) {
                                     ForEach(groupedNotes[day] ?? []) { note in
-                                        NavigationLink(value: note) {
-                                            NoteRow(note: note)
-                                        }
+                                    NavigationLink(value: note.id) {
+                                        NoteRow(note: note)
                                     }
+                                    .tag(note.id)
+                                }
                                 } header: {
                                     HStack {
                                         Text(day.formattedDate())
@@ -149,16 +152,18 @@ struct ContentView: View {
                     .animation(.default, value: historyExpanded)
                     .animation(.default, value: historicalExpanded)
                     .navigationTitle("Notes2")
-                    .navigationDestination(for: Note.self) { note in
-                        NoteView(note: note, path: $path)
-                            .environment(\.modelContext, context)
+                    .navigationDestination(for: UUID.self) { noteID in
+                        if let note = notes.first(where: { $0.id == noteID }) {
+                            NoteView(note: note, selectedNoteID: $selectedNoteID)
+                                .environment(\.modelContext, context)
+                        }
                     }
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
                                 let newNote = Note()
                                 context.insert(newNote)
-                                path.append(newNote)
+                                selectedNoteID = newNote.id
                             } label: {
                                 HStack {
                                     Image(systemName: "plus")
@@ -180,7 +185,7 @@ struct ContentView: View {
                     if let idString = UserDefaults.standard.string(forKey: "lastOpenedNoteID"),
                        let uuid = UUID(uuidString: idString),
                        let note = notes.first(where: { $0.id == uuid }) {
-                        path.append(note)
+                        selectedNoteID = note.id
                     }
 
                     if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
@@ -213,7 +218,7 @@ struct ContentView: View {
                     .onEnded { value in
                         if isListDragging, value.translation.width < -100 { // Swipe left
                             if let lastEdited = recentNotes.first {
-                                path.append(lastEdited)
+                                selectedNoteID = lastEdited.id
                             }
                         }
                         // Reset drag state
@@ -225,8 +230,15 @@ struct ContentView: View {
                     }
             )
         } detail: {
-            Text("Select a note")
-                .foregroundStyle(.secondary)
+            if let selectedNoteID {
+                if let note = notes.first(where: { $0.id == selectedNoteID }) {
+                    NoteView(note: note, selectedNoteID: $selectedNoteID)
+                        .environment(\.modelContext, context)
+                }
+            } else {
+                Text("Select a note")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -267,7 +279,7 @@ struct LastNoteIndicatorView: View {
 
 struct NoteView: View {
     @Bindable var note: Note
-    @Binding var path: NavigationPath
+    @Binding var selectedNoteID: UUID?
     @Environment(\.modelContext) private var context: ModelContext
 
     @State private var noteText: NSAttributedString
@@ -280,8 +292,8 @@ struct NoteView: View {
     @State private var dragLocation: CGPoint = .zero
     @State private var isDragging = false
 
-    init(note: Note, path: Binding<NavigationPath>) {
-        self._path = path
+    init(note: Note, selectedNoteID: Binding<UUID?>) {
+        self._selectedNoteID = selectedNoteID
         self._note = Bindable(wrappedValue: note)
 
         if let attr = try? NSAttributedString(
@@ -349,10 +361,9 @@ struct NoteView: View {
                     if isDragging, value.translation.width < -100 { // Swipe left
                         let newNote = Note()
                         context.insert(newNote)
-
-                        $path.wrappedValue.removeLast()
+                        selectedNoteID = nil
                         DispatchQueue.main.async {
-                            $path.wrappedValue.append(newNote)
+                            selectedNoteID = newNote.id
                         }
                     }
                     // Reset drag state
@@ -364,7 +375,7 @@ struct NoteView: View {
                 }
         )
         .ignoresSafeArea()
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(UIDevice.current.userInterfaceIdiom == .phone ? .hidden : .visible, for: .navigationBar)
         .onAppear {
             UserDefaults.standard.set(note.id.uuidString, forKey: "lastOpenedNoteID")
         }
