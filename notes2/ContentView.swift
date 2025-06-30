@@ -210,7 +210,8 @@ struct NoteView: View {
     @StateObject var settings = AppSettings.shared
 
     @State private var dragOffset: CGSize = .zero
-    @State private var dragStartLocation: CGPoint = .zero
+    @State private var dragLocation: CGPoint = .zero
+    @State private var isDragging = false
 
     init(note: Note, path: Binding<NavigationPath>) {
         self._path = path
@@ -256,38 +257,45 @@ struct NoteView: View {
                 }
             }
 
-            GeometryReader { geometry in
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 50, height: geometry.size.height) // Only 50 points from the right edge
-                    .contentShape(Rectangle()) // Make the clear rectangle tappable
-                    .offset(x: geometry.size.width - 50) // Position it on the right edge
-                    .gesture(
-                        DragGesture(minimumDistance: 10, coordinateSpace: .local)
-                            .onChanged { value in
-                                dragOffset = value.translation
-                                dragStartLocation = value.startLocation
-                            }
-                            .onEnded { value in
-                                if value.translation.width < -100 { // Swipe left
-                                    let newNote = Note()
-                                    context.insert(newNote)
-
-                                    $path.wrappedValue.removeLast()
-                                    DispatchQueue.main.async {
-                                        $path.wrappedValue.append(newNote)
-                                    }
-                                }
-                                dragOffset = .zero // Reset offset
-                                dragStartLocation = .zero // Reset location
-                            }
-                    )
-            }
-
-            if dragOffset != .zero {
-                NewNoteIndicatorView(translation: dragOffset, location: dragStartLocation)
+            if isDragging {
+                NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
             }
         }
+        .gesture(
+            DragGesture(minimumDistance: 25, coordinateSpace: .global)
+                .onChanged { value in
+                    // Only activate if the drag starts from the right edge of the screen
+                    if value.startLocation.x > UIScreen.main.bounds.width - 50 {
+                        // Set the location first
+                        dragOffset = value.translation
+                        dragLocation = value.location
+                        
+                        // Then animate the appearance if it's not already visible
+                        if !isDragging {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isDragging = true
+                            }
+                        }
+                    }
+                }
+                .onEnded { value in
+                    if isDragging, value.translation.width < -100 { // Swipe left
+                        let newNote = Note()
+                        context.insert(newNote)
+
+                        $path.wrappedValue.removeLast()
+                        DispatchQueue.main.async {
+                            $path.wrappedValue.append(newNote)
+                        }
+                    }
+                    // Reset drag state
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isDragging = false
+                    }
+                    dragOffset = .zero
+                    dragLocation = .zero
+                }
+        )
         .ignoresSafeArea()
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
@@ -295,11 +303,6 @@ struct NoteView: View {
         }
         .onDisappear {
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
-        }
-
-
-        if dragOffset != .zero {
-            NewNoteIndicatorView(translation: dragOffset, location: dragStartLocation)
         }
     }
 }
@@ -314,25 +317,21 @@ struct NewNoteIndicatorView: View {
         let willCreateNote = translation.width < -100
         let backgroundColor = willCreateNote ? Color.green : Color.red
 
-        GeometryReader { geometry in
-            Text("New Note")
-                .font(.headline)
-                .padding()
-                .background(backgroundColor)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-                .frame(maxWidth: .infinity, alignment: .trailing) // Push to the right
-                .offset(x: translation.width) // Keep X as is
-                .offset(y: location.y - 500) // Adjust Y using geometry.size.height
-                .animation(.interactiveSpring(), value: translation)
-                .transition(.opacity)
-                .onChange(of: willCreateNote) { oldValue, newValue in
-                    if oldValue != newValue {
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
-                    }
+        Text("New Note")
+            .font(.headline)
+            .padding()
+            .background(backgroundColor)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .position(x: UIScreen.main.bounds.width + translation.width - 60, y: location.y - 50)
+            .animation(.interactiveSpring(), value: translation)
+            .transition(.opacity)
+            .onChange(of: willCreateNote) { oldValue, newValue in
+                if oldValue != newValue {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
                 }
-        }
+            }
     }
 }
 
