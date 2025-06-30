@@ -41,7 +41,13 @@ extension Note {
         ) {
             let plain = attr.string.trimmingCharacters(in: .whitespacesAndNewlines)
             if let firstLine = plain.components(separatedBy: .newlines).first {
-                return firstLine.isEmpty ? "" : firstLine
+                let trimmedLine = firstLine.trimmingCharacters(in: .whitespaces)
+                let maxLength = 70
+                if trimmedLine.count > maxLength {
+                    return String(trimmedLine.prefix(maxLength - 3)) + "..."
+                } else {
+                    return trimmedLine.isEmpty ? "" : trimmedLine
+                }
             }
         }
 
