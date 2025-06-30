@@ -322,8 +322,11 @@ struct NoteView: View {
                         coordinator.toggleAttribute(.title1)
                     }
 
-                    // focus the editor
-                    coordinator.textView?.becomeFirstResponder()
+                    editorCoordinator?.textView?.becomeFirstResponder()
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        editorCoordinator?.textView?.becomeFirstResponder()
+                    }
                 },
             )
             .onChange(of: noteText) { oldValue, newValue in
