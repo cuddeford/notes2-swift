@@ -11,7 +11,7 @@ This is a simple, distraction-free notes app for iOS and iPadOS, written in Swif
 *   **`ContentView.swift`**: The main view of the app. It displays a list of notes, grouped by creation date (Today, Yesterday, etc.), and provides navigation to individual note views. It also features sections for "Pinned" and "Recent" notes. It handles the "Go to Last Edited Note" swipe gesture.
 *   **`Note.swift` (`@Model`)**: The SwiftData model for a single note. It includes properties for the note's content (stored as RTFD data), creation/update timestamps, cursor position, and a flag for pinning. The `firstLine` computed property now truncates the string to 60 characters and appends "..." if it's longer. This file was extracted from `ContentView.swift`.
 *   **`NoteView.swift`**: The view for editing a single note. It uses a `RichTextEditor` to allow for formatted text. It also handles the "New Note" swipe gesture. This file was extracted from `ContentView.swift`.
-*   **`RichTextEditor.swift`**: A `UIViewRepresentable` that wraps a `UITextView` to provide a rich text editing experience within SwiftUI. It handles text styling (bold, italic, underline, headings), and manages the keyboard and cursor. It now accepts an `initialFocus` parameter to control whether the editor should become first responder on appearance.
+*   **`RichTextEditor.swift`**: A `UIViewRepresentable` that wraps a `UITextView` to provide a rich text editing experience within SwiftUI. It handles text styling (bold, italic, underline, headings), manages the keyboard and cursor, and implements typewriter scrolling to keep the current line of text in focus.
 *   **`EditorToolbar.swift`**: A SwiftUI view that provides a toolbar with buttons for text formatting. It's displayed above the keyboard when editing a note.
 *   **`NoteRow.swift`**: A SwiftUI view that displays a single note in the main list, showing the first line of the note and its creation date. It also handles swipe actions for pinning and deleting notes.
 *   **`KeyboardObserver.swift`**: A helper class that observes keyboard visibility and height changes, allowing the UI to adjust accordingly.
@@ -26,6 +26,7 @@ This is a simple, distraction-free notes app for iOS and iPadOS, written in Swif
 ### Key Features
 
 *   **Rich Text Editing**: Users can format their notes with bold, italic, underline, and different heading styles.
+*   **Typewriter Mode**: Keeps the current line of text in a comfortable reading position while typing.
 *   **Note Organization**: Notes are automatically grouped by date.
 *   **Pinned Notes**: Users can pin important notes to the top of the list.
 *   **Recent Notes**: The two most recently updated notes are shown in a dedicated "Recents" section.

@@ -75,6 +75,7 @@ struct RichTextEditor: UIViewRepresentable {
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
                 self.parent.text = textView.attributedText
+                self.centerCursorInTextView()
             }
         }
 
@@ -85,6 +86,7 @@ struct RichTextEditor: UIViewRepresentable {
                 if textView.selectedRange.length == 0 {
                     self.parent.note.cursorLocation = textView.selectedRange.location
                 }
+                self.centerCursorInTextView()
             }
         }
 
@@ -98,23 +100,48 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func centerCursorInTextView() {
-            return
-
-            guard let textView = textView else { return }
-            guard let selectedTextRange = textView.selectedTextRange else { return }
+            guard let textView = textView, let selectedTextRange = textView.selectedTextRange, textView.hasText else { return }
 
             let caretRect = textView.caretRect(for: selectedTextRange.end)
-            let visibleHeight = textView.bounds.height - textView.contentInset.top - textView.contentInset.bottom
-            let targetOffsetY = caretRect.midY - visibleHeight * 0.75
+            // A caret rect can be infinite if the view is not yet in the hierarchy or has zero size.
+            if caretRect.isInfinite || caretRect.isNull { return }
 
-            let maxOffsetY = textView.contentSize.height - visibleHeight
-            let minOffsetY: CGFloat = 0
-            let finalOffsetY = max(minOffsetY, min(targetOffsetY, maxOffsetY))
+            // The visible portion of the text view, excluding insets
+            let visibleHeight = textView.bounds.height - textView.textContainerInset.top - textView.textContainerInset.bottom
+            if visibleHeight <= 0 { return }
 
-            // Only scroll if the offset is significantly different (e.g., > 2 points)
-            if abs(textView.contentOffset.y - finalOffsetY) > 5 {
-                print("RE-CENTERING!")
-                textView.setContentOffset(CGPoint(x: 0, y: finalOffsetY), animated: true)
+            // The Y position of the caret relative to the top of the entire content
+            let caretY = caretRect.midY
+
+            // The Y position of the top of the visible text area, relative to the content.
+            let visibleTopY = textView.contentOffset.y
+
+            // The caret's position relative to the visible frame (ignoring insets for a moment)
+            let caretYInFrame = caretY - visibleTopY
+
+            // The "activation point" for typewriter scrolling
+            // This point is relative to the frame's top.
+            let activationPoint = textView.textContainerInset.top + (visibleHeight)
+
+            // Only scroll if the caret has moved past the activation point
+            if caretYInFrame > activationPoint {
+                // We want to scroll the text view so that the caret is positioned AT the activation point.
+                // The amount to scroll is the difference between the caret's current position and where we want it to be.
+                let scrollAmount = caretYInFrame - activationPoint
+                let newContentOffsetY = textView.contentOffset.y + scrollAmount
+
+                // Clamp to valid range
+                let maxOffsetY = textView.contentSize.height - textView.bounds.height + textView.textContainerInset.bottom
+                let minOffsetY = -textView.textContainerInset.top
+                let finalOffsetY = max(minOffsetY, min(newContentOffsetY, maxOffsetY))
+
+                // Only animate if the change is non-trivial
+                if abs(textView.contentOffset.y - finalOffsetY) > 1 {
+                    // Using a very short animation avoids a jarring jump but is faster than the default.
+                    UIView.animate(withDuration: 0.1, delay: 0, options: .curveEaseOut, animations: {
+                        textView.setContentOffset(CGPoint(x: 0, y: finalOffsetY), animated: false)
+                    }, completion: nil)
+                }
             }
         }
 
@@ -263,7 +290,7 @@ struct RichTextEditor: UIViewRepresentable {
         textView.textContainerInset = UIEdgeInsets(
             top: settings.padding,
             left: settings.padding,
-            bottom: 200,
+            bottom: settings.padding,
             right: settings.padding
         )
         textView.keyboardDismissMode = .interactive
@@ -325,27 +352,47 @@ struct RichTextEditor: UIViewRepresentable {
             hostingController.view.setNeedsLayout()
         }
 
-        // Automatically adjust the text container inset based on keyboard height
+        // --- Typewriter Scrolling Insets ---
         let baseInset: CGFloat = settings.padding
-        let extraWhitespace: CGFloat = 200
         let keyboardHeight = keyboard.keyboardHeight
 
-        let bottomInset: CGFloat
+        // Adjust contentInset to make space for the keyboard and typewriter effect
+        let bottomContentInset: CGFloat
         if keyboardHeight > 0 {
-            bottomInset = keyboardHeight + baseInset
+            // When the keyboard is visible, the bottom inset should be large enough to allow
+            // scrolling the text way up, leaving a large blank area below.
+            // This makes it feel like the text view is scrolling "over" the keyboard.
+            bottomContentInset = keyboardHeight - uiView.safeAreaInsets.bottom + baseInset
         } else {
-            bottomInset = extraWhitespace
+            // When the keyboard is hidden, we don't need a huge inset.
+            bottomContentInset = baseInset
         }
 
-        if uiView.textContainerInset.bottom != bottomInset {
-            UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseInOut]) {
-                uiView.textContainerInset = UIEdgeInsets(
-                    top: baseInset,
-                    left: baseInset,
-                    bottom: bottomInset,
-                    right: baseInset,
-                )
-            }
+        let newContentInsets = UIEdgeInsets(
+            top: 0,
+            left: 0,
+            bottom: bottomContentInset,
+            right: 0
+        )
+
+        if uiView.contentInset != newContentInsets {
+            uiView.contentInset = newContentInsets
+            // Also adjust the scroll indicators to match
+            uiView.scrollIndicatorInsets = newContentInsets
         }
+
+        // Adjust textContainerInset for visual padding around the text itself.
+        // This is kept constant whether the keyboard is visible or not.
+        // let newTextContainerInsets = UIEdgeInsets(
+        //     top: baseInset,
+        //     left: baseInset,
+        //     bottom: baseInset,
+        //     right: baseInset
+        // )
+
+        // if uiView.textContainerInset != newTextContainerInsets {
+        //     uiView.textContainerInset = newTextContainerInsets
+        // }
+        // --- End Typewriter Scrolling Insets ---
     }
 }
