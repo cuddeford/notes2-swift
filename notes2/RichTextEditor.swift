@@ -69,6 +69,9 @@ struct RichTextEditor: UIViewRepresentable {
         var toolbarHostingController: UIHostingController<EditorToolbar>?
         private var initialSpacing: CGFloat?
         private var affectedParagraphRange: NSRange?
+        private let hapticGenerator = UIImpactFeedbackGenerator(style: .light)
+        private let spacingDetents: [CGFloat] = [2, 4, 8, 12, 18, 24, 36, 48, 60, 72]
+        private var lastDetentIndex: Int = -1
 
         init(_ parent: RichTextEditor) {
             self.parent = parent
@@ -89,27 +92,43 @@ struct RichTextEditor: UIViewRepresentable {
                     if let paragraphStyle = currentAttributes[.paragraphStyle] as? NSParagraphStyle {
                         self.initialSpacing = paragraphStyle.paragraphSpacing
                     } else {
-                        self.initialSpacing = parent.settings.paragraphSpacing // Default
+                        self.initialSpacing = parent.settings.defaultParagraphSpacing // Default
                     }
                 }
-                gesture.scale = 1.0 // Reset scale
+                gesture.scale = 1.0
+                hapticGenerator.prepare()
+
             } else if gesture.state == .changed {
                 guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
 
-                let newSpacing = max(0, min(100, initialSpacing * gesture.scale))
+                // Calculate a target spacing based on the gesture's scale
+                let targetSpacing = initialSpacing * gesture.scale
 
+                // Find the detent closest to the target spacing
+                guard let closestDetent = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) else { return }
+
+                // Get the current paragraph style
                 let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
-                let paragraphStyle = (mutableText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+                let currentParagraphStyle = (mutableText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle)
 
-                paragraphStyle.paragraphSpacing = newSpacing
-                mutableText.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
+                // Only update and fire haptics if the detent has changed
+                if currentParagraphStyle?.paragraphSpacing != closestDetent {
+                    print("Paragraph spacing: \(closestDetent)")
 
-                // To avoid a jumpy update, we update the text view's storage directly
-                // and then sync it back to the binding in the .ended state.
-                textView.textStorage.beginEditing()
-                textView.textStorage.setAttributedString(mutableText)
-                textView.textStorage.endEditing()
+                    let newParagraphStyle = (currentParagraphStyle?.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+                    newParagraphStyle.paragraphSpacing = closestDetent
 
+                    // Animate the change
+                    UIView.animate(withDuration: 0.1) {
+                        textView.textStorage.beginEditing()
+                        textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+                        textView.textStorage.endEditing()
+                    }
+
+                    // Fire haptic feedback
+                    hapticGenerator.impactOccurred()
+                    hapticGenerator.prepare()
+                }
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
                 // Update the binding
@@ -347,7 +366,7 @@ struct RichTextEditor: UIViewRepresentable {
         textView.allowsEditingTextAttributes = true
 
         let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.paragraphSpacing = settings.paragraphSpacing
+        paragraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
         // --- Add the SwiftUI toolbar as inputAccessoryView ---
@@ -378,7 +397,7 @@ struct RichTextEditor: UIViewRepresentable {
         if uiView.attributedText != text {
             let mutable = NSMutableAttributedString(attributedString: text)
             let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.paragraphSpacing = settings.paragraphSpacing
+            paragraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
             mutable.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: mutable.length))
             uiView.attributedText = mutable
         }
