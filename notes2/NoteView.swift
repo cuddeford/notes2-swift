@@ -79,8 +79,9 @@ struct NoteView: View {
                     let paragraph = paragraphs[index]
                     Rectangle()
                         .fill(Color.gray.opacity(0.2)) // Light grey background
+                        .cornerRadius(10)
                         .frame(width: textViewWidth - textContainerInset.left - textContainerInset.right, height: paragraph.height)
-                        .offset(x: paragraph.screenPosition.x + textContainerInset.left, y: paragraph.screenPosition.y - contentOffset.y + textContainerInset.top)
+                        .offset(x: paragraph.screenPosition.x, y: paragraph.screenPosition.y)
                 }
             }
             
