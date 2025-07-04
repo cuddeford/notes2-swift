@@ -111,6 +111,8 @@ struct RichTextEditor: UIViewRepresentable {
         textView.addGestureRecognizer(pinchGesture)
 
         context.coordinator.textView = textView
+        context.coordinator.textContainerInset = textView.textContainerInset
+        context.coordinator.textViewWidth = textView.bounds.width
         DispatchQueue.main.async { // Ensure UI updates happen on the main thread
             textView.becomeFirstResponder()
         }
@@ -172,6 +174,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Also adjust the scroll indicators to match
             uiView.scrollIndicatorInsets = newContentInsets
         }
+        context.coordinator.textViewWidth = uiView.bounds.width
     }
 
     func makeCoordinator() -> Coordinator {
@@ -192,6 +195,9 @@ struct RichTextEditor: UIViewRepresentable {
         private var lastDetentIndex: Int = -1
 
         @Published var paragraphs: [Paragraph] = []
+        @Published var textContainerInset: UIEdgeInsets = .zero
+        @Published var contentOffset: CGPoint = .zero
+        @Published var textViewWidth: CGFloat = 0
 
         init(_ parent: RichTextEditor) {
             self.parent = parent
@@ -226,7 +232,7 @@ struct RichTextEditor: UIViewRepresentable {
                 let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
                 paragraph.height = rect.height
                 paragraph.numberOfLines = Int(rect.height / textView.font!.lineHeight) // Approximation
-                paragraph.screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y - textView.contentOffset.y)
+                paragraph.screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y)
 
                 updatedParagraphs.append(paragraph)
             }
@@ -235,6 +241,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             updateParagraphSpatialProperties()
+            self.contentOffset = scrollView.contentOffset
         }
 
         private func reconstructAttributedText() -> NSAttributedString {

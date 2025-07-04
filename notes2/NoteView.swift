@@ -42,7 +42,7 @@ struct NoteView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             RichTextEditor(
                 text: $noteText,
                 selectedRange: $selectedRange,
@@ -69,8 +69,19 @@ struct NoteView: View {
             }
             .onChange(of: editorCoordinator?.paragraphs) { oldParagraphs, newParagraphs in
                 // Handle changes in paragraphs, e.g., update UI based on spatial properties
-                print("Paragraphs changed: \(newParagraphs?.count ?? 0) paragraphs")
+                // print("Paragraphs changed: \(newParagraphs?.count ?? 0) paragraphs")
                 // You can now access newParagraphs[i].height, newParagraphs[i].screenPosition, etc.
+            }
+
+            // Overlay for paragraph backgrounds
+            if let paragraphs = editorCoordinator?.paragraphs, let textContainerInset = editorCoordinator?.textContainerInset, let contentOffset = editorCoordinator?.contentOffset, let textViewWidth = editorCoordinator?.textViewWidth {
+                ForEach(paragraphs.indices, id: \.self) { index in
+                    let paragraph = paragraphs[index]
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2)) // Light grey background
+                        .frame(width: textViewWidth - textContainerInset.left - textContainerInset.right, height: paragraph.height)
+                        .offset(x: paragraph.screenPosition.x + textContainerInset.left, y: paragraph.screenPosition.y - contentOffset.y + textContainerInset.top)
+                }
             }
             
 
