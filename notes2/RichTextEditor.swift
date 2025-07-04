@@ -67,9 +67,57 @@ struct RichTextEditor: UIViewRepresentable {
         weak var textView: UITextView?
         private var debounceWorkItem: DispatchWorkItem?
         var toolbarHostingController: UIHostingController<EditorToolbar>?
+        private var initialSpacing: CGFloat?
+        private var affectedParagraphRange: NSRange?
 
         init(_ parent: RichTextEditor) {
             self.parent = parent
+        }
+
+        @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
+            guard let textView = textView else { return }
+
+            if gesture.state == .began {
+                let location = gesture.location(in: textView)
+                let characterIndex = textView.layoutManager.characterIndex(for: location, in: textView.textContainer, fractionOfDistanceBetweenInsertionPoints: nil)
+
+                if characterIndex < textView.textStorage.length {
+                    let range = paragraphRange(for: textView.attributedText, at: characterIndex)
+                    self.affectedParagraphRange = range
+
+                    let currentAttributes = textView.attributedText.attributes(at: range.location, effectiveRange: nil)
+                    if let paragraphStyle = currentAttributes[.paragraphStyle] as? NSParagraphStyle {
+                        self.initialSpacing = paragraphStyle.paragraphSpacing
+                    } else {
+                        self.initialSpacing = parent.settings.paragraphSpacing // Default
+                    }
+                }
+                gesture.scale = 1.0 // Reset scale
+            } else if gesture.state == .changed {
+                guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
+
+                let newSpacing = max(0, min(100, initialSpacing * gesture.scale))
+
+                let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
+                let paragraphStyle = (mutableText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+
+                paragraphStyle.paragraphSpacing = newSpacing
+                mutableText.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
+
+                // To avoid a jumpy update, we update the text view's storage directly
+                // and then sync it back to the binding in the .ended state.
+                textView.textStorage.beginEditing()
+                textView.textStorage.setAttributedString(mutableText)
+                textView.textStorage.endEditing()
+
+
+            } else if gesture.state == .ended || gesture.state == .cancelled {
+                // Update the binding
+                parent.text = textView.attributedText
+                // Reset state
+                initialSpacing = nil
+                affectedParagraphRange = nil
+            }
         }
 
         func textViewDidChange(_ textView: UITextView) {
@@ -318,6 +366,9 @@ struct RichTextEditor: UIViewRepresentable {
         textView.inputAccessoryView = hostingController.view
         context.coordinator.toolbarHostingController = hostingController
         // -----------------------------------------------------
+
+        let pinchGesture = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePinchGesture(_:)))
+        textView.addGestureRecognizer(pinchGesture)
 
         context.coordinator.textView = textView
         return textView
