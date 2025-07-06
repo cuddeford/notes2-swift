@@ -10,10 +10,17 @@ import Foundation
 import SwiftUI
 
 struct Paragraph: Identifiable, Equatable {
+    static func == (lhs: Paragraph, rhs: Paragraph) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.content == rhs.content &&
+               lhs.range == rhs.range &&
+               lhs.paragraphStyle == rhs.paragraphStyle
+    }
+
     let id = UUID()
     var content: NSAttributedString
     var range: NSRange
-    var paragraphSpacing: CGFloat = 0.0
+    var paragraphStyle: NSParagraphStyle = NSParagraphStyle.default
     var numberOfLines: Int = 0
     var height: CGFloat = 0.0
     var screenPosition: CGPoint = .zero

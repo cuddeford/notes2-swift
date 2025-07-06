@@ -79,9 +79,18 @@ struct RichTextEditor: UIViewRepresentable {
         textView.font = UIFont.preferredFont(forTextStyle: .title1)
         textView.delegate = context.coordinator
         textView.allowsEditingTextAttributes = true
+        
+        let ruledView = RuledView(frame: .zero)
+        ruledView.textView = textView
+        textView.backgroundColor = .clear
+        textView.addSubview(ruledView)
+        textView.sendSubviewToBack(ruledView)
+        context.coordinator.ruledView = ruledView
 
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
+        paragraphStyle.minimumLineHeight = textView.font!.lineHeight
+        paragraphStyle.maximumLineHeight = textView.font!.lineHeight
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
         // Apply default title style if the text view is empty
@@ -129,6 +138,8 @@ struct RichTextEditor: UIViewRepresentable {
         if uiView.selectedRange != selectedRange {
             uiView.selectedRange = selectedRange
         }
+
+        context.coordinator.updateRuledViewFrame()
 
         context.coordinator.updateTypingAttributes()
 
@@ -186,6 +197,7 @@ struct RichTextEditor: UIViewRepresentable {
     class Coordinator: NSObject, UITextViewDelegate {
         var parent: RichTextEditor
         weak var textView: UITextView?
+        weak var ruledView: RuledView?
         private var debounceWorkItem: DispatchWorkItem?
         var toolbarHostingController: UIHostingController<EditorToolbar>?
         private var initialSpacing: CGFloat?
@@ -214,9 +226,9 @@ struct RichTextEditor: UIViewRepresentable {
                 let paragraphContent = attributedText.attributedSubstring(from: paragraphNSRange)
 
                 let currentAttributes = attributedText.attributes(at: paragraphNSRange.location, effectiveRange: nil)
-                let paragraphSpacing: CGFloat = (currentAttributes[.paragraphStyle] as? NSParagraphStyle)?.paragraphSpacing ?? CGFloat(parent.settings.defaultParagraphSpacing)
+                let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
 
-                newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphNSRange, paragraphSpacing: paragraphSpacing))
+                newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphNSRange, paragraphStyle: paragraphStyle))
                 currentIndex = NSMaxRange(paragraphNSRange)
             }
             self.paragraphs = newParagraphs
@@ -242,15 +254,21 @@ struct RichTextEditor: UIViewRepresentable {
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             updateParagraphSpatialProperties()
             self.contentOffset = scrollView.contentOffset
+            ruledView?.setNeedsDisplay()
+        }
+
+        func updateRuledViewFrame() {
+            guard let textView = textView, let ruledView = ruledView else { return }
+            let contentSize = textView.contentSize
+            ruledView.frame = CGRect(x: 0, y: 0, width: contentSize.width, height: contentSize.height)
+            ruledView.setNeedsDisplay()
         }
 
         private func reconstructAttributedText() -> NSAttributedString {
             let mutableAttributedText = NSMutableAttributedString()
             for paragraph in paragraphs {
                 let paragraphContent = NSMutableAttributedString(attributedString: paragraph.content)
-                let newParagraphStyle = (paragraphContent.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
-                newParagraphStyle.paragraphSpacing = paragraph.paragraphSpacing
-                paragraphContent.addAttribute(.paragraphStyle, value: newParagraphStyle, range: NSRange(location: 0, length: paragraphContent.length))
+                paragraphContent.addAttribute(.paragraphStyle, value: paragraph.paragraphStyle, range: NSRange(location: 0, length: paragraphContent.length))
                 mutableAttributedText.append(paragraphContent)
             }
             return mutableAttributedText
@@ -268,7 +286,7 @@ struct RichTextEditor: UIViewRepresentable {
                     self.affectedParagraphRange = range
 
                     if let index = paragraphs.firstIndex(where: { $0.range == range }) {
-                        self.initialSpacing = paragraphs[index].paragraphSpacing
+                        self.initialSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
                     } else {
                         self.initialSpacing = parent.settings.defaultParagraphSpacing // Default
                     }
@@ -286,12 +304,18 @@ struct RichTextEditor: UIViewRepresentable {
                 guard let closestDetent = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) else { return }
 
                 if let index = paragraphs.firstIndex(where: { $0.range == range }) {
-                    if paragraphs[index].paragraphSpacing != closestDetent {
+                    let currentParagraphStyle = paragraphs[index].paragraphStyle
+                    if currentParagraphStyle.paragraphSpacing != closestDetent {
                         print("Paragraph spacing: \(closestDetent)")
-                        paragraphs[index].paragraphSpacing = closestDetent
+                        let newParagraphStyle = NSMutableParagraphStyle()
+                        newParagraphStyle.setParagraphStyle(currentParagraphStyle)
+                        newParagraphStyle.paragraphSpacing = closestDetent
+                        paragraphs[index].paragraphStyle = newParagraphStyle
 
-                        // Update the attributed text
-                        textView.attributedText = self.reconstructAttributedText()
+                        // Update the attributed text and the parent binding
+                        let updatedText = self.reconstructAttributedText()
+                        textView.attributedText = updatedText
+                        self.parent.text = updatedText
 
                         // Animate the change (if any visual properties are animated)
                         UIView.animate(withDuration: 0.1) {
@@ -315,9 +339,10 @@ struct RichTextEditor: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
+                self.parent.text = textView.attributedText
                 self.parseAttributedText(textView.attributedText)
-                self.parent.text = self.reconstructAttributedText()
                 self.centerCursorInTextView()
+                self.updateRuledViewFrame()
             }
         }
 
@@ -336,7 +361,14 @@ struct RichTextEditor: UIViewRepresentable {
             guard let textView = textView else { return }
             let loc = max(0, min(textView.selectedRange.location - 1, textView.attributedText.length - 1))
             if textView.attributedText.length > 0 && loc >= 0 {
-                let attrs = textView.attributedText.attributes(at: loc, effectiveRange: nil)
+                var attrs = textView.attributedText.attributes(at: loc, effectiveRange: nil)
+                // Ensure paragraph style has correct line heights based on the font
+                if let font = attrs[.font] as? UIFont {
+                    let paragraphStyle = (attrs[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+                    paragraphStyle.minimumLineHeight = font.lineHeight
+                    paragraphStyle.maximumLineHeight = font.lineHeight
+                    attrs[.paragraphStyle] = paragraphStyle
+                }
                 textView.typingAttributes = attrs
             }
         }
@@ -506,6 +538,12 @@ struct RichTextEditor: UIViewRepresentable {
                         newFont = UIFont.noteStyle(targetStyle, traits: traits)
                     }
                     mutable.addAttribute(.font, value: newFont, range: subrange)
+
+                    // Apply paragraph style with correct line height
+                    let paragraphStyle = (mutable.attribute(.paragraphStyle, at: subrange.location, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+                    paragraphStyle.minimumLineHeight = newFont.lineHeight
+                    paragraphStyle.maximumLineHeight = newFont.lineHeight
+                    mutable.addAttribute(.paragraphStyle, value: paragraphStyle, range: subrange)
                 }
             }
 
