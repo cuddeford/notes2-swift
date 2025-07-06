@@ -73,19 +73,6 @@ struct NoteView: View {
                 // You can now access newParagraphs[i].height, newParagraphs[i].screenPosition, etc.
             }
 
-            // Overlay for paragraph backgrounds
-            if let paragraphs = editorCoordinator?.paragraphs, let textContainerInset = editorCoordinator?.textContainerInset, let contentOffset = editorCoordinator?.contentOffset, let textViewWidth = editorCoordinator?.textViewWidth {
-                ForEach(paragraphs.indices, id: \.self) { index in
-                    let paragraph = paragraphs[index]
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2)) // Light grey background
-                        .cornerRadius(10)
-                        .frame(width: textViewWidth - textContainerInset.left - textContainerInset.right, height: paragraph.height)
-                        .offset(x: paragraph.screenPosition.x, y: paragraph.screenPosition.y)
-                }
-            }
-            
-
             if isDragging {
                 NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
             }
