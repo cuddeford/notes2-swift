@@ -38,8 +38,9 @@ class RuledView: UIView {
             if let paragraphStyle = textStorage.attribute(.paragraphStyle, at: characterRange.location, effectiveRange: nil) as? NSParagraphStyle {
                 let paragraphRange = (textStorage.string as NSString).paragraphRange(for: characterRange)
                 let isLastLineOfParagraph = NSMaxRange(characterRange) == NSMaxRange(paragraphRange)
+                let isLastParagraphInTextStorage = NSMaxRange(paragraphRange) == (textStorage.string as NSString).length
 
-                if isLastLineOfParagraph {
+                if isLastLineOfParagraph && !isLastParagraphInTextStorage {
                     lineY -= paragraphStyle.paragraphSpacing
                 }
             }
