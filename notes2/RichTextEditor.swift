@@ -79,7 +79,7 @@ struct RichTextEditor: UIViewRepresentable {
         textView.font = UIFont.preferredFont(forTextStyle: .title1)
         textView.delegate = context.coordinator
         textView.allowsEditingTextAttributes = true
-        
+
         let ruledView = RuledView(frame: .zero)
         ruledView.textView = textView
         textView.backgroundColor = .clear
@@ -203,7 +203,9 @@ struct RichTextEditor: UIViewRepresentable {
         private var initialSpacing: CGFloat?
         private var affectedParagraphRange: NSRange?
         private let hapticGenerator = UIImpactFeedbackGenerator(style: .light)
-        private let spacingDetents: [CGFloat] = [2, 4, 8, 12, 18, 24, 36, 48, 60, 72]
+        // Detents for paragraph spacing adjustments
+        // min is for related paragraphs, max is for unrelated paragraphs
+        private let spacingDetents: [CGFloat] = [12, 100]
         private var lastDetentIndex: Int = -1
 
         @Published var paragraphs: [Paragraph] = []
@@ -298,7 +300,7 @@ struct RichTextEditor: UIViewRepresentable {
                 guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
 
                 // Calculate a target spacing based on the gesture's scale
-                let targetSpacing = initialSpacing * gesture.scale
+                let targetSpacing = initialSpacing * gesture.scale * 2
 
                 // Find the detent closest to the target spacing
                 guard let closestDetent = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) else { return }
