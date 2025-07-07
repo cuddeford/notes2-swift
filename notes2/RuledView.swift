@@ -22,7 +22,7 @@ class RuledView: UIView {
             .font: UIFont.systemFont(ofSize: 36, weight: .bold),
             .foregroundColor: UIColor.white
         ]
-        
+
         let inset = textView.textContainerInset
 
         // Draw the red border and index for the first pinched paragraph
@@ -31,7 +31,7 @@ class RuledView: UIView {
             let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
             let path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius)
 
-            context.setFillColor(UIColor.red.withAlphaComponent(0.5).cgColor)
+            context.setFillColor(UIColor.red.withAlphaComponent(0.25).cgColor)
             context.addPath(path.cgPath)
             context.fillPath()
 
@@ -39,12 +39,12 @@ class RuledView: UIView {
             context.setLineWidth(2.0)
             context.addPath(path.cgPath)
             context.strokePath()
-            
-            let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
-            let indexSize = indexString.size()
-            let padding: CGFloat = 8.0
-            let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
-            indexString.draw(at: indexPoint)
+
+            // let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
+            // let indexSize = indexString.size()
+            // let padding: CGFloat = 8.0
+            // let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
+            // indexString.draw(at: indexPoint)
         }
 
         // Draw the blue border and index for the second pinched paragraph
@@ -53,7 +53,7 @@ class RuledView: UIView {
             let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
             let path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius)
 
-            context.setFillColor(UIColor.blue.withAlphaComponent(0.5).cgColor)
+            context.setFillColor(UIColor.blue.withAlphaComponent(0.25).cgColor)
             context.addPath(path.cgPath)
             context.fillPath()
 
@@ -62,13 +62,13 @@ class RuledView: UIView {
             context.addPath(path.cgPath)
             context.strokePath()
 
-            let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
-            let indexSize = indexString.size()
-            let padding: CGFloat = 8.0
-            let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
-            indexString.draw(at: indexPoint)
+            // let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
+            // let indexSize = indexString.size()
+            // let padding: CGFloat = 8.0
+            // let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
+            // indexString.draw(at: indexPoint)
         }
-        
+
         let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
         context.setStrokeColor(lineColor.cgColor)
         context.setLineWidth(1.0)
