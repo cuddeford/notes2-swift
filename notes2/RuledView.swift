@@ -18,9 +18,9 @@ class RuledView: UIView {
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext(), let textView = textView else { return }
 
-        let lineColor = UIColor.lightGray.withAlphaComponent(1.0)
+        let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
         context.setStrokeColor(lineColor.cgColor)
-        context.setLineWidth(1.0) // As you requested
+        context.setLineWidth(1.0)
 
         let layoutManager = textView.layoutManager
         let textStorage = textView.textStorage
