@@ -68,7 +68,7 @@ class RuledView: UIView {
             let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: &glyphRange)
             let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
 
-            var lineY = lineRect.origin.y + lineRect.height
+            var lineY = lineRect.origin.y + lineRect.height + inset.top
 
             // Adjust for paragraph spacing if this is the last line of a paragraph
             if let paragraphStyle = textStorage.attribute(.paragraphStyle, at: characterRange.location, effectiveRange: nil) as? NSParagraphStyle {
@@ -78,13 +78,6 @@ class RuledView: UIView {
                     lineY -= paragraphStyle.paragraphSpacing
                 }
             }
-
-            // Adjust for the "lines too high" issue.
-            // This offset moves the line down slightly to be truly "underneath" the text.
-            // The exact value might need to be fine-tuned.
-            let verticalOffset: CGFloat = 15.0
-
-            lineY += verticalOffset
 
             // Draw the line from edge to edge of the view's bounds.
             context.move(to: CGPoint(x: self.bounds.minX, y: lineY))
