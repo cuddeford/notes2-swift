@@ -16,8 +16,15 @@ class RuledView: UIView {
     }
 
     override func draw(_ rect: CGRect) {
-        guard let context = UIGraphicsGetCurrentContext(), let textView = textView else { return }
+        guard let context = UIGraphicsGetCurrentContext(), let textView = textView, let coordinator = textView.delegate as? RichTextEditor.Coordinator else { return }
 
+        // Draw the red border for the pinched paragraph if it exists
+        if let pinchedRect = coordinator.pinchedParagraphRect {
+            context.setStrokeColor(UIColor.red.cgColor)
+            context.setLineWidth(2.0)
+            context.stroke(pinchedRect.insetBy(dx: -2, dy: -2)) // Inset slightly for visibility
+        }
+        
         let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
         context.setStrokeColor(lineColor.cgColor)
         context.setLineWidth(1.0)
@@ -38,7 +45,6 @@ class RuledView: UIView {
             if let paragraphStyle = textStorage.attribute(.paragraphStyle, at: characterRange.location, effectiveRange: nil) as? NSParagraphStyle {
                 let paragraphRange = (textStorage.string as NSString).paragraphRange(for: characterRange)
                 let isLastLineOfParagraph = NSMaxRange(characterRange) == NSMaxRange(paragraphRange)
-                let isLastParagraphInTextStorage = NSMaxRange(paragraphRange) == (textStorage.string as NSString).length
                 if isLastLineOfParagraph {
                     lineY -= paragraphStyle.paragraphSpacing
                 }
