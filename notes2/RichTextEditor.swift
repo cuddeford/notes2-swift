@@ -292,6 +292,26 @@ struct RichTextEditor: UIViewRepresentable {
                     let range1 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position1))
                     let range2 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position2))
 
+                    guard let index1 = paragraphs.firstIndex(where: { $0.range == range1 }),
+                          let index2 = paragraphs.firstIndex(where: { $0.range == range2 }) else {
+                        gesture.state = .cancelled
+                        return
+                    }
+
+                    // Edge case 1: Same paragraph touched twice
+                    if index1 == index2 {
+                        print("Pinch gesture cancelled: Same paragraph touched twice.")
+                        gesture.state = .cancelled
+                        return
+                    }
+
+                    // Edge case 2: Non-adjacent paragraphs
+                    if abs(index1 - index2) != 1 {
+                        print("Pinch gesture cancelled: Non-adjacent paragraphs.")
+                        gesture.state = .cancelled
+                        return
+                    }
+
                     // Always find the top-most paragraph to modify its spacing
                     let topRange = range1.location < range2.location ? range1 : range2
                     self.affectedParagraphRange = topRange
