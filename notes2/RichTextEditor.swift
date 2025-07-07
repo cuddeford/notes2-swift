@@ -315,9 +315,8 @@ struct RichTextEditor: UIViewRepresentable {
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
-
             } else if gesture.state == .changed {
-                guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
+                guard let initialSpacing = initialSpacing, let range = affectedParagraphRange, let textView = self.textView else { return }
 
                 // Calculate a target spacing based on the gesture's scale
                 let targetSpacing = initialSpacing * gesture.scale * 2
@@ -338,6 +337,20 @@ struct RichTextEditor: UIViewRepresentable {
                         let updatedText = self.reconstructAttributedText()
                         textView.attributedText = updatedText
                         self.parent.text = updatedText
+                        
+                        // Recalculate frames and request redraw
+                        textView.layoutIfNeeded()
+                        if let p1Index = self.pinchedParagraphIndex1, p1Index < self.paragraphs.count {
+                            let p1Range = self.paragraphs[p1Index].range
+                            let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: p1Range, actualCharacterRange: nil)
+                            self.pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
+                        }
+                        if let p2Index = self.pinchedParagraphIndex2, p2Index < self.paragraphs.count {
+                            let p2Range = self.paragraphs[p2Index].range
+                            let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: p2Range, actualCharacterRange: nil)
+                            self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
+                        }
+                        self.ruledView?.setNeedsDisplay()
 
                         // Animate the change (if any visual properties are animated)
                         UIView.animate(withDuration: 0.1) {

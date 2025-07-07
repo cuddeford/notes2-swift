@@ -23,34 +23,38 @@ class RuledView: UIView {
             .foregroundColor: UIColor.white
         ]
 
+        let inset = textView.textContainerInset
+
         // Draw the red border and index for the first pinched paragraph
         if let pinchedRect = coordinator.pinchedParagraphRect1, let index = coordinator.pinchedParagraphIndex1 {
+            let drawingRect = pinchedRect.offsetBy(dx: inset.left, dy: inset.top)
             context.setStrokeColor(UIColor.red.cgColor)
             context.setFillColor(UIColor.red.withAlphaComponent(0.5).cgColor)
             context.setLineWidth(2.0)
-            context.fill(pinchedRect)
-            context.stroke(pinchedRect.insetBy(dx: -2, dy: -2))
-            
+            context.fill(drawingRect)
+            context.stroke(drawingRect.insetBy(dx: -2, dy: -2))
+
             let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
             let indexSize = indexString.size()
-            let indexPoint = CGPoint(x: pinchedRect.midX - indexSize.width / 2, y: pinchedRect.midY - indexSize.height / 2)
+            let indexPoint = CGPoint(x: drawingRect.midX - indexSize.width / 2, y: drawingRect.midY - indexSize.height / 2)
             indexString.draw(at: indexPoint)
         }
 
         // Draw the blue border and index for the second pinched paragraph
         if let pinchedRect = coordinator.pinchedParagraphRect2, let index = coordinator.pinchedParagraphIndex2 {
+            let drawingRect = pinchedRect.offsetBy(dx: inset.left, dy: inset.top)
             context.setStrokeColor(UIColor.blue.cgColor)
             context.setFillColor(UIColor.blue.withAlphaComponent(0.5).cgColor)
             context.setLineWidth(2.0)
-            context.fill(pinchedRect)
-            context.stroke(pinchedRect.insetBy(dx: -2, dy: -2))
+            context.fill(drawingRect)
+            context.stroke(drawingRect.insetBy(dx: -2, dy: -2))
 
             let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
             let indexSize = indexString.size()
-            let indexPoint = CGPoint(x: pinchedRect.midX - indexSize.width / 2, y: pinchedRect.midY - indexSize.height / 2)
+            let indexPoint = CGPoint(x: drawingRect.midX - indexSize.width / 2, y: drawingRect.midY - indexSize.height / 2)
             indexString.draw(at: indexPoint)
         }
-        
+
         let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
         context.setStrokeColor(lineColor.cgColor)
         context.setLineWidth(1.0)
