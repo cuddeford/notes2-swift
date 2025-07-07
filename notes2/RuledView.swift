@@ -18,11 +18,37 @@ class RuledView: UIView {
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext(), let textView = textView, let coordinator = textView.delegate as? RichTextEditor.Coordinator else { return }
 
-        // Draw the red border for the pinched paragraph if it exists
-        if let pinchedRect = coordinator.pinchedParagraphRect {
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 36, weight: .bold),
+            .foregroundColor: UIColor.white
+        ]
+
+        // Draw the red border and index for the first pinched paragraph
+        if let pinchedRect = coordinator.pinchedParagraphRect1, let index = coordinator.pinchedParagraphIndex1 {
             context.setStrokeColor(UIColor.red.cgColor)
+            context.setFillColor(UIColor.red.withAlphaComponent(0.5).cgColor)
             context.setLineWidth(2.0)
-            context.stroke(pinchedRect.insetBy(dx: -2, dy: -2)) // Inset slightly for visibility
+            context.fill(pinchedRect)
+            context.stroke(pinchedRect.insetBy(dx: -2, dy: -2))
+            
+            let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
+            let indexSize = indexString.size()
+            let indexPoint = CGPoint(x: pinchedRect.midX - indexSize.width / 2, y: pinchedRect.midY - indexSize.height / 2)
+            indexString.draw(at: indexPoint)
+        }
+
+        // Draw the blue border and index for the second pinched paragraph
+        if let pinchedRect = coordinator.pinchedParagraphRect2, let index = coordinator.pinchedParagraphIndex2 {
+            context.setStrokeColor(UIColor.blue.cgColor)
+            context.setFillColor(UIColor.blue.withAlphaComponent(0.5).cgColor)
+            context.setLineWidth(2.0)
+            context.fill(pinchedRect)
+            context.stroke(pinchedRect.insetBy(dx: -2, dy: -2))
+
+            let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
+            let indexSize = indexString.size()
+            let indexPoint = CGPoint(x: pinchedRect.midX - indexSize.width / 2, y: pinchedRect.midY - indexSize.height / 2)
+            indexString.draw(at: indexPoint)
         }
         
         let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
@@ -31,7 +57,6 @@ class RuledView: UIView {
 
         let layoutManager = textView.layoutManager
         let textStorage = textView.textStorage
-        let textContainer = textView.textContainer
 
         var glyphIndex = 0
         while glyphIndex < layoutManager.numberOfGlyphs {

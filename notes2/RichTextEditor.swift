@@ -207,7 +207,10 @@ struct RichTextEditor: UIViewRepresentable {
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [12, 100]
         private var lastDetentIndex: Int = -1
-        var pinchedParagraphRect: CGRect?
+        var pinchedParagraphRect1: CGRect?
+        var pinchedParagraphRect2: CGRect?
+        var pinchedParagraphIndex1: Int?
+        var pinchedParagraphIndex2: Int?
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -280,23 +283,35 @@ struct RichTextEditor: UIViewRepresentable {
         @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
             guard let textView = textView else { return }
 
-            if gesture.state == .began {
-                let location = gesture.location(in: textView)
-                if let characterIndex = textView.closestPosition(to: location) {
-                    let range = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: characterIndex))
-                    self.affectedParagraphRange = range
-                    
-                    // Calculate and store the frame for drawing
-                    let glyphRange = textView.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-                    self.pinchedParagraphRect = textView.layoutManager.boundingRect(forGlyphRange: glyphRange, in: textView.textContainer)
-                    
-                    if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+            if gesture.state == .began && gesture.numberOfTouches >= 2 {
+                let location1 = gesture.location(ofTouch: 0, in: textView)
+                let location2 = gesture.location(ofTouch: 1, in: textView)
+
+                if let position1 = textView.closestPosition(to: location1), let position2 = textView.closestPosition(to: location2) {
+                    let range1 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position1))
+                    let range2 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position2))
+
+                    // Always find the top-most paragraph to modify its spacing
+                    let topRange = range1.location < range2.location ? range1 : range2
+                    self.affectedParagraphRange = topRange
+
+                    // Calculate and store frames and indices for drawing
+                    let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: range1, actualCharacterRange: nil)
+                    self.pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
+                    self.pinchedParagraphIndex1 = paragraphs.firstIndex(where: { $0.range == range1 })
+
+                    let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: range2, actualCharacterRange: nil)
+                    self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
+                    self.pinchedParagraphIndex2 = paragraphs.firstIndex(where: { $0.range == range2 })
+
+                    // Get the initial spacing from the top-most paragraph
+                    if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
                         self.initialSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
                     } else {
                         self.initialSpacing = parent.settings.defaultParagraphSpacing // Default
                     }
-                    
-                    ruledView?.setNeedsDisplay() // Redraw to show the border
+
+                    ruledView?.setNeedsDisplay() // Redraw to show the borders
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
@@ -341,8 +356,11 @@ struct RichTextEditor: UIViewRepresentable {
                 // Reset state
                 initialSpacing = nil
                 affectedParagraphRange = nil
-                pinchedParagraphRect = nil
-                ruledView?.setNeedsDisplay() // Redraw to hide the border
+                pinchedParagraphRect1 = nil
+                pinchedParagraphRect2 = nil
+                pinchedParagraphIndex1 = nil
+                pinchedParagraphIndex2 = nil
+                ruledView?.setNeedsDisplay() // Redraw to hide the borders
             }
         }
 
