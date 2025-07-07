@@ -97,6 +97,30 @@ class RuledView: UIView {
             // indexString.draw(at: indexPoint)
         }
 
+        // Draw "Unrelated paragraphs" text if detent is 100
+        if coordinator.currentDetent == 100,
+           let rect1 = coordinator.pinchedParagraphRect1,
+           let rect2 = coordinator.pinchedParagraphRect2 {
+
+            let topRect = rect1.minY < rect2.minY ? rect1 : rect2
+            let bottomRect = rect1.minY < rect2.minY ? rect2 : rect1
+
+            let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
+
+            let unrelatedText = "Unrelated paragraphs"
+            let unrelatedAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
+                .foregroundColor: UIColor.lightGray
+            ]
+            let attributedUnrelatedText = NSAttributedString(string: unrelatedText, attributes: unrelatedAttributes)
+            let textSize = attributedUnrelatedText.size()
+
+            let textX = (self.bounds.width - textSize.width) / 2.0
+            let textY = gapCenterY - (textSize.height / 2.0)
+
+            attributedUnrelatedText.draw(at: CGPoint(x: textX, y: textY))
+        }
+
         let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
         context.setStrokeColor(lineColor.cgColor)
         context.setLineWidth(1.0)
