@@ -42,7 +42,8 @@ class RuledView: UIView {
             
             let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
             let indexSize = indexString.size()
-            let indexPoint = CGPoint(x: drawingRect.midX - indexSize.width / 2, y: drawingRect.midY - indexSize.height / 2)
+            let padding: CGFloat = 8.0
+            let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
             indexString.draw(at: indexPoint)
         }
 
@@ -63,7 +64,8 @@ class RuledView: UIView {
 
             let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
             let indexSize = indexString.size()
-            let indexPoint = CGPoint(x: drawingRect.midX - indexSize.width / 2, y: drawingRect.midY - indexSize.height / 2)
+            let padding: CGFloat = 8.0
+            let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
             indexString.draw(at: indexPoint)
         }
         
