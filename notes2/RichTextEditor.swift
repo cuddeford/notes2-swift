@@ -216,6 +216,7 @@ struct RichTextEditor: UIViewRepresentable {
         @Published var textContainerInset: UIEdgeInsets = .zero
         @Published var contentOffset: CGPoint = .zero
         @Published var textViewWidth: CGFloat = 0
+        @Published var currentDetent: CGFloat?
 
         init(_ parent: RichTextEditor) {
             self.parent = parent
@@ -310,6 +311,7 @@ struct RichTextEditor: UIViewRepresentable {
                     } else {
                         self.initialSpacing = parent.settings.defaultParagraphSpacing // Default
                     }
+                    self.currentDetent = self.initialSpacing // Set initial detent
 
                     ruledView?.setNeedsDisplay() // Redraw to show the borders
                 }
@@ -337,6 +339,7 @@ struct RichTextEditor: UIViewRepresentable {
                         let updatedText = self.reconstructAttributedText()
                         textView.attributedText = updatedText
                         self.parent.text = updatedText
+                        self.currentDetent = closestDetent
                         
                         // Recalculate frames and request redraw
                         textView.layoutIfNeeded()
@@ -373,6 +376,7 @@ struct RichTextEditor: UIViewRepresentable {
                 pinchedParagraphRect2 = nil
                 pinchedParagraphIndex1 = nil
                 pinchedParagraphIndex2 = nil
+                currentDetent = nil
                 ruledView?.setNeedsDisplay() // Redraw to hide the borders
             }
         }

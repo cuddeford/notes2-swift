@@ -31,11 +31,25 @@ class RuledView: UIView {
             let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
             let path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius)
 
-            context.setFillColor(UIColor.red.withAlphaComponent(0.25).cgColor)
+            let fillColor: UIColor
+            let strokeColor: UIColor
+
+            if coordinator.currentDetent == 12 {
+                fillColor = UIColor.green.withAlphaComponent(0.25)
+                strokeColor = UIColor.green
+            } else if coordinator.currentDetent == 100 {
+                fillColor = UIColor.yellow.withAlphaComponent(0.25)
+                strokeColor = UIColor.yellow
+            } else {
+                fillColor = UIColor.red.withAlphaComponent(0.25)
+                strokeColor = UIColor.red
+            }
+
+            context.setFillColor(fillColor.cgColor)
             context.addPath(path.cgPath)
             context.fillPath()
 
-            context.setStrokeColor(UIColor.red.cgColor)
+            context.setStrokeColor(strokeColor.cgColor)
             context.setLineWidth(2.0)
             context.addPath(path.cgPath)
             context.strokePath()
@@ -53,11 +67,25 @@ class RuledView: UIView {
             let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
             let path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius)
 
-            context.setFillColor(UIColor.blue.withAlphaComponent(0.25).cgColor)
+            let fillColor: UIColor
+            let strokeColor: UIColor
+
+            if coordinator.currentDetent == 12 {
+                fillColor = UIColor.green.withAlphaComponent(0.25)
+                strokeColor = UIColor.green
+            } else if coordinator.currentDetent == 100 {
+                fillColor = UIColor.yellow.withAlphaComponent(0.25)
+                strokeColor = UIColor.yellow
+            } else {
+                fillColor = UIColor.blue.withAlphaComponent(0.25)
+                strokeColor = UIColor.blue
+            }
+
+            context.setFillColor(fillColor.cgColor)
             context.addPath(path.cgPath)
             context.fillPath()
 
-            context.setStrokeColor(UIColor.blue.cgColor)
+            context.setStrokeColor(strokeColor.cgColor)
             context.setLineWidth(2.0)
             context.addPath(path.cgPath)
             context.strokePath()
