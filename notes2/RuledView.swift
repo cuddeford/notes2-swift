@@ -3,124 +3,113 @@ import UIKit
 class RuledView: UIView {
     weak var textView: UITextView?
 
+    private let paragraphOverlay1 = CAShapeLayer()
+    private let paragraphOverlay2 = CAShapeLayer()
+    private let unrelatedTextLayer = CATextLayer()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
-        self.backgroundColor = .clear
-        self.isOpaque = false
+        setupLayers()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
+        setupLayers()
+    }
+
+    private func setupLayers() {
         self.backgroundColor = .clear
         self.isOpaque = false
+
+        // Setup paragraph overlays
+        [paragraphOverlay1, paragraphOverlay2].forEach {
+            $0.lineWidth = 2.0
+            $0.fillColor = UIColor.clear.cgColor
+            layer.addSublayer($0)
+        }
+
+        // Setup text layer
+        unrelatedTextLayer.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        unrelatedTextLayer.fontSize = 14
+        unrelatedTextLayer.foregroundColor = UIColor.lightGray.cgColor
+        unrelatedTextLayer.string = "Unrelated paragraphs"
+        unrelatedTextLayer.alignmentMode = .center
+        unrelatedTextLayer.contentsScale = UIScreen.main.scale
+        unrelatedTextLayer.isHidden = true
+        layer.addSublayer(unrelatedTextLayer)
+    }
+
+    func updateOverlays(rect1: CGRect?, rect2: CGRect?, detent: CGFloat, animated: Bool) {
+        let inset = textView?.textContainerInset ?? .zero
+        
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(animated ? 0.2 : 0)
+
+        // Update first overlay
+        if let rect = rect1 {
+            let drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
+            let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
+            paragraphOverlay1.path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
+            
+            let (fill, stroke) = colors(for: detent, default: .red)
+            paragraphOverlay1.fillColor = fill.cgColor
+            paragraphOverlay1.strokeColor = stroke.cgColor
+            paragraphOverlay1.opacity = 1
+        } else {
+            paragraphOverlay1.opacity = 0
+        }
+
+        // Update second overlay
+        if let rect = rect2 {
+            let drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
+            let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
+            paragraphOverlay2.path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
+
+            let (fill, stroke) = colors(for: detent, default: .blue)
+            paragraphOverlay2.fillColor = fill.cgColor
+            paragraphOverlay2.strokeColor = stroke.cgColor
+            paragraphOverlay2.opacity = 1
+        } else {
+            paragraphOverlay2.opacity = 0
+        }
+
+        // Update "Unrelated paragraphs" text
+        if detent == 100, let r1 = rect1, let r2 = rect2 {
+            let topRect = r1.minY < r2.minY ? r1 : r2
+            let bottomRect = r1.minY < r2.minY ? r2 : r1
+            let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
+            let textSize = unrelatedTextLayer.preferredFrameSize()
+            
+            unrelatedTextLayer.frame = CGRect(
+                x: (bounds.width - textSize.width) / 2.0,
+                y: gapCenterY - (textSize.height / 2.0),
+                width: textSize.width,
+                height: textSize.height
+            )
+            unrelatedTextLayer.isHidden = false
+            unrelatedTextLayer.opacity = 1
+        } else {
+            unrelatedTextLayer.opacity = 0
+        }
+
+        CATransaction.commit()
+    }
+
+    private func colors(for detent: CGFloat, default defaultColor: UIColor) -> (fill: UIColor, stroke: UIColor) {
+        switch detent {
+        case 12:
+            return (UIColor.green.withAlphaComponent(0.25), .green)
+        case 100:
+            return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
+        default:
+            return (defaultColor.withAlphaComponent(0.25), defaultColor)
+        }
     }
 
     override func draw(_ rect: CGRect) {
-        guard let context = UIGraphicsGetCurrentContext(), let textView = textView, let coordinator = textView.delegate as? RichTextEditor.Coordinator else { return }
-
-        let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 36, weight: .bold),
-            .foregroundColor: UIColor.white
-        ]
+        guard let context = UIGraphicsGetCurrentContext(), let textView = textView else { return }
 
         let inset = textView.textContainerInset
-
-        // Draw the red border and index for the first pinched paragraph
-        if let pinchedRect = coordinator.pinchedParagraphRect1, let index = coordinator.pinchedParagraphIndex1 {
-            let drawingRect = pinchedRect.offsetBy(dx: inset.left, dy: inset.top)
-            let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
-            let path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius)
-
-            let fillColor: UIColor
-            let strokeColor: UIColor
-
-            if coordinator.currentDetent == 12 {
-                fillColor = UIColor.green.withAlphaComponent(0.25)
-                strokeColor = UIColor.green
-            } else if coordinator.currentDetent == 100 {
-                fillColor = UIColor.yellow.withAlphaComponent(0.25)
-                strokeColor = UIColor.yellow
-            } else {
-                fillColor = UIColor.red.withAlphaComponent(0.25)
-                strokeColor = UIColor.red
-            }
-
-            context.setFillColor(fillColor.cgColor)
-            context.addPath(path.cgPath)
-            context.fillPath()
-
-            context.setStrokeColor(strokeColor.cgColor)
-            context.setLineWidth(2.0)
-            context.addPath(path.cgPath)
-            context.strokePath()
-
-            // let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
-            // let indexSize = indexString.size()
-            // let padding: CGFloat = 8.0
-            // let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
-            // indexString.draw(at: indexPoint)
-        }
-
-        // Draw the blue border and index for the second pinched paragraph
-        if let pinchedRect = coordinator.pinchedParagraphRect2, let index = coordinator.pinchedParagraphIndex2 {
-            let drawingRect = pinchedRect.offsetBy(dx: inset.left, dy: inset.top)
-            let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
-            let path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius)
-
-            let fillColor: UIColor
-            let strokeColor: UIColor
-
-            if coordinator.currentDetent == 12 {
-                fillColor = UIColor.green.withAlphaComponent(0.25)
-                strokeColor = UIColor.green
-            } else if coordinator.currentDetent == 100 {
-                fillColor = UIColor.yellow.withAlphaComponent(0.25)
-                strokeColor = UIColor.yellow
-            } else {
-                fillColor = UIColor.blue.withAlphaComponent(0.25)
-                strokeColor = UIColor.blue
-            }
-
-            context.setFillColor(fillColor.cgColor)
-            context.addPath(path.cgPath)
-            context.fillPath()
-
-            context.setStrokeColor(strokeColor.cgColor)
-            context.setLineWidth(2.0)
-            context.addPath(path.cgPath)
-            context.strokePath()
-
-            // let indexString = NSAttributedString(string: "\(index)", attributes: textAttributes)
-            // let indexSize = indexString.size()
-            // let padding: CGFloat = 8.0
-            // let indexPoint = CGPoint(x: drawingRect.maxX - indexSize.width - padding, y: drawingRect.maxY - indexSize.height - padding)
-            // indexString.draw(at: indexPoint)
-        }
-
-        // Draw "Unrelated paragraphs" text if detent is 100
-        if coordinator.currentDetent == 100,
-           let rect1 = coordinator.pinchedParagraphRect1,
-           let rect2 = coordinator.pinchedParagraphRect2 {
-
-            let topRect = rect1.minY < rect2.minY ? rect1 : rect2
-            let bottomRect = rect1.minY < rect2.minY ? rect2 : rect1
-
-            let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
-
-            let unrelatedText = "Unrelated paragraphs"
-            let unrelatedAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
-                .foregroundColor: UIColor.lightGray
-            ]
-            let attributedUnrelatedText = NSAttributedString(string: unrelatedText, attributes: unrelatedAttributes)
-            let textSize = attributedUnrelatedText.size()
-
-            let textX = (self.bounds.width - textSize.width) / 2.0
-            let textY = gapCenterY - (textSize.height / 2.0)
-
-            attributedUnrelatedText.draw(at: CGPoint(x: textX, y: textY))
-        }
-
         let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
         context.setStrokeColor(lineColor.cgColor)
         context.setLineWidth(1.0)
@@ -136,7 +125,6 @@ class RuledView: UIView {
 
             var lineY = lineRect.origin.y + lineRect.height + inset.top
 
-            // Adjust for paragraph spacing if this is the last line of a paragraph
             if let paragraphStyle = textStorage.attribute(.paragraphStyle, at: characterRange.location, effectiveRange: nil) as? NSParagraphStyle {
                 let paragraphRange = (textStorage.string as NSString).paragraphRange(for: characterRange)
                 let isLastLineOfParagraph = NSMaxRange(characterRange) == NSMaxRange(paragraphRange)
@@ -145,7 +133,6 @@ class RuledView: UIView {
                 }
             }
 
-            // Draw the line from edge to edge of the view's bounds.
             context.move(to: CGPoint(x: self.bounds.minX, y: lineY))
             context.addLine(to: CGPoint(x: self.bounds.maxX, y: lineY))
             context.strokePath()

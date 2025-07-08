@@ -298,71 +298,57 @@ struct RichTextEditor: UIViewRepresentable {
                         return
                     }
 
-                    // Edge case 1: Same paragraph touched twice
-                    if index1 == index2 {
-                        print("Pinch gesture cancelled: Same paragraph touched twice.")
+                    if index1 == index2 || abs(index1 - index2) != 1 {
                         gesture.state = .cancelled
                         return
                     }
 
-                    // Edge case 2: Non-adjacent paragraphs
-                    if abs(index1 - index2) != 1 {
-                        print("Pinch gesture cancelled: Non-adjacent paragraphs.")
-                        gesture.state = .cancelled
-                        return
-                    }
-
-                    // Always find the top-most paragraph to modify its spacing
                     let topRange = range1.location < range2.location ? range1 : range2
                     self.affectedParagraphRange = topRange
 
-                    // Calculate and store frames and indices for drawing
                     let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: range1, actualCharacterRange: nil)
                     self.pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
-                    self.pinchedParagraphIndex1 = paragraphs.firstIndex(where: { $0.range == range1 })
+                    self.pinchedParagraphIndex1 = index1
 
                     let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: range2, actualCharacterRange: nil)
                     self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
-                    self.pinchedParagraphIndex2 = paragraphs.firstIndex(where: { $0.range == range2 })
+                    self.pinchedParagraphIndex2 = index2
 
-                    // Get the initial spacing from the top-most paragraph
                     if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
                         self.initialSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
                     } else {
-                        self.initialSpacing = parent.settings.defaultParagraphSpacing // Default
+                        self.initialSpacing = parent.settings.defaultParagraphSpacing
                     }
-                    self.currentDetent = self.initialSpacing // Set initial detent
+                    self.currentDetent = self.initialSpacing
 
-                    ruledView?.setNeedsDisplay() // Redraw to show the borders
+                    ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: self.currentDetent ?? 0, animated: true)
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
+
             } else if gesture.state == .changed {
                 guard let initialSpacing = initialSpacing, let range = affectedParagraphRange, let textView = self.textView else { return }
 
-                // Calculate a target spacing based on the gesture's scale
                 let targetSpacing = initialSpacing * gesture.scale * 2
-
-                // Find the detent closest to the target spacing
                 guard let closestDetent = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) else { return }
 
-                if let index = paragraphs.firstIndex(where: { $0.range == range }) {
-                    let currentParagraphStyle = paragraphs[index].paragraphStyle
-                    if currentParagraphStyle.paragraphSpacing != closestDetent {
-                        print("Paragraph spacing: \(closestDetent)")
+                if let index = paragraphs.firstIndex(where: { $0.range == range }),
+                   paragraphs[index].paragraphStyle.paragraphSpacing != closestDetent {
+                    
+                    self.currentDetent = closestDetent
+                    
+                    UIView.animate(withDuration: 0.2, animations: {
                         let newParagraphStyle = NSMutableParagraphStyle()
-                        newParagraphStyle.setParagraphStyle(currentParagraphStyle)
+                        newParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
                         newParagraphStyle.paragraphSpacing = closestDetent
-                        paragraphs[index].paragraphStyle = newParagraphStyle
+                        self.paragraphs[index].paragraphStyle = newParagraphStyle
 
-                        // Update the attributed text and the parent binding
                         let updatedText = self.reconstructAttributedText()
                         textView.attributedText = updatedText
                         self.parent.text = updatedText
-                        self.currentDetent = closestDetent
                         
-                        // Recalculate frames and request redraw
                         textView.layoutIfNeeded()
+
                         if let p1Index = self.pinchedParagraphIndex1, p1Index < self.paragraphs.count {
                             let p1Range = self.paragraphs[p1Index].range
                             let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: p1Range, actualCharacterRange: nil)
@@ -373,23 +359,19 @@ struct RichTextEditor: UIViewRepresentable {
                             let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: p2Range, actualCharacterRange: nil)
                             self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
                         }
-                        self.ruledView?.setNeedsDisplay()
+                        
+                        self.ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: closestDetent, animated: false)
+                    })
 
-                        // Animate the change (if any visual properties are animated)
-                        UIView.animate(withDuration: 0.1) {
-                            // No direct textStorage editing here, layout will happen naturally
-                        }
-
-                        // Fire haptic feedback
-                        hapticGenerator.impactOccurred()
-                        hapticGenerator.prepare()
-                    }
+                    hapticGenerator.impactOccurred()
+                    hapticGenerator.prepare()
                 }
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
-                // Update the binding
                 parent.text = reconstructAttributedText()
-                // Reset state
+                
+                ruledView?.updateOverlays(rect1: nil, rect2: nil, detent: 0, animated: true)
+
                 initialSpacing = nil
                 affectedParagraphRange = nil
                 pinchedParagraphRect1 = nil
@@ -397,7 +379,6 @@ struct RichTextEditor: UIViewRepresentable {
                 pinchedParagraphIndex1 = nil
                 pinchedParagraphIndex2 = nil
                 currentDetent = nil
-                ruledView?.setNeedsDisplay() // Redraw to hide the borders
             }
         }
 
