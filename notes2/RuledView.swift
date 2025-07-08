@@ -41,16 +41,16 @@ class RuledView: UIView {
 
     func updateOverlays(rect1: CGRect?, rect2: CGRect?, detent: CGFloat, animated: Bool) {
         let inset = textView?.textContainerInset ?? .zero
-        
+
         CATransaction.begin()
         CATransaction.setAnimationDuration(animated ? 0.2 : 0)
 
         // Update first overlay
         if let rect = rect1 {
             let drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
-            let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
+            let cornerRadius = 10.0
             paragraphOverlay1.path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
-            
+
             let (fill, stroke) = colors(for: detent, default: .red)
             paragraphOverlay1.fillColor = fill.cgColor
             paragraphOverlay1.strokeColor = stroke.cgColor
@@ -62,7 +62,7 @@ class RuledView: UIView {
         // Update second overlay
         if let rect = rect2 {
             let drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
-            let cornerRadius = min(drawingRect.width, drawingRect.height) * 0.06
+            let cornerRadius = 10.0
             paragraphOverlay2.path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
 
             let (fill, stroke) = colors(for: detent, default: .blue)
@@ -79,7 +79,7 @@ class RuledView: UIView {
             let bottomRect = r1.minY < r2.minY ? r2 : r1
             let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
             let textSize = unrelatedTextLayer.preferredFrameSize()
-            
+
             unrelatedTextLayer.frame = CGRect(
                 x: (bounds.width - textSize.width) / 2.0,
                 y: gapCenterY - (textSize.height / 2.0),

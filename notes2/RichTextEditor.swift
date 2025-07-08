@@ -207,6 +207,7 @@ struct RichTextEditor: UIViewRepresentable {
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [12, 100]
         private var lastDetentIndex: Int = -1
+        private var lastClosestDetent: CGFloat?
         var pinchedParagraphRect1: CGRect?
         var pinchedParagraphRect2: CGRect?
         var pinchedParagraphIndex1: Int?
@@ -320,8 +321,11 @@ struct RichTextEditor: UIViewRepresentable {
                         self.initialSpacing = parent.settings.defaultParagraphSpacing
                     }
                     self.currentDetent = self.initialSpacing
+                    
+                    // Set the initial detent for color and haptics
+                    self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
 
-                    ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: self.currentDetent ?? 0, animated: true)
+                    ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: self.lastClosestDetent ?? 0, animated: true)
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
@@ -329,56 +333,74 @@ struct RichTextEditor: UIViewRepresentable {
             } else if gesture.state == .changed {
                 guard let initialSpacing = initialSpacing, let range = affectedParagraphRange, let textView = self.textView else { return }
 
-                let targetSpacing = initialSpacing * gesture.scale * 2
-                guard let closestDetent = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) else { return }
+                let sensitivity: CGFloat = 1.5
+                var targetSpacing = initialSpacing + (gesture.scale - 1) * initialSpacing * sensitivity
+                targetSpacing = max(parent.settings.defaultParagraphSpacing, min(targetSpacing, 120))
+                
+                let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
 
-                if let index = paragraphs.firstIndex(where: { $0.range == range }),
-                   paragraphs[index].paragraphStyle.paragraphSpacing != closestDetent {
-                    
-                    self.currentDetent = closestDetent
-                    
-                    UIView.animate(withDuration: 0.2, animations: {
-                        let newParagraphStyle = NSMutableParagraphStyle()
-                        newParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
-                        newParagraphStyle.paragraphSpacing = closestDetent
-                        self.paragraphs[index].paragraphStyle = newParagraphStyle
-
-                        let updatedText = self.reconstructAttributedText()
-                        textView.attributedText = updatedText
-                        self.parent.text = updatedText
-                        
-                        textView.layoutIfNeeded()
-
-                        if let p1Index = self.pinchedParagraphIndex1, p1Index < self.paragraphs.count {
-                            let p1Range = self.paragraphs[p1Index].range
-                            let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: p1Range, actualCharacterRange: nil)
-                            self.pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
-                        }
-                        if let p2Index = self.pinchedParagraphIndex2, p2Index < self.paragraphs.count {
-                            let p2Range = self.paragraphs[p2Index].range
-                            let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: p2Range, actualCharacterRange: nil)
-                            self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
-                        }
-                        
-                        self.ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: closestDetent, animated: false)
-                    })
-
-                    hapticGenerator.impactOccurred()
-                    hapticGenerator.prepare()
+                // Fire haptic if the detent has changed
+                if closestDetentForColor != self.lastClosestDetent {
+                    self.hapticGenerator.impactOccurred()
+                    self.hapticGenerator.prepare()
+                    self.lastClosestDetent = closestDetentForColor
                 }
 
-            } else if gesture.state == .ended || gesture.state == .cancelled {
-                parent.text = reconstructAttributedText()
-                
-                ruledView?.updateOverlays(rect1: nil, rect2: nil, detent: 0, animated: true)
+                let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
+                let newParagraphStyle = NSMutableParagraphStyle()
+                newParagraphStyle.setParagraphStyle(currentStyle)
+                newParagraphStyle.paragraphSpacing = targetSpacing
 
-                initialSpacing = nil
-                affectedParagraphRange = nil
-                pinchedParagraphRect1 = nil
-                pinchedParagraphRect2 = nil
-                pinchedParagraphIndex1 = nil
-                pinchedParagraphIndex2 = nil
-                currentDetent = nil
+                textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+                if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                    paragraphs[index].paragraphStyle = newParagraphStyle
+                }
+                self.currentDetent = targetSpacing
+
+                textView.layoutIfNeeded()
+                if let p1Index = self.pinchedParagraphIndex1, p1Index < self.paragraphs.count {
+                    let p1Range = self.paragraphs[p1Index].range
+                    let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: p1Range, actualCharacterRange: nil)
+                    self.pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
+                }
+                if let p2Index = self.pinchedParagraphIndex2, p2Index < self.paragraphs.count {
+                    let p2Range = self.paragraphs[p2Index].range
+                    let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: p2Range, actualCharacterRange: nil)
+                    self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
+                }
+                ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: closestDetentForColor, animated: false)
+
+            } else if gesture.state == .ended || gesture.state == .cancelled {
+                guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange, let textView = self.textView else { return }
+
+                let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) })
+
+                UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut, animations: {
+                    let finalParagraphStyle = NSMutableParagraphStyle()
+                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                        finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
+                    }
+                    finalParagraphStyle.paragraphSpacing = closestDetent ?? self.parent.settings.defaultParagraphSpacing
+                    
+                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
+                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                        self.paragraphs[index].paragraphStyle = finalParagraphStyle
+                    }
+                    
+                    textView.layoutIfNeeded()
+                    
+                    self.ruledView?.updateOverlays(rect1: nil, rect2: nil, detent: 0, animated: true)
+                }) { _ in
+                    self.parent.text = self.reconstructAttributedText()
+                    self.initialSpacing = nil
+                    self.affectedParagraphRange = nil
+                    self.pinchedParagraphRect1 = nil
+                    self.pinchedParagraphRect2 = nil
+                    self.pinchedParagraphIndex1 = nil
+                    self.pinchedParagraphIndex2 = nil
+                    self.currentDetent = nil
+                    self.lastClosestDetent = nil
+                }
             }
         }
 
