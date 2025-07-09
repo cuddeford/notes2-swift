@@ -10,6 +10,11 @@ import SwiftUI
 
 class AppSettings: ObservableObject {
     static let shared = AppSettings()
+
+    // The two detents for paragraph spacing
+    static let relatedParagraphSpacing: CGFloat = 32
+    static let unrelatedParagraphSpacing: CGFloat = 120
+
     @Published var defaultParagraphSpacing: Double {
         didSet { UserDefaults.standard.set(defaultParagraphSpacing, forKey: "defaultParagraphSpacing") }
     }
@@ -24,7 +29,7 @@ class AppSettings: ObservableObject {
 
     private init() {
         let spacing = UserDefaults.standard.double(forKey: "defaultParagraphSpacing")
-        self.defaultParagraphSpacing = spacing == 0 ? 12.0 : spacing
+        self.defaultParagraphSpacing = spacing == 0 ? AppSettings.unrelatedParagraphSpacing : spacing
 
         let size = UserDefaults.standard.double(forKey: "fontSize")
         self.fontSize = size == 0 ? 18.0 : size

@@ -205,7 +205,7 @@ struct RichTextEditor: UIViewRepresentable {
         private let hapticGenerator = UIImpactFeedbackGenerator(style: .light)
         // Detents for paragraph spacing adjustments
         // min is for related paragraphs, max is for unrelated paragraphs
-        private let spacingDetents: [CGFloat] = [12, 100]
+        private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
         var pinchedParagraphRect1: CGRect?

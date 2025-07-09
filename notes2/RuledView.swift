@@ -74,7 +74,7 @@ class RuledView: UIView {
         }
 
         // Update "Unrelated paragraphs" text
-        if detent == 100, let r1 = rect1, let r2 = rect2 {
+        if detent == AppSettings.unrelatedParagraphSpacing, let r1 = rect1, let r2 = rect2 {
             let topRect = r1.minY < r2.minY ? r1 : r2
             let bottomRect = r1.minY < r2.minY ? r2 : r1
             let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
@@ -97,9 +97,9 @@ class RuledView: UIView {
 
     private func colors(for detent: CGFloat, default defaultColor: UIColor) -> (fill: UIColor, stroke: UIColor) {
         switch detent {
-        case 12:
+        case AppSettings.relatedParagraphSpacing:
             return (UIColor.green.withAlphaComponent(0.25), .green)
-        case 100:
+        case AppSettings.unrelatedParagraphSpacing:
             return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
         default:
             return (defaultColor.withAlphaComponent(0.25), defaultColor)
