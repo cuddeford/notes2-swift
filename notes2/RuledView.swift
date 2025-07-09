@@ -32,7 +32,7 @@ class RuledView: UIView {
         // Setup text layer
         unrelatedTextLayer.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         unrelatedTextLayer.fontSize = 14
-        unrelatedTextLayer.foregroundColor = UIColor.lightGray.cgColor
+        unrelatedTextLayer.foregroundColor = UIColor.yellow.cgColor
         unrelatedTextLayer.string = "Unrelated paragraphs"
         unrelatedTextLayer.alignmentMode = .center
         unrelatedTextLayer.contentsScale = UIScreen.main.scale
@@ -42,7 +42,7 @@ class RuledView: UIView {
         // Setup related text layer
         relatedTextLayer.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         relatedTextLayer.fontSize = 14
-        relatedTextLayer.foregroundColor = UIColor.lightGray.cgColor
+        relatedTextLayer.foregroundColor = UIColor.green.cgColor
         relatedTextLayer.string = "Related paragraphs"
         relatedTextLayer.alignmentMode = .center
         relatedTextLayer.contentsScale = UIScreen.main.scale
@@ -94,7 +94,7 @@ class RuledView: UIView {
             let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
 
             let textSize = unrelatedTextLayer.preferredFrameSize()
-            
+
             unrelatedTextLayer.frame = CGRect(
                 x: (bounds.width - textSize.width) / 2.0,
                 y: gapCenterY - (textSize.height / 2.0),
@@ -117,7 +117,7 @@ class RuledView: UIView {
             let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
 
             let textSize = relatedTextLayer.preferredFrameSize()
-            
+
             relatedTextLayer.frame = CGRect(
                 x: (bounds.width - textSize.width) / 2.0,
                 y: gapCenterY - (textSize.height / 2.0),
