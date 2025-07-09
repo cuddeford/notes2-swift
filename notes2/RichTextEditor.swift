@@ -321,7 +321,7 @@ struct RichTextEditor: UIViewRepresentable {
                         self.initialSpacing = parent.settings.defaultParagraphSpacing
                     }
                     self.currentDetent = self.initialSpacing
-                    
+
                     // Set the initial detent for color and haptics
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
 
@@ -337,10 +337,10 @@ struct RichTextEditor: UIViewRepresentable {
                 let gestureRange: CGFloat = 200 // The virtual "distance" of the pinch gesture in points
                 let gestureProgress = (gesture.scale - 1.0) * gestureRange
                 var targetSpacing = initialSpacing + gestureProgress
-                
+
                 // Clamp the spacing to the defined detents
                 targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
-                
+
                 let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
 
                 if closestDetentForColor != lastClosestDetent {
@@ -372,6 +372,7 @@ struct RichTextEditor: UIViewRepresentable {
                     pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
                 }
                 ruledView?.updateOverlays(rect1: pinchedParagraphRect1, rect2: pinchedParagraphRect2, detent: closestDetentForColor, animated: false)
+                ruledView?.setNeedsDisplay()
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
                 guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange, let textView = self.textView else { return }
@@ -384,14 +385,14 @@ struct RichTextEditor: UIViewRepresentable {
                         finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
                     }
                     finalParagraphStyle.paragraphSpacing = closestDetent ?? self.parent.settings.defaultParagraphSpacing
-                    
+
                     textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
                     if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
                         self.paragraphs[index].paragraphStyle = finalParagraphStyle
                     }
-                    
+
                     textView.layoutIfNeeded()
-                    
+
                     self.ruledView?.updateOverlays(rect1: nil, rect2: nil, detent: 0, animated: true)
                 }) { _ in
                     self.parent.text = self.reconstructAttributedText()
