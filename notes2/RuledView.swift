@@ -6,6 +6,7 @@ class RuledView: UIView {
     private let paragraphOverlay1 = CAShapeLayer()
     private let paragraphOverlay2 = CAShapeLayer()
     private let unrelatedTextLayer = CATextLayer()
+    private let relatedTextLayer = CATextLayer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -37,6 +38,16 @@ class RuledView: UIView {
         unrelatedTextLayer.contentsScale = UIScreen.main.scale
         unrelatedTextLayer.isHidden = true
         layer.addSublayer(unrelatedTextLayer)
+
+        // Setup related text layer
+        relatedTextLayer.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        relatedTextLayer.fontSize = 14
+        relatedTextLayer.foregroundColor = UIColor.lightGray.cgColor
+        relatedTextLayer.string = "Related paragraphs"
+        relatedTextLayer.alignmentMode = .center
+        relatedTextLayer.contentsScale = UIScreen.main.scale
+        relatedTextLayer.isHidden = true
+        layer.addSublayer(relatedTextLayer)
     }
 
     func updateOverlays(rect1: CGRect?, rect2: CGRect?, detent: CGFloat, animated: Bool) {
@@ -74,12 +85,16 @@ class RuledView: UIView {
         }
 
         // Update "Unrelated paragraphs" text
-        if detent == AppSettings.unrelatedParagraphSpacing, let r1 = rect1, let r2 = rect2 {
+        if detent == AppSettings.unrelatedParagraphSpacing,
+           let r1 = rect1,
+           let r2 = rect2 {
             let topRect = r1.minY < r2.minY ? r1 : r2
             let bottomRect = r1.minY < r2.minY ? r2 : r1
-            let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
-            let textSize = unrelatedTextLayer.preferredFrameSize()
 
+            let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
+
+            let textSize = unrelatedTextLayer.preferredFrameSize()
+            
             unrelatedTextLayer.frame = CGRect(
                 x: (bounds.width - textSize.width) / 2.0,
                 y: gapCenterY - (textSize.height / 2.0),
@@ -90,6 +105,29 @@ class RuledView: UIView {
             unrelatedTextLayer.opacity = 1
         } else {
             unrelatedTextLayer.opacity = 0
+        }
+
+        // Update "Related paragraphs" text
+        if detent == AppSettings.relatedParagraphSpacing,
+           let r1 = rect1,
+           let r2 = rect2 {
+            let topRect = r1.minY < r2.minY ? r1 : r2
+            let bottomRect = r1.minY < r2.minY ? r2 : r1
+
+            let gapCenterY = (topRect.maxY + bottomRect.minY) / 2.0 + inset.top
+
+            let textSize = relatedTextLayer.preferredFrameSize()
+            
+            relatedTextLayer.frame = CGRect(
+                x: (bounds.width - textSize.width) / 2.0,
+                y: gapCenterY - (textSize.height / 2.0),
+                width: textSize.width,
+                height: textSize.height
+            )
+            relatedTextLayer.isHidden = false
+            relatedTextLayer.opacity = 1
+        } else {
+            relatedTextLayer.opacity = 0
         }
 
         CATransaction.commit()
