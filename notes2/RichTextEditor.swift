@@ -338,8 +338,8 @@ struct RichTextEditor: UIViewRepresentable {
                 let gestureProgress = (gesture.scale - 1.0) * gestureRange
                 var targetSpacing = initialSpacing + gestureProgress
                 
-                // Clamp the spacing to a reasonable range to avoid extreme values
-                targetSpacing = max(0, min(targetSpacing, AppSettings.unrelatedParagraphSpacing + 40))
+                // Clamp the spacing to the defined detents
+                targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
                 
                 let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
 
