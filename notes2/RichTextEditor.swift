@@ -331,19 +331,22 @@ struct RichTextEditor: UIViewRepresentable {
                 hapticGenerator.prepare()
 
             } else if gesture.state == .changed {
-                guard let initialSpacing = initialSpacing, let range = affectedParagraphRange, let textView = self.textView else { return }
+                guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
 
-                let sensitivity: CGFloat = 1.5
-                var targetSpacing = initialSpacing + (gesture.scale - 1) * initialSpacing * sensitivity
-                targetSpacing = max(parent.settings.defaultParagraphSpacing, min(targetSpacing, 120))
+                // Symmetrical scaling logic
+                let gestureRange: CGFloat = 200 // The virtual "distance" of the pinch gesture in points
+                let gestureProgress = (gesture.scale - 1.0) * gestureRange
+                var targetSpacing = initialSpacing + gestureProgress
+                
+                // Clamp the spacing to a reasonable range to avoid extreme values
+                targetSpacing = max(0, min(targetSpacing, AppSettings.unrelatedParagraphSpacing + 40))
                 
                 let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
 
-                // Fire haptic if the detent has changed
-                if closestDetentForColor != self.lastClosestDetent {
-                    self.hapticGenerator.impactOccurred()
-                    self.hapticGenerator.prepare()
-                    self.lastClosestDetent = closestDetentForColor
+                if closestDetentForColor != lastClosestDetent {
+                    hapticGenerator.impactOccurred()
+                    hapticGenerator.prepare()
+                    lastClosestDetent = closestDetentForColor
                 }
 
                 let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
@@ -355,20 +358,20 @@ struct RichTextEditor: UIViewRepresentable {
                 if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                     paragraphs[index].paragraphStyle = newParagraphStyle
                 }
-                self.currentDetent = targetSpacing
+                currentDetent = targetSpacing
 
                 textView.layoutIfNeeded()
-                if let p1Index = self.pinchedParagraphIndex1, p1Index < self.paragraphs.count {
-                    let p1Range = self.paragraphs[p1Index].range
+                if let p1Index = pinchedParagraphIndex1, p1Index < paragraphs.count {
+                    let p1Range = paragraphs[p1Index].range
                     let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: p1Range, actualCharacterRange: nil)
-                    self.pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
+                    pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
                 }
-                if let p2Index = self.pinchedParagraphIndex2, p2Index < self.paragraphs.count {
-                    let p2Range = self.paragraphs[p2Index].range
+                if let p2Index = pinchedParagraphIndex2, p2Index < paragraphs.count {
+                    let p2Range = paragraphs[p2Index].range
                     let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: p2Range, actualCharacterRange: nil)
-                    self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
+                    pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
                 }
-                ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: closestDetentForColor, animated: false)
+                ruledView?.updateOverlays(rect1: pinchedParagraphRect1, rect2: pinchedParagraphRect2, detent: closestDetentForColor, animated: false)
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
                 guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange, let textView = self.textView else { return }
