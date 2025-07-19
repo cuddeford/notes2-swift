@@ -263,7 +263,7 @@ struct RichTextEditor: UIViewRepresentable {
             for var paragraph in paragraphs {
                 let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
                 paragraph.height = rect.height
-                paragraph.numberOfLines = Int(rect.height / textView.font!.lineHeight) // Approximation
+                paragraph.numberOfLines = Int((rect.height / textView.font!.lineHeight).rounded(.toNearestOrAwayFromZero))
                 paragraph.screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y)
 
                 updatedParagraphs.append(paragraph)
