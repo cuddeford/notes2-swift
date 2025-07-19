@@ -96,7 +96,19 @@ struct RichTextEditor: UIViewRepresentable {
         // Apply default title style if the text view is empty
         if textView.attributedText.length == 0 {
             let defaultFont = UIFont.noteStyle(.title1, traits: .traitBold)
-            textView.typingAttributes[.font] = defaultFont
+            let defaultParagraphStyle = NSMutableParagraphStyle()
+            defaultParagraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
+            defaultParagraphStyle.minimumLineHeight = defaultFont.lineHeight
+            defaultParagraphStyle.maximumLineHeight = defaultFont.lineHeight
+
+            let initialAttributes: [NSAttributedString.Key: Any] = [
+                .font: defaultFont,
+                .paragraphStyle: defaultParagraphStyle,
+                .foregroundColor: UIColor.label
+            ]
+            textView.attributedText = NSAttributedString(string: "", attributes: initialAttributes)
+            // Also set typing attributes for consistency when user starts typing
+            textView.typingAttributes = initialAttributes
         }
 
         // --- Add the SwiftUI toolbar as inputAccessoryView ---
