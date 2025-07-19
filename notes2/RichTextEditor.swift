@@ -253,6 +253,7 @@ struct RichTextEditor: UIViewRepresentable {
             }
             self.paragraphs = newParagraphs
             updateParagraphSpatialProperties()
+            ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView!)
         }
 
         func updateParagraphSpatialProperties() {
@@ -336,7 +337,7 @@ struct RichTextEditor: UIViewRepresentable {
                     // Set the initial detent for color and haptics
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
 
-                    ruledView?.updateOverlays(rect1: self.pinchedParagraphRect1, rect2: self.pinchedParagraphRect2, detent: self.lastClosestDetent ?? 0, animated: true)
+                    ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
@@ -382,7 +383,7 @@ struct RichTextEditor: UIViewRepresentable {
                     let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: p2Range, actualCharacterRange: nil)
                     pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
                 }
-                ruledView?.updateOverlays(rect1: pinchedParagraphRect1, rect2: pinchedParagraphRect2, detent: closestDetentForColor, animated: false)
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
                 ruledView?.setNeedsDisplay()
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
@@ -404,7 +405,7 @@ struct RichTextEditor: UIViewRepresentable {
 
                     textView.layoutIfNeeded()
 
-                    self.ruledView?.updateOverlays(rect1: nil, rect2: nil, detent: 0, animated: true)
+                    self.ruledView?.hideAllParagraphOverlays()
                 }) { _ in
                     self.parent.text = self.reconstructAttributedText()
                     self.initialSpacing = nil
@@ -415,6 +416,7 @@ struct RichTextEditor: UIViewRepresentable {
                     self.pinchedParagraphIndex2 = nil
                     self.currentDetent = nil
                     self.lastClosestDetent = nil
+                    self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
                 }
             }
         }
