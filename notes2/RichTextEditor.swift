@@ -258,7 +258,6 @@ struct RichTextEditor: UIViewRepresentable {
         func updateParagraphSpatialProperties() {
             guard let textView = textView else { return }
             var updatedParagraphs = [Paragraph]()
-            var currentYOffset: CGFloat = 0
 
             for var paragraph in paragraphs {
                 let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
