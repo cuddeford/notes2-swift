@@ -15,6 +15,8 @@ class AppSettings: ObservableObject {
     static let relatedParagraphSpacing: CGFloat = 32
     static let unrelatedParagraphSpacing: CGFloat = 250
 
+    static let showRuledLines = false
+
     @Published var defaultParagraphSpacing: Double {
         didSet { UserDefaults.standard.set(defaultParagraphSpacing, forKey: "defaultParagraphSpacing") }
     }

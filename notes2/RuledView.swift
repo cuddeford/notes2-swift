@@ -79,37 +79,41 @@ class RuledView: UIView {
     }
 
     override func draw(_ rect: CGRect) {
-        // guard let context = UIGraphicsGetCurrentContext(), let textView = textView else { return }
+        if (!AppSettings.showRuledLines) {
+            return
+        }
 
-        // let inset = textView.textContainerInset
-        // let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
-        // context.setStrokeColor(lineColor.cgColor)
-        // context.setLineWidth(1.0)
+        guard let context = UIGraphicsGetCurrentContext(), let textView = textView else { return }
 
-        // let layoutManager = textView.layoutManager
-        // let textStorage = textView.textStorage
+        let inset = textView.textContainerInset
+        let lineColor = UIColor.lightGray.withAlphaComponent(0.3)
+        context.setStrokeColor(lineColor.cgColor)
+        context.setLineWidth(1.0)
 
-        // var glyphIndex = 0
-        // while glyphIndex < layoutManager.numberOfGlyphs {
-        //     var glyphRange = NSRange()
-        //     let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: &glyphRange)
-        //     let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        let layoutManager = textView.layoutManager
+        let textStorage = textView.textStorage
 
-        //     var lineY = lineRect.origin.y + lineRect.height + inset.top
+        var glyphIndex = 0
+        while glyphIndex < layoutManager.numberOfGlyphs {
+            var glyphRange = NSRange()
+            let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: &glyphRange)
+            let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
 
-        //     if let paragraphStyle = textStorage.attribute(.paragraphStyle, at: characterRange.location, effectiveRange: nil) as? NSParagraphStyle {
-        //         let paragraphRange = (textStorage.string as NSString).paragraphRange(for: characterRange)
-        //         let isLastLineOfParagraph = NSMaxRange(characterRange) == NSMaxRange(paragraphRange)
-        //         if isLastLineOfParagraph {
-        //             lineY -= paragraphStyle.paragraphSpacing
-        //         }
-        //     }
+            var lineY = lineRect.origin.y + lineRect.height + inset.top
 
-        //     context.move(to: CGPoint(x: self.bounds.minX, y: lineY))
-        //     context.addLine(to: CGPoint(x: self.bounds.maxX, y: lineY))
-        //     context.strokePath()
+            if let paragraphStyle = textStorage.attribute(.paragraphStyle, at: characterRange.location, effectiveRange: nil) as? NSParagraphStyle {
+                let paragraphRange = (textStorage.string as NSString).paragraphRange(for: characterRange)
+                let isLastLineOfParagraph = NSMaxRange(characterRange) == NSMaxRange(paragraphRange)
+                if isLastLineOfParagraph {
+                    lineY -= paragraphStyle.paragraphSpacing
+                }
+            }
 
-        //     glyphIndex = NSMaxRange(glyphRange)
-        // }
+            context.move(to: CGPoint(x: self.bounds.minX, y: lineY))
+            context.addLine(to: CGPoint(x: self.bounds.maxX, y: lineY))
+            context.strokePath()
+
+            glyphIndex = NSMaxRange(glyphRange)
+        }
     }
 }
