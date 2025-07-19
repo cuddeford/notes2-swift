@@ -238,22 +238,52 @@ struct RichTextEditor: UIViewRepresentable {
 
         func parseAttributedText(_ attributedText: NSAttributedString) {
             var newParagraphs: [Paragraph] = []
-            let fullRange = NSRange(location: 0, length: attributedText.length)
-            var currentIndex = 0
+            let string = attributedText.string as NSString
+            let fullLength = string.length
+            var start = 0
 
-            while currentIndex < fullRange.length {
-                let paragraphNSRange = (attributedText.string as NSString).paragraphRange(for: NSRange(location: currentIndex, length: 0))
-                let paragraphContent = attributedText.attributedSubstring(from: paragraphNSRange)
+            while start < fullLength {
+                // Find the next newline character
+                let newlineRange = string.range(of: "\n", options: [], range: NSRange(location: start, length: fullLength - start))
+                let end: Int
+                if newlineRange.location != NSNotFound {
+                    end = newlineRange.location
+                } else {
+                    end = fullLength
+                }
 
-                let currentAttributes = attributedText.attributes(at: paragraphNSRange.location, effectiveRange: nil)
+                let paragraphRange = NSRange(location: start, length: end - start)
+                let paragraphContent = attributedText.attributedSubstring(from: paragraphRange)
+                let currentAttributes = attributedText.attributes(at: start, effectiveRange: nil)
                 let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
 
-                newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphNSRange, paragraphStyle: paragraphStyle))
-                currentIndex = NSMaxRange(paragraphNSRange)
+                newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
+
+                // Move to the character after the newline (if any)
+                start = end + 1
+
+                // If the newline was found and we're at the end, add an empty paragraph for the trailing newline
+                if newlineRange.location != NSNotFound && start > fullLength {
+                    let emptyRange = NSRange(location: fullLength, length: 0)
+                    let emptyAttributes = attributedText.length > 0 ? attributedText.attributes(at: fullLength - 1, effectiveRange: nil) : [:]
+                    let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
+                    newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
+                }
             }
+
+            // If the string ends with a newline, ensure an empty paragraph is added
+            if fullLength > 0, string.character(at: fullLength - 1) == "\n".utf16.first {
+                let emptyRange = NSRange(location: fullLength, length: 0)
+                let emptyAttributes = attributedText.length > 0 ? attributedText.attributes(at: fullLength - 1, effectiveRange: nil) : [:]
+                let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
+                newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
+            }
+
             self.paragraphs = newParagraphs
             updateParagraphSpatialProperties()
-            ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView!)
+            if let tv = textView {
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: tv)
+            }
         }
 
         func updateParagraphSpatialProperties() {
