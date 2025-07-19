@@ -35,8 +35,17 @@ class RuledView: UIView {
         // Update existing layers or create new ones
         for (index, paragraph) in paragraphs.enumerated() {
             let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
-            let drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
-            let path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
+            var drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
+
+            // force paragraph blocks when single lines, rather than inline
+            let blockRect = CGRect(
+                x: drawingRect.minX,
+                y: drawingRect.minY,
+                width: textView.textContainer.size.width,
+                height: drawingRect.height,
+            )
+
+            let path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
 
             let (fill, stroke) = colors(for: AppSettings.shared.defaultParagraphSpacing, default: .blue)
 
