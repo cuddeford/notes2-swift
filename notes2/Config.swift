@@ -13,7 +13,7 @@ class AppSettings: ObservableObject {
 
     // The two detents for paragraph spacing
     static let relatedParagraphSpacing: CGFloat = 32
-    static let unrelatedParagraphSpacing: CGFloat = 120
+    static let unrelatedParagraphSpacing: CGFloat = 400
 
     @Published var defaultParagraphSpacing: Double {
         didSet { UserDefaults.standard.set(defaultParagraphSpacing, forKey: "defaultParagraphSpacing") }

@@ -334,7 +334,7 @@ struct RichTextEditor: UIViewRepresentable {
                 guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
 
                 // Symmetrical scaling logic
-                let gestureRange: CGFloat = 200 // The virtual "distance" of the pinch gesture in points
+                let gestureRange = AppSettings.unrelatedParagraphSpacing - AppSettings.relatedParagraphSpacing
                 let gestureProgress = (gesture.scale - 1.0) * gestureRange
                 var targetSpacing = initialSpacing + gestureProgress
 
