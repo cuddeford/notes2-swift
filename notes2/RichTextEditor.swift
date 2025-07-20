@@ -250,6 +250,18 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
 
+            // After enumerating, check if the text ends with a newline. If so, and the last
+            // paragraph isn't already just a newline, add an empty paragraph to allow typing
+            // on a new line.
+            if let lastChar = string.substring(with: NSRange(location: string.length - 1, length: 1)).first, lastChar.isNewline,
+               let lastParagraph = newParagraphs.last, lastParagraph.content.string != "\n" {
+
+                let emptyRange = NSRange(location: string.length, length: 0)
+                let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
+                let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
+                newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
+            }
+
             // Handle the case of an empty string.
             if newParagraphs.isEmpty {
                 let emptyRange = NSRange(location: 0, length: 0)

@@ -37,15 +37,33 @@ class RuledView: UIView {
             let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
             var drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
 
-            // force paragraph blocks when single lines, rather than inline
-            let blockRect = CGRect(
-                x: drawingRect.minX,
-                y: drawingRect.minY,
-                width: textView.textContainer.size.width,
-                height: drawingRect.height,
-            )
+            if index == paragraphs.count - 2 {
+                if paragraphs[paragraphs.count - 1].content.string.isEmpty {
+                    drawingRect.size.height -= paragraph.paragraphStyle.paragraphSpacing + textView.font!.lineHeight
+                    drawingRect.size.width -= 5.0
+                    drawingRect.origin.x += 5.0
+                }
+            }
 
-            let path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
+            var path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
+
+            if index == paragraphs.count - 1 {
+                let lastIsEmpty = paragraph.content.string.isEmpty
+                // force paragraph blocks when single lines, rather than inline
+                var width = textView.textContainer.size.width - 10.0
+                if paragraphs.indices.contains(index - 1) {
+                    width = textView.layoutManager.boundingRect(forGlyphRange: paragraphs[index - 1].range, in: textView.textContainer).offsetBy(dx: inset.left, dy: inset.top).width - (lastIsEmpty ? 5.0 : 0)
+                }
+
+                let blockRect = CGRect(
+                    x: drawingRect.minX,
+                    y: drawingRect.minY,
+                    width: width,
+                    height: drawingRect.height,
+                )
+
+                path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
+            }
 
             let (fill, stroke) = colors(for: AppSettings.shared.defaultParagraphSpacing, default: .blue)
 
