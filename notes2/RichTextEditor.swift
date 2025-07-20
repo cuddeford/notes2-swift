@@ -91,6 +91,8 @@ struct RichTextEditor: UIViewRepresentable {
 
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
+        paragraphStyle.minimumLineHeight = textView.font!.lineHeight
+        paragraphStyle.maximumLineHeight = textView.font!.lineHeight
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
         // Apply default title style if the text view is empty
@@ -98,6 +100,8 @@ struct RichTextEditor: UIViewRepresentable {
             let defaultFont = UIFont.noteStyle(.title1, traits: .traitBold)
             let defaultParagraphStyle = NSMutableParagraphStyle()
             defaultParagraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
+            defaultParagraphStyle.minimumLineHeight = defaultFont.lineHeight
+            defaultParagraphStyle.maximumLineHeight = defaultFont.lineHeight
 
             let initialAttributes: [NSAttributedString.Key: Any] = [
                 .font: defaultFont,
@@ -455,6 +459,8 @@ struct RichTextEditor: UIViewRepresentable {
                 // Ensure paragraph style has correct line heights based on the font
                 if let font = attrs[.font] as? UIFont {
                     let paragraphStyle = (attrs[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+                    paragraphStyle.minimumLineHeight = font.lineHeight
+                    paragraphStyle.maximumLineHeight = font.lineHeight
                     attrs[.paragraphStyle] = paragraphStyle
                 }
                 textView.typingAttributes = attrs
@@ -629,6 +635,8 @@ struct RichTextEditor: UIViewRepresentable {
 
                     // Apply paragraph style with correct line height
                     let paragraphStyle = (mutable.attribute(.paragraphStyle, at: subrange.location, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+                    paragraphStyle.minimumLineHeight = newFont.lineHeight
+                    paragraphStyle.maximumLineHeight = newFont.lineHeight
                     mutable.addAttribute(.paragraphStyle, value: paragraphStyle, range: subrange)
                 }
             }
