@@ -9,47 +9,44 @@ import SwiftUI
 import Combine
 
 class CustomTextView: UITextView {
+    weak var coordinator: RichTextEditor.Coordinator?
+
     override func caretRect(for position: UITextPosition) -> CGRect {
         var originalRect = super.caretRect(for: position)
 
         let offset = self.offset(from: beginningOfDocument, to: position)
         if offset < attributedText.length {
-            // Get the font at the current position
-            let font = attributedText.attribute(.font, at: offset, effectiveRange: nil) as? UIFont
-            let expectedLineHeight = font?.lineHeight ?? originalRect.height
-
-            // Get the paragraph style at the current position
             let paragraphStyle = attributedText.attribute(.paragraphStyle, at: offset, effectiveRange: nil) as? NSParagraphStyle
             let paragraphSpacing = paragraphStyle?.paragraphSpacing ?? 0.0
 
-            originalRect.size.height -= paragraphSpacing
+            if originalRect.height - paragraphSpacing > 0 && originalRect.height - paragraphSpacing > paragraphStyle?.minimumLineHeight ?? paragraphSpacing {
+                originalRect.size.height -= paragraphSpacing
+            }
         }
+
         return originalRect
     }
 
     override func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
-        let originalSelectionRects = super.selectionRects(for: range)
-        var newSelectionRects: [UITextSelectionRect] = []
+        let originalRects = super.selectionRects(for: range)
+        var adjustedRects: [UITextSelectionRect] = []
 
-        for selectionRect in originalSelectionRects {
-            var newRect = selectionRect.rect
-
-            // Get the font at the beginning of the selection rect
-            if let textPosition = self.closestPosition(to: selectionRect.rect.origin),
-               let location = self.offset(from: beginningOfDocument, to: textPosition) as? Int,
-               location < attributedText.length { // Ensure location is within bounds
-
-                let font = attributedText.attribute(.font, at: location, effectiveRange: nil) as? UIFont
-                let expectedLineHeight = font?.lineHeight ?? newRect.height
-
-                let paragraphStyle = attributedText.attribute(.paragraphStyle, at: location, effectiveRange: nil) as? NSParagraphStyle
-                let paragraphSpacing = paragraphStyle?.paragraphSpacing ?? 0.0
-
-                newRect.size.height -= paragraphSpacing
-            }
-            newSelectionRects.append(CustomTextSelectionRect(rect: newRect, writingDirection: selectionRect.writingDirection, containsStart: selectionRect.containsStart, containsEnd: selectionRect.containsEnd, isVertical: selectionRect.isVertical))
+        for selectionRect in originalRects {
+            adjustedRects.append(CustomTextSelectionRect(
+                rect: CGRect(
+                    x: selectionRect.rect.minX,
+                    y: selectionRect.rect.minY,
+                    width: selectionRect.rect.width,
+                    height: originalRects[0].rect.height,
+                ),
+                writingDirection: selectionRect.writingDirection,
+                containsStart: selectionRect.containsStart,
+                containsEnd: selectionRect.containsEnd,
+                isVertical: selectionRect.isVertical
+            ))
         }
-        return newSelectionRects
+
+        return adjustedRects
     }
 }
 
@@ -148,6 +145,7 @@ struct RichTextEditor: UIViewRepresentable {
         textView.keyboardDismissMode = .interactive
         textView.font = UIFont.preferredFont(forTextStyle: .title1)
         textView.delegate = context.coordinator
+        textView.coordinator = context.coordinator
         textView.allowsEditingTextAttributes = true
 
         let ruledView = RuledView(frame: .zero)
