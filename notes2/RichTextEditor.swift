@@ -220,10 +220,6 @@ struct RichTextEditor: UIViewRepresentable {
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
-        var pinchedParagraphRect1: CGRect?
-        var pinchedParagraphRect2: CGRect?
-        var pinchedParagraphIndex1: Int?
-        var pinchedParagraphIndex2: Int?
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -239,44 +235,28 @@ struct RichTextEditor: UIViewRepresentable {
         func parseAttributedText(_ attributedText: NSAttributedString) {
             var newParagraphs: [Paragraph] = []
             let string = attributedText.string as NSString
-            let fullLength = string.length
-            var start = 0
+            let fullRange = NSRange(location: 0, length: string.length)
 
-            while start < fullLength {
-                // Find the next newline character
-                let newlineRange = string.range(of: "\n", options: [], range: NSRange(location: start, length: fullLength - start))
-                let end: Int
-                if newlineRange.location != NSNotFound {
-                    end = newlineRange.location
-                } else {
-                    end = fullLength
-                }
+            if string.length > 0 {
+                string.enumerateSubstrings(in: fullRange, options: .byParagraphs) { (substring, paragraphRange, enclosingRange, stop) in
+                    guard substring != nil else { return }
 
-                let paragraphRange = NSRange(location: start, length: end - start)
-                let paragraphContent = attributedText.attributedSubstring(from: paragraphRange)
-                let currentAttributes = attributedText.attributes(at: start, effectiveRange: nil)
-                let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
+                    let paragraphContent = attributedText.attributedSubstring(from: enclosingRange)
+                    let currentAttributes = attributedText.attributes(at: paragraphRange.location, effectiveRange: nil)
+                    let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
 
-                newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
-
-                // Move to the character after the newline (if any)
-                start = end + 1
-
-                // If the newline was found and we're at the end, add an empty paragraph for the trailing newline
-                if newlineRange.location != NSNotFound && start > fullLength {
-                    let emptyRange = NSRange(location: fullLength, length: 0)
-                    let emptyAttributes = attributedText.length > 0 ? attributedText.attributes(at: fullLength - 1, effectiveRange: nil) : [:]
-                    let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
-                    newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
+                    newParagraphs.append(Paragraph(content: paragraphContent, range: enclosingRange, paragraphStyle: paragraphStyle))
+                    print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(enclosingRange)")
                 }
             }
 
-            // If the string ends with a newline, ensure an empty paragraph is added
-            if fullLength > 0, string.character(at: fullLength - 1) == "\n".utf16.first {
-                let emptyRange = NSRange(location: fullLength, length: 0)
-                let emptyAttributes = attributedText.length > 0 ? attributedText.attributes(at: fullLength - 1, effectiveRange: nil) : [:]
+            // Handle the case of an empty string.
+            if newParagraphs.isEmpty {
+                let emptyRange = NSRange(location: 0, length: 0)
+                let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
                 let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
                 newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
+                print("Added empty paragraph for empty text. Range: \(emptyRange)")
             }
 
             self.paragraphs = newParagraphs
@@ -318,7 +298,14 @@ struct RichTextEditor: UIViewRepresentable {
             let mutableAttributedText = NSMutableAttributedString()
             for paragraph in paragraphs {
                 let paragraphContent = NSMutableAttributedString(attributedString: paragraph.content)
-                paragraphContent.addAttribute(.paragraphStyle, value: paragraph.paragraphStyle, range: NSRange(location: 0, length: paragraphContent.length))
+                let contentRange = NSRange(location: 0, length: paragraphContent.length)
+
+                // Apply the stored paragraph style over the entire range of the paragraph content.
+                // This ensures that any updates (like from the pinch gesture) are reflected.
+                if contentRange.length > 0 {
+                    paragraphContent.addAttribute(.paragraphStyle, value: paragraph.paragraphStyle, range: contentRange)
+                }
+
                 mutableAttributedText.append(paragraphContent)
             }
             return mutableAttributedText
@@ -335,8 +322,8 @@ struct RichTextEditor: UIViewRepresentable {
                     let range1 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position1))
                     let range2 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position2))
 
-                    guard let index1 = paragraphs.firstIndex(where: { $0.range == range1 }),
-                          let index2 = paragraphs.firstIndex(where: { $0.range == range2 }) else {
+                    guard let index1 = paragraphs.firstIndex(where: { ($0.range == range1) || ($0.range.location == range1.location && $0.range.length == range1.length - 1) }),
+                          let index2 = paragraphs.firstIndex(where: { ($0.range == range2) || ($0.range.location == range2.location && $0.range.length == range2.length - 1) }) else {
                         gesture.state = .cancelled
                         return
                     }
@@ -346,16 +333,10 @@ struct RichTextEditor: UIViewRepresentable {
                         return
                     }
 
-                    let topRange = range1.location < range2.location ? range1 : range2
+                    let topRange = paragraphs[index1].range.location < paragraphs[index2].range.location
+                        ? paragraphs[index1].range
+                        : paragraphs[index2].range
                     self.affectedParagraphRange = topRange
-
-                    let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: range1, actualCharacterRange: nil)
-                    self.pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
-                    self.pinchedParagraphIndex1 = index1
-
-                    let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: range2, actualCharacterRange: nil)
-                    self.pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
-                    self.pinchedParagraphIndex2 = index2
 
                     if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
                         self.initialSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
@@ -403,16 +384,6 @@ struct RichTextEditor: UIViewRepresentable {
                 currentDetent = targetSpacing
 
                 textView.layoutIfNeeded()
-                if let p1Index = pinchedParagraphIndex1, p1Index < paragraphs.count {
-                    let p1Range = paragraphs[p1Index].range
-                    let glyphRange1 = textView.layoutManager.glyphRange(forCharacterRange: p1Range, actualCharacterRange: nil)
-                    pinchedParagraphRect1 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange1, in: textView.textContainer)
-                }
-                if let p2Index = pinchedParagraphIndex2, p2Index < paragraphs.count {
-                    let p2Range = paragraphs[p2Index].range
-                    let glyphRange2 = textView.layoutManager.glyphRange(forCharacterRange: p2Range, actualCharacterRange: nil)
-                    pinchedParagraphRect2 = textView.layoutManager.boundingRect(forGlyphRange: glyphRange2, in: textView.textContainer)
-                }
                 ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
                 ruledView?.setNeedsDisplay()
 
@@ -440,10 +411,6 @@ struct RichTextEditor: UIViewRepresentable {
                     self.parent.text = self.reconstructAttributedText()
                     self.initialSpacing = nil
                     self.affectedParagraphRange = nil
-                    self.pinchedParagraphRect1 = nil
-                    self.pinchedParagraphRect2 = nil
-                    self.pinchedParagraphIndex1 = nil
-                    self.pinchedParagraphIndex2 = nil
                     self.currentDetent = nil
                     self.lastClosestDetent = nil
                     self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
