@@ -6,12 +6,79 @@
 //
 
 import SwiftUI
+import Combine
+
+class CustomTextView: UITextView {
+    weak var coordinator: RichTextEditor.Coordinator?
+
+    override func caretRect(for position: UITextPosition) -> CGRect {
+        var originalRect = super.caretRect(for: position)
+
+        let offset = self.offset(from: beginningOfDocument, to: position)
+        if offset < attributedText.length {
+            let paragraphStyle = attributedText.attribute(.paragraphStyle, at: offset, effectiveRange: nil) as? NSParagraphStyle
+            let paragraphSpacing = paragraphStyle?.paragraphSpacing ?? 0.0
+
+            if originalRect.height - paragraphSpacing > 0 && originalRect.height - paragraphSpacing > paragraphStyle?.minimumLineHeight ?? paragraphSpacing {
+                originalRect.size.height -= paragraphSpacing
+            }
+        }
+
+        return originalRect
+    }
+
+    override func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
+        let originalRects = super.selectionRects(for: range)
+        var adjustedRects: [UITextSelectionRect] = []
+
+        for selectionRect in originalRects {
+            adjustedRects.append(CustomTextSelectionRect(
+                rect: CGRect(
+                    x: selectionRect.rect.minX,
+                    y: selectionRect.rect.minY,
+                    width: selectionRect.rect.width,
+                    height: originalRects[0].rect.height,
+                ),
+                writingDirection: selectionRect.writingDirection,
+                containsStart: selectionRect.containsStart,
+                containsEnd: selectionRect.containsEnd,
+                isVertical: selectionRect.isVertical
+            ))
+        }
+
+        return adjustedRects
+    }
+}
+
+class CustomTextSelectionRect: UITextSelectionRect {
+    private let _rect: CGRect
+    private let _writingDirection: NSWritingDirection
+    private let _containsStart: Bool
+    private let _containsEnd: Bool
+    private let _isVertical: Bool
+
+    init(rect: CGRect, writingDirection: NSWritingDirection, containsStart: Bool, containsEnd: Bool, isVertical: Bool) {
+        _rect = rect
+        _writingDirection = writingDirection
+        _containsStart = containsStart
+        _containsEnd = containsEnd
+        _isVertical = isVertical
+    }
+
+    override var rect: CGRect { return _rect }
+    override var writingDirection: NSWritingDirection { return _writingDirection }
+    override var containsStart: Bool { return _containsStart }
+    override var containsEnd: Bool { return _containsEnd }
+    override var isVertical: Bool { return _isVertical }
+}
 
 func paragraphRange(for text: NSAttributedString, at location: Int) -> NSRange {
     let string = text.string as NSString
     let length = string.length
-    guard length > 0 else { return NSRange(location: 0, length: 0) }
-    let safeLocation = min(max(location, 0), length - 1)
+    if length == 0 {
+        return NSRange(location: 0, length: 0)
+    }
+    let safeLocation = min(max(location, 0), length)
     return string.paragraphRange(for: NSRange(location: safeLocation, length: 0))
 }
 
@@ -54,6 +121,7 @@ enum NoteTextAttribute {
 }
 
 struct RichTextEditor: UIViewRepresentable {
+    typealias UIViewType = CustomTextView
     @Binding var text: NSAttributedString
     @Binding var selectedRange: NSRange
     var note: Note
@@ -61,21 +129,380 @@ struct RichTextEditor: UIViewRepresentable {
     @StateObject var settings = AppSettings.shared
 
     var keyboard: KeyboardObserver
+    var onCoordinatorReady: ((Coordinator) -> Void)? = nil
+
+    func makeUIView(context: Context) -> CustomTextView {
+        let textView = CustomTextView()
+        textView.isEditable = true
+        textView.isScrollEnabled = true
+        textView.alwaysBounceVertical = true
+        textView.textContainerInset = UIEdgeInsets(
+            top: settings.padding,
+            left: settings.padding,
+            bottom: settings.padding,
+            right: settings.padding
+        )
+        textView.keyboardDismissMode = .interactive
+        textView.font = UIFont.preferredFont(forTextStyle: .title1)
+        textView.delegate = context.coordinator
+        textView.coordinator = context.coordinator
+        textView.allowsEditingTextAttributes = true
+
+        let ruledView = RuledView(frame: .zero)
+        ruledView.textView = textView
+        textView.backgroundColor = .clear
+        textView.addSubview(ruledView)
+        textView.sendSubviewToBack(ruledView)
+        context.coordinator.ruledView = ruledView
+
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
+        paragraphStyle.minimumLineHeight = textView.font!.lineHeight
+        paragraphStyle.maximumLineHeight = textView.font!.lineHeight
+        textView.typingAttributes[.paragraphStyle] = paragraphStyle
+
+        // Apply default title style if the text view is empty
+        if textView.attributedText.length == 0 {
+            let defaultFont = UIFont.noteStyle(.title1, traits: .traitBold)
+            let defaultParagraphStyle = NSMutableParagraphStyle()
+            defaultParagraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
+            defaultParagraphStyle.minimumLineHeight = defaultFont.lineHeight
+            defaultParagraphStyle.maximumLineHeight = defaultFont.lineHeight
+
+            let initialAttributes: [NSAttributedString.Key: Any] = [
+                .font: defaultFont,
+                .paragraphStyle: defaultParagraphStyle,
+                .foregroundColor: UIColor.label
+            ]
+            textView.attributedText = NSAttributedString(string: "", attributes: initialAttributes)
+            // Also set typing attributes for consistency when user starts typing
+            textView.typingAttributes = initialAttributes
+        }
+
+        // --- Add the SwiftUI toolbar as inputAccessoryView ---
+        let toolbar = EditorToolbar(
+            onBold: { context.coordinator.toggleAttribute(.bold) },
+            onItalic: { context.coordinator.toggleAttribute(.italic) },
+            onUnderline: { context.coordinator.toggleAttribute(.underline) },
+            onTitle1: { context.coordinator.toggleAttribute(.title1) },
+            onTitle2: { context.coordinator.toggleAttribute(.title2) },
+            onBody: { context.coordinator.toggleAttribute(.body) },
+            settings: settings
+        )
+        let hostingController = UIHostingController(rootView: toolbar)
+        hostingController.view.backgroundColor = .clear
+        hostingController.view.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60)
+        textView.inputAccessoryView = hostingController.view
+        context.coordinator.toolbarHostingController = hostingController
+        // -----------------------------------------------------
+
+        let pinchGesture = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePinchGesture(_:)))
+        textView.addGestureRecognizer(pinchGesture)
+
+        context.coordinator.textView = textView
+        context.coordinator.textContainerInset = textView.textContainerInset
+        context.coordinator.textViewWidth = textView.bounds.width
+        DispatchQueue.main.async { // Ensure UI updates happen on the main thread
+            textView.becomeFirstResponder()
+        }
+        return textView
+    }
+
+    func updateUIView(_ uiView: CustomTextView, context: Context) {
+        // Only update if the attributed text has actually changed to avoid infinite loops
+        if uiView.attributedText != text {
+            uiView.attributedText = text
+            context.coordinator.parseAttributedText(text)
+        }
+
+        if uiView.selectedRange != selectedRange {
+            uiView.selectedRange = selectedRange
+        }
+
+        context.coordinator.updateRuledViewFrame()
+
+        context.coordinator.updateTypingAttributes()
+
+        // Update the toolbar if settings changed
+        if let hostingController = context.coordinator.toolbarHostingController {
+            hostingController.rootView = EditorToolbar(
+                onBold: { context.coordinator.toggleAttribute(.bold) },
+                onItalic: { context.coordinator.toggleAttribute(.italic) },
+                onUnderline: { context.coordinator.toggleAttribute(.underline) },
+                onTitle1: { context.coordinator.toggleAttribute(.title1) },
+                onTitle2: { context.coordinator.toggleAttribute(.title2) },
+                onBody: { context.coordinator.toggleAttribute(.body) },
+                settings: settings
+            )
+            hostingController.view.setNeedsLayout()
+        }
+
+        // --- Typewriter Scrolling Insets ---
+        let baseInset: CGFloat = settings.padding
+        let keyboardHeight = keyboard.keyboardHeight
+
+        // Adjust contentInset to make space for the keyboard and typewriter effect
+        let bottomContentInset: CGFloat
+        if keyboardHeight > 0 {
+            // When the keyboard is visible, the bottom inset should be large enough to allow
+            // scrolling the text way up, leaving a large blank area below.
+            // This makes it feel like the text view is scrolling "over" the keyboard.
+            bottomContentInset = keyboardHeight - uiView.safeAreaInsets.bottom + baseInset
+        } else {
+            // When the keyboard is hidden, we don't need a huge inset.
+            bottomContentInset = baseInset
+        }
+
+        let newContentInsets = UIEdgeInsets(
+            top: 0,
+            left: 0,
+            bottom: bottomContentInset,
+            right: 0
+        )
+
+        if uiView.contentInset != newContentInsets {
+            uiView.contentInset = newContentInsets
+            // Also adjust the scroll indicators to match
+            uiView.scrollIndicatorInsets = newContentInsets
+        }
+        context.coordinator.textViewWidth = uiView.bounds.width
+    }
+
+    func makeCoordinator() -> Coordinator {
+        let coordinator = Coordinator(self)
+        onCoordinatorReady?(coordinator)
+        return coordinator
+    }
 
     class Coordinator: NSObject, UITextViewDelegate {
         var parent: RichTextEditor
         weak var textView: UITextView?
+        weak var ruledView: RuledView?
         private var debounceWorkItem: DispatchWorkItem?
         var toolbarHostingController: UIHostingController<EditorToolbar>?
+        private var initialSpacing: CGFloat?
+        private var affectedParagraphRange: NSRange?
+        private let hapticGenerator = UIImpactFeedbackGenerator(style: .light)
+        // Detents for paragraph spacing adjustments
+        // min is for related paragraphs, max is for unrelated paragraphs
+        private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
+        private var lastDetentIndex: Int = -1
+        private var lastClosestDetent: CGFloat?
+
+        @Published var paragraphs: [Paragraph] = []
+        @Published var textContainerInset: UIEdgeInsets = .zero
+        @Published var contentOffset: CGPoint = .zero
+        @Published var textViewWidth: CGFloat = 0
+        @Published var currentDetent: CGFloat?
 
         init(_ parent: RichTextEditor) {
             self.parent = parent
+            super.init()
+        }
+
+        func parseAttributedText(_ attributedText: NSAttributedString) {
+            var newParagraphs: [Paragraph] = []
+            let string = attributedText.string
+
+            if attributedText.length == 0 {
+                let emptyRange = NSRange(location: 0, length: 0)
+                let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
+                let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
+                newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
+                print("Added empty paragraph for empty text. Range: \(emptyRange)")
+            } else {
+                let lines = string.components(separatedBy: "\n")
+                var currentLocation = 0
+
+                for (index, line) in lines.enumerated() {
+                    let isLastLine = index == lines.count - 1
+                    let lineLength = line.utf16.count
+                    let paragraphLength = isLastLine ? lineLength : lineLength + 1
+                    let paragraphRange = NSRange(location: currentLocation, length: paragraphLength)
+
+                    guard paragraphRange.location + paragraphRange.length <= attributedText.length else {
+                        print("Error: Invalid range for paragraph \(index). Range: \(paragraphRange), Total Length: \(attributedText.length)")
+                        continue
+                    }
+
+                    let paragraphContent = attributedText.attributedSubstring(from: paragraphRange)
+                    let locationForAttributes = max(0, min(paragraphRange.location, attributedText.length - 1))
+                    let currentAttributes = attributedText.attributes(at: locationForAttributes, effectiveRange: nil)
+                    let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
+
+                    newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
+                    print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(paragraphRange)")
+
+                    currentLocation += paragraphLength
+                }
+            }
+
+            self.paragraphs = newParagraphs
+            updateParagraphSpatialProperties()
+            if let tv = textView {
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: tv)
+                // print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
+            }
+        }
+
+        func updateParagraphSpatialProperties() {
+            guard let textView = textView else { return }
+            var updatedParagraphs = [Paragraph]()
+
+            for var paragraph in paragraphs {
+                let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
+                paragraph.height = rect.height
+                paragraph.numberOfLines = Int((rect.height / textView.font!.lineHeight).rounded(.toNearestOrAwayFromZero))
+                paragraph.screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y)
+
+                updatedParagraphs.append(paragraph)
+            }
+            self.paragraphs = updatedParagraphs
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            updateParagraphSpatialProperties()
+            self.contentOffset = scrollView.contentOffset
+            ruledView?.setNeedsDisplay()
+        }
+
+        func updateRuledViewFrame() {
+            guard let textView = textView, let ruledView = ruledView else { return }
+            let contentSize = textView.contentSize
+            ruledView.frame = CGRect(x: 0, y: 0, width: contentSize.width, height: contentSize.height)
+            ruledView.setNeedsDisplay()
+        }
+
+        private func reconstructAttributedText() -> NSAttributedString {
+            let mutableAttributedText = NSMutableAttributedString()
+            for paragraph in paragraphs {
+                let paragraphContent = NSMutableAttributedString(attributedString: paragraph.content)
+                let contentRange = NSRange(location: 0, length: paragraphContent.length)
+
+                // Apply the stored paragraph style over the entire range of the paragraph content.
+                // This ensures that any updates (like from the pinch gesture) are reflected.
+                if contentRange.length > 0 {
+                    paragraphContent.addAttribute(.paragraphStyle, value: paragraph.paragraphStyle, range: contentRange)
+                }
+
+                mutableAttributedText.append(paragraphContent)
+            }
+            return mutableAttributedText
+        }
+
+        @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
+            guard let textView = textView else { return }
+
+            if gesture.state == .began && gesture.numberOfTouches >= 2 {
+                let location1 = gesture.location(ofTouch: 0, in: textView)
+                let location2 = gesture.location(ofTouch: 1, in: textView)
+
+                if let position1 = textView.closestPosition(to: location1), let position2 = textView.closestPosition(to: location2) {
+                    let range1 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position1))
+                    let range2 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position2))
+
+                    guard let index1 = paragraphs.firstIndex(where: { ($0.range == range1) || ($0.range.location == range1.location && $0.range.length == range1.length - 1) }),
+                          let index2 = paragraphs.firstIndex(where: { ($0.range == range2) || ($0.range.location == range2.location && $0.range.length == range2.length - 1) }) else {
+                        gesture.state = .cancelled
+                        return
+                    }
+
+                    if index1 == index2 || abs(index1 - index2) != 1 {
+                        gesture.state = .cancelled
+                        return
+                    }
+
+                    let topRange = paragraphs[index1].range.location < paragraphs[index2].range.location
+                        ? paragraphs[index1].range
+                        : paragraphs[index2].range
+                    self.affectedParagraphRange = topRange
+
+                    if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
+                        self.initialSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
+                    } else {
+                        self.initialSpacing = parent.settings.defaultParagraphSpacing
+                    }
+                    self.currentDetent = self.initialSpacing
+
+                    // Set the initial detent for color and haptics
+                    self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
+
+                    ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                }
+                gesture.scale = 1.0
+                hapticGenerator.prepare()
+
+            } else if gesture.state == .changed {
+                guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
+
+                // Symmetrical scaling logic
+                let gestureRange = AppSettings.unrelatedParagraphSpacing - AppSettings.relatedParagraphSpacing
+                let gestureProgress = (gesture.scale - 1.0) * gestureRange
+                var targetSpacing = initialSpacing + gestureProgress
+
+                // Clamp the spacing to the defined detents
+                targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
+
+                let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
+
+                if closestDetentForColor != lastClosestDetent {
+                    hapticGenerator.impactOccurred()
+                    hapticGenerator.prepare()
+                    lastClosestDetent = closestDetentForColor
+                }
+
+                let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
+                let newParagraphStyle = NSMutableParagraphStyle()
+                newParagraphStyle.setParagraphStyle(currentStyle)
+                newParagraphStyle.paragraphSpacing = targetSpacing
+
+                textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+                if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                    paragraphs[index].paragraphStyle = newParagraphStyle
+                }
+                currentDetent = targetSpacing
+
+                textView.layoutIfNeeded()
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                ruledView?.setNeedsDisplay()
+
+            } else if gesture.state == .ended || gesture.state == .cancelled {
+                guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange, let textView = self.textView else { return }
+
+                let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) })
+
+                UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut, animations: {
+                    let finalParagraphStyle = NSMutableParagraphStyle()
+                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                        finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
+                    }
+                    finalParagraphStyle.paragraphSpacing = closestDetent ?? self.parent.settings.defaultParagraphSpacing
+
+                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
+                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                        self.paragraphs[index].paragraphStyle = finalParagraphStyle
+                    }
+
+                    textView.layoutIfNeeded()
+
+                    self.ruledView?.hideAllParagraphOverlays()
+                }) { _ in
+                    self.parent.text = self.reconstructAttributedText()
+                    self.initialSpacing = nil
+                    self.affectedParagraphRange = nil
+                    self.currentDetent = nil
+                    self.lastClosestDetent = nil
+                    self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                }
+            }
         }
 
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
                 self.parent.text = textView.attributedText
+                self.parseAttributedText(textView.attributedText)
                 self.centerCursorInTextView()
+                self.updateRuledViewFrame()
             }
         }
 
@@ -94,7 +521,14 @@ struct RichTextEditor: UIViewRepresentable {
             guard let textView = textView else { return }
             let loc = max(0, min(textView.selectedRange.location - 1, textView.attributedText.length - 1))
             if textView.attributedText.length > 0 && loc >= 0 {
-                let attrs = textView.attributedText.attributes(at: loc, effectiveRange: nil)
+                var attrs = textView.attributedText.attributes(at: loc, effectiveRange: nil)
+                // Ensure paragraph style has correct line heights based on the font
+                if let font = attrs[.font] as? UIFont {
+                    let paragraphStyle = (attrs[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+                    paragraphStyle.minimumLineHeight = font.lineHeight
+                    paragraphStyle.maximumLineHeight = font.lineHeight
+                    attrs[.paragraphStyle] = paragraphStyle
+                }
                 textView.typingAttributes = attrs
             }
         }
@@ -264,135 +698,18 @@ struct RichTextEditor: UIViewRepresentable {
                         newFont = UIFont.noteStyle(targetStyle, traits: traits)
                     }
                     mutable.addAttribute(.font, value: newFont, range: subrange)
+
+                    // Apply paragraph style with correct line height
+                    let paragraphStyle = (mutable.attribute(.paragraphStyle, at: subrange.location, effectiveRange: nil) as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+                    paragraphStyle.minimumLineHeight = newFont.lineHeight
+                    paragraphStyle.maximumLineHeight = newFont.lineHeight
+                    mutable.addAttribute(.paragraphStyle, value: paragraphStyle, range: subrange)
                 }
             }
 
             parent.text = mutable
+            self.parseAttributedText(mutable)
             self.updateTypingAttributes()
         }
-    }
-
-    var onCoordinatorReady: ((Coordinator) -> Void)? = nil
-    func makeCoordinator() -> Coordinator {
-        let coordinator = Coordinator(self)
-        DispatchQueue.main.async {
-            self.onCoordinatorReady?(coordinator)
-        }
-
-        return coordinator
-    }
-
-    func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
-        textView.isEditable = true
-        textView.isScrollEnabled = true
-        textView.alwaysBounceVertical = true
-        textView.textContainerInset = UIEdgeInsets(
-            top: settings.padding,
-            left: settings.padding,
-            bottom: settings.padding,
-            right: settings.padding
-        )
-        textView.keyboardDismissMode = .interactive
-        textView.font = UIFont.preferredFont(forTextStyle: .title1)
-        textView.delegate = context.coordinator
-        textView.allowsEditingTextAttributes = true
-
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.paragraphSpacing = settings.paragraphSpacing
-        textView.typingAttributes[.paragraphStyle] = paragraphStyle
-
-        // --- Add the SwiftUI toolbar as inputAccessoryView ---
-        let toolbar = EditorToolbar(
-            onBold: { context.coordinator.toggleAttribute(.bold) },
-            onItalic: { context.coordinator.toggleAttribute(.italic) },
-            onUnderline: { context.coordinator.toggleAttribute(.underline) },
-            onTitle1: { context.coordinator.toggleAttribute(.title1) },
-            onTitle2: { context.coordinator.toggleAttribute(.title2) },
-            onBody: { context.coordinator.toggleAttribute(.body) },
-            settings: settings,
-        )
-        let hostingController = UIHostingController(rootView: toolbar)
-        hostingController.view.backgroundColor = .clear
-        hostingController.view.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60)
-        textView.inputAccessoryView = hostingController.view
-        context.coordinator.toolbarHostingController = hostingController
-        // -----------------------------------------------------
-
-        context.coordinator.textView = textView
-        return textView
-    }
-
-    func updateUIView(_ uiView: UITextView, context: Context) {
-        if uiView.attributedText != text {
-            let mutable = NSMutableAttributedString(attributedString: text)
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.paragraphSpacing = settings.paragraphSpacing
-            mutable.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: mutable.length))
-            uiView.attributedText = mutable
-        }
-
-        if uiView.selectedRange != selectedRange {
-            uiView.selectedRange = selectedRange
-        }
-
-        context.coordinator.updateTypingAttributes()
-
-        // Update the toolbar if settings changed
-        if let hostingController = context.coordinator.toolbarHostingController {
-            hostingController.rootView = EditorToolbar(
-                onBold: { context.coordinator.toggleAttribute(.bold) },
-                onItalic: { context.coordinator.toggleAttribute(.italic) },
-                onUnderline: { context.coordinator.toggleAttribute(.underline) },
-                onTitle1: { context.coordinator.toggleAttribute(.title1) },
-                onTitle2: { context.coordinator.toggleAttribute(.title2) },
-                onBody: { context.coordinator.toggleAttribute(.body) },
-                settings: settings,
-            )
-            hostingController.view.setNeedsLayout()
-        }
-
-        // --- Typewriter Scrolling Insets ---
-        let baseInset: CGFloat = settings.padding
-        let keyboardHeight = keyboard.keyboardHeight
-
-        // Adjust contentInset to make space for the keyboard and typewriter effect
-        let bottomContentInset: CGFloat
-        if keyboardHeight > 0 {
-            // When the keyboard is visible, the bottom inset should be large enough to allow
-            // scrolling the text way up, leaving a large blank area below.
-            // This makes it feel like the text view is scrolling "over" the keyboard.
-            bottomContentInset = keyboardHeight - uiView.safeAreaInsets.bottom + baseInset
-        } else {
-            // When the keyboard is hidden, we don't need a huge inset.
-            bottomContentInset = baseInset
-        }
-
-        let newContentInsets = UIEdgeInsets(
-            top: 0,
-            left: 0,
-            bottom: bottomContentInset,
-            right: 0
-        )
-
-        if uiView.contentInset != newContentInsets {
-            uiView.contentInset = newContentInsets
-            // Also adjust the scroll indicators to match
-            uiView.scrollIndicatorInsets = newContentInsets
-        }
-
-        // Adjust textContainerInset for visual padding around the text itself.
-        // This is kept constant whether the keyboard is visible or not.
-        // let newTextContainerInsets = UIEdgeInsets(
-        //     top: baseInset,
-        //     left: baseInset,
-        //     bottom: baseInset,
-        //     right: baseInset
-        // )
-
-        // if uiView.textContainerInset != newTextContainerInsets {
-        //     uiView.textContainerInset = newTextContainerInsets
-        // }
-        // --- End Typewriter Scrolling Insets ---
     }
 }

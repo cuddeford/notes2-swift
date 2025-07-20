@@ -31,7 +31,7 @@ struct NoteView: View {
         if let attr = try? NSAttributedString(
             data: note.content,
             options: [.documentType: NSAttributedString.DocumentType.rtfd],
-            documentAttributes: nil,
+            documentAttributes: nil
         ) {
             _noteText = State(initialValue: attr)
         } else {
@@ -42,7 +42,7 @@ struct NoteView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             RichTextEditor(
                 text: $noteText,
                 selectedRange: $selectedRange,
@@ -50,25 +50,27 @@ struct NoteView: View {
                 keyboard: keyboard,
                 onCoordinatorReady: { coordinator in
                     self.editorCoordinator = coordinator
-                    if noteText.length == 0 {
-                        coordinator.toggleAttribute(.title1)
-                    }
-
-                    editorCoordinator?.textView?.becomeFirstResponder()
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        editorCoordinator?.textView?.becomeFirstResponder()
-                    }
-                },
+                }
             )
+            .onAppear {
+                // Initial parsing and spatial property update when the view appears
+                editorCoordinator?.parseAttributedText(noteText)
+            }
             .onChange(of: noteText) { oldValue, newValue in
                 if let data = try? newValue.data(
                     from: NSRange(location: 0, length: newValue.length),
-                    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd],
+                    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd]
                 ) {
                     note.content = data
                     note.updatedAt = Date()
                 }
+                // Re-parse and update spatial properties when noteText changes
+                editorCoordinator?.parseAttributedText(newValue)
+            }
+            .onChange(of: editorCoordinator?.paragraphs) { oldParagraphs, newParagraphs in
+                // Handle changes in paragraphs, e.g., update UI based on spatial properties
+                // print("Paragraphs changed: \(newParagraphs?.count ?? 0) paragraphs")
+                // You can now access newParagraphs[i].height, newParagraphs[i].screenPosition, etc.
             }
 
             if isDragging {
