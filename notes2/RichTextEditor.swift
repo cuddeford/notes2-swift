@@ -236,41 +236,39 @@ struct RichTextEditor: UIViewRepresentable {
 
         func parseAttributedText(_ attributedText: NSAttributedString) {
             var newParagraphs: [Paragraph] = []
-            let string = attributedText.string as NSString
-            let fullRange = NSRange(location: 0, length: string.length)
+            let string = attributedText.string
 
-            if string.length > 0 {
-                string.enumerateSubstrings(in: fullRange, options: .byParagraphs) { (substring, paragraphRange, enclosingRange, stop) in
-                    guard substring != nil else { return }
-
-                    let paragraphContent = attributedText.attributedSubstring(from: enclosingRange)
-                    let currentAttributes = attributedText.attributes(at: paragraphRange.location, effectiveRange: nil)
-                    let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
-
-                    newParagraphs.append(Paragraph(content: paragraphContent, range: enclosingRange, paragraphStyle: paragraphStyle))
-                    print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(enclosingRange)")
-                }
-            }
-
-            // After enumerating, check if the text ends with a newline. If so, and the last
-            // paragraph isn't already just a newline, add an empty paragraph to allow typing
-            // on a new line.
-            if let lastChar = string.substring(with: NSRange(location: string.length - 1, length: 1)).first, lastChar.isNewline,
-               let lastParagraph = newParagraphs.last, lastParagraph.content.string != "\n" {
-
-                let emptyRange = NSRange(location: string.length, length: 0)
-                let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
-                let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
-                newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
-            }
-
-            // Handle the case of an empty string.
-            if newParagraphs.isEmpty {
+            if attributedText.length == 0 {
                 let emptyRange = NSRange(location: 0, length: 0)
                 let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
                 let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
                 newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
                 print("Added empty paragraph for empty text. Range: \(emptyRange)")
+            } else {
+                let lines = string.components(separatedBy: "\n")
+                var currentLocation = 0
+
+                for (index, line) in lines.enumerated() {
+                    let isLastLine = index == lines.count - 1
+                    let lineLength = line.utf16.count
+                    let paragraphLength = isLastLine ? lineLength : lineLength + 1
+                    let paragraphRange = NSRange(location: currentLocation, length: paragraphLength)
+
+                    guard paragraphRange.location + paragraphRange.length <= attributedText.length else {
+                        print("Error: Invalid range for paragraph \(index). Range: \(paragraphRange), Total Length: \(attributedText.length)")
+                        continue
+                    }
+
+                    let paragraphContent = attributedText.attributedSubstring(from: paragraphRange)
+                    let locationForAttributes = max(0, min(paragraphRange.location, attributedText.length - 1))
+                    let currentAttributes = attributedText.attributes(at: locationForAttributes, effectiveRange: nil)
+                    let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
+
+                    newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
+                    print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(paragraphRange)")
+
+                    currentLocation += paragraphLength
+                }
             }
 
             self.paragraphs = newParagraphs
