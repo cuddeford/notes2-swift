@@ -8,6 +8,73 @@
 import SwiftUI
 import Combine
 
+class CustomTextView: UITextView {
+    override func caretRect(for position: UITextPosition) -> CGRect {
+        var originalRect = super.caretRect(for: position)
+
+        let offset = self.offset(from: beginningOfDocument, to: position)
+        if offset < attributedText.length {
+            // Get the font at the current position
+            let font = attributedText.attribute(.font, at: offset, effectiveRange: nil) as? UIFont
+            let expectedLineHeight = font?.lineHeight ?? originalRect.height
+
+            // Get the paragraph style at the current position
+            let paragraphStyle = attributedText.attribute(.paragraphStyle, at: offset, effectiveRange: nil) as? NSParagraphStyle
+            let paragraphSpacing = paragraphStyle?.paragraphSpacing ?? 0.0
+
+            originalRect.size.height -= paragraphSpacing
+        }
+        return originalRect
+    }
+
+    override func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
+        let originalSelectionRects = super.selectionRects(for: range)
+        var newSelectionRects: [UITextSelectionRect] = []
+
+        for selectionRect in originalSelectionRects {
+            var newRect = selectionRect.rect
+
+            // Get the font at the beginning of the selection rect
+            if let textPosition = self.closestPosition(to: selectionRect.rect.origin),
+               let location = self.offset(from: beginningOfDocument, to: textPosition) as? Int,
+               location < attributedText.length { // Ensure location is within bounds
+
+                let font = attributedText.attribute(.font, at: location, effectiveRange: nil) as? UIFont
+                let expectedLineHeight = font?.lineHeight ?? newRect.height
+
+                let paragraphStyle = attributedText.attribute(.paragraphStyle, at: location, effectiveRange: nil) as? NSParagraphStyle
+                let paragraphSpacing = paragraphStyle?.paragraphSpacing ?? 0.0
+
+                newRect.size.height -= paragraphSpacing
+            }
+            newSelectionRects.append(CustomTextSelectionRect(rect: newRect, writingDirection: selectionRect.writingDirection, containsStart: selectionRect.containsStart, containsEnd: selectionRect.containsEnd, isVertical: selectionRect.isVertical))
+        }
+        return newSelectionRects
+    }
+}
+
+class CustomTextSelectionRect: UITextSelectionRect {
+    private let _rect: CGRect
+    private let _writingDirection: NSWritingDirection
+    private let _containsStart: Bool
+    private let _containsEnd: Bool
+    private let _isVertical: Bool
+
+    init(rect: CGRect, writingDirection: NSWritingDirection, containsStart: Bool, containsEnd: Bool, isVertical: Bool) {
+        _rect = rect
+        _writingDirection = writingDirection
+        _containsStart = containsStart
+        _containsEnd = containsEnd
+        _isVertical = isVertical
+    }
+
+    override var rect: CGRect { return _rect }
+    override var writingDirection: NSWritingDirection { return _writingDirection }
+    override var containsStart: Bool { return _containsStart }
+    override var containsEnd: Bool { return _containsEnd }
+    override var isVertical: Bool { return _isVertical }
+}
+
 func paragraphRange(for text: NSAttributedString, at location: Int) -> NSRange {
     let string = text.string as NSString
     let length = string.length
@@ -57,6 +124,7 @@ enum NoteTextAttribute {
 }
 
 struct RichTextEditor: UIViewRepresentable {
+    typealias UIViewType = CustomTextView
     @Binding var text: NSAttributedString
     @Binding var selectedRange: NSRange
     var note: Note
@@ -66,8 +134,8 @@ struct RichTextEditor: UIViewRepresentable {
     var keyboard: KeyboardObserver
     var onCoordinatorReady: ((Coordinator) -> Void)? = nil
 
-    func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+    func makeUIView(context: Context) -> CustomTextView {
+        let textView = CustomTextView()
         textView.isEditable = true
         textView.isScrollEnabled = true
         textView.alwaysBounceVertical = true
@@ -142,7 +210,7 @@ struct RichTextEditor: UIViewRepresentable {
         return textView
     }
 
-    func updateUIView(_ uiView: UITextView, context: Context) {
+    func updateUIView(_ uiView: CustomTextView, context: Context) {
         // Only update if the attributed text has actually changed to avoid infinite loops
         if uiView.attributedText != text {
             uiView.attributedText = text
