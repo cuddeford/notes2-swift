@@ -11,8 +11,10 @@ import Combine
 func paragraphRange(for text: NSAttributedString, at location: Int) -> NSRange {
     let string = text.string as NSString
     let length = string.length
-    guard length > 0 else { return NSRange(location: 0, length: 0) }
-    let safeLocation = min(max(location, 0), length - 1)
+    if length == 0 {
+        return NSRange(location: 0, length: 0)
+    }
+    let safeLocation = min(max(location, 0), length)
     return string.paragraphRange(for: NSRange(location: safeLocation, length: 0))
 }
 
