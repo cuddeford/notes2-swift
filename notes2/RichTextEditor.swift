@@ -341,7 +341,7 @@ struct RichTextEditor: UIViewRepresentable {
             updateParagraphSpatialProperties()
             if let tv = textView {
                 ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: tv)
-                // print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
+                print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
             }
         }
 
