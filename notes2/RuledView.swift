@@ -100,7 +100,7 @@ class RuledView: UIView {
             return (UIColor.green.withAlphaComponent(0.25), .green)
         case AppSettings.unrelatedParagraphSpacing:
             // this doesn't auto update when toggling dark mode. TODO: trigger this
-            return (UIColor.label.withAlphaComponent(0.1), UIColor.label.withAlphaComponent(0.25))
+            return (UIColor.label.withAlphaComponent(0.05), UIColor.label.withAlphaComponent(0.1))
         default:
             return (defaultColor.withAlphaComponent(0.25), defaultColor)
         }
