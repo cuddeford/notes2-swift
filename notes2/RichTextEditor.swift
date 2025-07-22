@@ -422,12 +422,30 @@ struct RichTextEditor: UIViewRepresentable {
                         : paragraphs[index2].range
                     self.affectedParagraphRange = topRange
 
-                    if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
-                        self.initialSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
+                    // Get current spacing - either from animation or from paragraph style
+                    let currentSpacing: CGFloat
+                    if let displayLink = displayLink, let existingRange = affectedParagraphRange, existingRange == topRange {
+                        // Animation is in progress for this same range, calculate current position
+                        let elapsed = CACurrentMediaTime() - animationStartTime
+                        let duration: CFTimeInterval = 1
+                        let progress = CGFloat(min(elapsed / duration, 1.0))
+                        let easedProgress = EasingFunctions.easeOutBack(progress)
+                        currentSpacing = animationStartSpacing + (animationTargetSpacing - animationStartSpacing) * easedProgress
+                        
+                        // Stop current animation
+                        displayLink.invalidate()
+                        self.displayLink = nil
                     } else {
-                        self.initialSpacing = parent.settings.defaultParagraphSpacing
+                        // No animation in progress or new range, use stored value
+                        if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
+                            currentSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
+                        } else {
+                            currentSpacing = parent.settings.defaultParagraphSpacing
+                        }
                     }
-                    self.currentDetent = self.initialSpacing
+                    
+                    self.initialSpacing = currentSpacing
+                    self.currentDetent = currentSpacing
 
                     // Set the initial detent for color and haptics
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
