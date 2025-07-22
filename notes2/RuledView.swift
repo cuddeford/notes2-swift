@@ -90,7 +90,7 @@ class RuledView: UIView {
                     var primaryParagraphDetent = paragraph.paragraphStyle.paragraphSpacing
                     var latestTimestamp: CFTimeInterval = -1
 
-                    for (range, pairInfo) in activePinchedPairs {
+                    for (_, pairInfo) in activePinchedPairs {
                         if pairInfo.indices.contains(index) {
                             if pairInfo.timestamp > latestTimestamp {
                                 latestTimestamp = pairInfo.timestamp
