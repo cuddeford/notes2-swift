@@ -65,7 +65,7 @@ class RuledView: UIView {
                 path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
             }
 
-            let (fill, stroke) = colors(for: AppSettings.shared.defaultParagraphSpacing, default: .blue)
+            let (fill, stroke) = colors()
 
             if index < paragraphOverlays.count {
                 // Update existing layer
@@ -94,15 +94,15 @@ class RuledView: UIView {
         }
     }
 
-    private func colors(for detent: CGFloat, default defaultColor: UIColor) -> (fill: UIColor, stroke: UIColor) {
+    private func colors(for detent: CGFloat? = nil) -> (fill: UIColor, stroke: UIColor) {
         switch detent {
         case AppSettings.relatedParagraphSpacing:
             return (UIColor.green.withAlphaComponent(0.25), .green)
         case AppSettings.unrelatedParagraphSpacing:
+            return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
+        default:
             // this doesn't auto update when toggling dark mode. TODO: trigger this
             return (UIColor.label.withAlphaComponent(0.05), UIColor.label.withAlphaComponent(0.1))
-        default:
-            return (defaultColor.withAlphaComponent(0.25), defaultColor)
         }
     }
 
