@@ -295,9 +295,11 @@ struct RichTextEditor: UIViewRepresentable {
         // Detents for paragraph spacing adjustments
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
+        private let animationDuration: CFTimeInterval = 5
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
+        private var activePinchedPairs: [NSRange: [Int]] = [:]
         private var pinchedParagraphIndices: [Int] = []
 
         @Published var paragraphs: [Paragraph] = []
@@ -351,7 +353,7 @@ struct RichTextEditor: UIViewRepresentable {
             self.paragraphs = newParagraphs
             updateParagraphSpatialProperties()
             if let tv = textView {
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: tv)
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: tv, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
                 print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
             }
         }
@@ -434,7 +436,7 @@ struct RichTextEditor: UIViewRepresentable {
                     if let activeAnimation = activeAnimations[topRange] {
                         // Animation is in progress for this same range, calculate current position
                         let elapsed = CACurrentMediaTime() - activeAnimation.startTime
-                        let duration: CFTimeInterval = 1
+                        let duration = self.animationDuration
                         let progress = CGFloat(min(elapsed / duration, 1.0))
                         let easedProgress = EasingFunctions.easeOutBack(progress)
                         currentSpacing = activeAnimation.startSpacing + (activeAnimation.targetSpacing - activeAnimation.startSpacing) * easedProgress
@@ -457,7 +459,11 @@ struct RichTextEditor: UIViewRepresentable {
                     // Set the initial detent for color and haptics
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
 
-                    ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, pinchedParagraphIndices: pinchedParagraphIndices, currentGestureDetent: self.currentDetent)
+                    // Track this pinched pair like we track animations
+                    activePinchedPairs[topRange] = [index1, index2]
+
+                    // Update overlays with all active pinched pairs
+                    ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: self.currentDetent, currentGestureRange: topRange)
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
@@ -493,7 +499,7 @@ struct RichTextEditor: UIViewRepresentable {
                 currentDetent = targetSpacing
 
                 textView.layoutIfNeeded()
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, pinchedParagraphIndices: pinchedParagraphIndices, currentGestureDetent: self.currentDetent)
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: self.currentDetent, currentGestureRange: range)
                 ruledView?.setNeedsDisplay()
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
@@ -504,7 +510,11 @@ struct RichTextEditor: UIViewRepresentable {
                 // Start smooth animation from current spacing to target
                 startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
 
-                self.ruledView?.hideAllParagraphOverlays()
+                // Remove this pinched pair from active tracking
+                activePinchedPairs.removeValue(forKey: range)
+                
+                // Update overlays to reflect remaining active pinched pairs
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
             }
         }
 
@@ -633,7 +643,7 @@ struct RichTextEditor: UIViewRepresentable {
             }
 
             let currentTime = CACurrentMediaTime()
-            let duration: CFTimeInterval = 1 // Animation duration in seconds
+            let duration = self.animationDuration
 
             // Process all active animations
             var completedAnimations: [NSRange] = []
@@ -684,7 +694,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Update UI if there are any animations still running or just completed
             if !activeAnimations.isEmpty || !completedAnimations.isEmpty {
                 textView.layoutIfNeeded()
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
 
                 // Clean up global state when all animations are complete
                 if activeAnimations.isEmpty {
@@ -693,8 +703,8 @@ struct RichTextEditor: UIViewRepresentable {
                     self.affectedParagraphRange = nil
                     self.currentDetent = nil
                     self.lastClosestDetent = nil
-                    self.pinchedParagraphIndices = []
-                    self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                    // Update overlays with remaining active pinched pairs
+                    self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
                 }
             }
         }

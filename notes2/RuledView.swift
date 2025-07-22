@@ -20,7 +20,7 @@ class RuledView: UIView {
         self.isOpaque = false
     }
 
-    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, pinchedParagraphIndices: [Int]? = nil, currentGestureDetent: CGFloat? = nil) {
+    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: [Int]] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
         let inset = textView.textContainerInset
         let cornerRadius = 10.0
 
@@ -65,10 +65,20 @@ class RuledView: UIView {
                 path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
             }
 
-            // Use current gesture detent for pinched paragraphs, actual spacing for others
-            let useGestureDetent = pinchedParagraphIndices?.contains(index) ?? false
-            let detent = useGestureDetent ? (currentGestureDetent ?? paragraph.paragraphStyle.paragraphSpacing) : paragraph.paragraphStyle.paragraphSpacing
-            let (fill, stroke) = colors(for: detent, isPinched: useGestureDetent)
+            // Check if this paragraph is part of any active pinched pair
+            var isPinched = false
+            var useCurrentDetent = false
+            
+            for (range, indices) in activePinchedPairs {
+                if indices.contains(index) {
+                    isPinched = true
+                    useCurrentDetent = (range == currentGestureRange)
+                    break
+                }
+            }
+            
+            let detent = (isPinched && useCurrentDetent) ? (currentGestureDetent ?? paragraph.paragraphStyle.paragraphSpacing) : paragraph.paragraphStyle.paragraphSpacing
+            let (fill, stroke) = colors(for: detent, isPinched: isPinched)
 
             if index < paragraphOverlays.count {
                 // Update existing layer
