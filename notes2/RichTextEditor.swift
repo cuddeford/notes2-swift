@@ -288,6 +288,10 @@ struct RichTextEditor: UIViewRepresentable {
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
+        private var animationTimer: Timer?
+        private var animationStartTime: CFTimeInterval = 0
+        private var animationStartSpacing: CGFloat = 0
+        private var animationTargetSpacing: CGFloat = 0
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -467,33 +471,14 @@ struct RichTextEditor: UIViewRepresentable {
                 ruledView?.setNeedsDisplay()
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
-                guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange, let textView = self.textView else { return }
+                guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
 
-                let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) })
-
-                UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut, animations: {
-                    let finalParagraphStyle = NSMutableParagraphStyle()
-                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
-                        finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
-                    }
-                    finalParagraphStyle.paragraphSpacing = closestDetent ?? self.parent.settings.defaultParagraphSpacing
-
-                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
-                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
-                        self.paragraphs[index].paragraphStyle = finalParagraphStyle
-                    }
-
-                    textView.layoutIfNeeded()
-
-                    self.ruledView?.hideAllParagraphOverlays()
-                }) { _ in
-                    self.parent.text = self.reconstructAttributedText()
-                    self.initialSpacing = nil
-                    self.affectedParagraphRange = nil
-                    self.currentDetent = nil
-                    self.lastClosestDetent = nil
-                    self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
-                }
+                let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) }) ?? self.parent.settings.defaultParagraphSpacing
+                
+                // Start smooth animation from current spacing to target
+                startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
+                
+                self.ruledView?.hideAllParagraphOverlays()
             }
         }
 
@@ -591,6 +576,81 @@ struct RichTextEditor: UIViewRepresentable {
             print("---")
         }
 
+        private func startSpacingAnimation(from startValue: CGFloat, to targetValue: CGFloat, range: NSRange) {
+            animationStartTime = CACurrentMediaTime()
+            animationStartSpacing = startValue
+            animationTargetSpacing = targetValue
+            
+            // Clean up any existing animation
+            animationTimer?.invalidate()
+            
+            // Start new animation
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] timer in
+                self?.animateSpacingStep(range: range)
+            }
+        }
+        
+        private func animateSpacingStep(range: NSRange) {
+            guard let textView = textView else {
+                animationTimer?.invalidate()
+                animationTimer = nil
+                return
+            }
+            
+            let elapsed = CACurrentMediaTime() - animationStartTime
+            let duration: CFTimeInterval = 0.3 // Animation duration in seconds
+            
+            if elapsed >= duration {
+                // Animation complete
+                animationTimer?.invalidate()
+                animationTimer = nil
+                
+                // Set final value
+                let finalParagraphStyle = NSMutableParagraphStyle()
+                if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                    finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
+                }
+                finalParagraphStyle.paragraphSpacing = animationTargetSpacing
+                
+                textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
+                if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                    self.paragraphs[index].paragraphStyle = finalParagraphStyle
+                }
+                
+                // Update parent text and clean up
+                self.parent.text = self.reconstructAttributedText()
+                self.initialSpacing = nil
+                self.affectedParagraphRange = nil
+                self.currentDetent = nil
+                self.lastClosestDetent = nil
+                self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                return
+            }
+            
+            // Calculate interpolated value
+            let progress = CGFloat(elapsed / duration)
+            let easedProgress = easeOutCubic(progress)
+            let currentSpacing = animationStartSpacing + (animationTargetSpacing - animationStartSpacing) * easedProgress
+            
+            // Apply interpolated spacing
+            let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
+            let newParagraphStyle = NSMutableParagraphStyle()
+            newParagraphStyle.setParagraphStyle(currentStyle)
+            newParagraphStyle.paragraphSpacing = currentSpacing
+            
+            textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+            if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                paragraphs[index].paragraphStyle = newParagraphStyle
+            }
+            
+            textView.layoutIfNeeded()
+            ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+        }
+        
+        private func easeOutCubic(_ t: CGFloat) -> CGFloat {
+            return 1 - pow(1 - t, 3)
+        }
+        
         func toggleAttribute(_ attribute: NoteTextAttribute) {
             let mutable = NSMutableAttributedString(attributedString: parent.text)
             var range = parent.selectedRange
