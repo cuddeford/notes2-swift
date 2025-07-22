@@ -275,6 +275,14 @@ struct RichTextEditor: UIViewRepresentable {
         return coordinator
     }
 
+    private struct ActiveAnimation {
+        let displayLink: CADisplayLink
+        let startTime: CFTimeInterval
+        let startSpacing: CGFloat
+        let targetSpacing: CGFloat
+        let range: NSRange
+    }
+
     class Coordinator: NSObject, UITextViewDelegate {
         var parent: RichTextEditor
         weak var textView: UITextView?
@@ -289,10 +297,7 @@ struct RichTextEditor: UIViewRepresentable {
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
-        private var displayLink: CADisplayLink?
-        private var animationStartTime: CFTimeInterval = 0
-        private var animationStartSpacing: CGFloat = 0
-        private var animationTargetSpacing: CGFloat = 0
+        private var activeAnimations: [NSRange: ActiveAnimation] = [:]
         private var pinchedParagraphIndices: [Int] = []
 
         @Published var paragraphs: [Paragraph] = []
@@ -426,26 +431,26 @@ struct RichTextEditor: UIViewRepresentable {
 
                     // Get current spacing - either from animation or from paragraph style
                     let currentSpacing: CGFloat
-                    if let displayLink = displayLink, let existingRange = affectedParagraphRange, existingRange == topRange {
+                    if let activeAnimation = activeAnimations[topRange] {
                         // Animation is in progress for this same range, calculate current position
-                        let elapsed = CACurrentMediaTime() - animationStartTime
+                        let elapsed = CACurrentMediaTime() - activeAnimation.startTime
                         let duration: CFTimeInterval = 1
                         let progress = CGFloat(min(elapsed / duration, 1.0))
                         let easedProgress = EasingFunctions.easeOutBack(progress)
-                        currentSpacing = animationStartSpacing + (animationTargetSpacing - animationStartSpacing) * easedProgress
-                        
-                        // Stop current animation
-                        displayLink.invalidate()
-                        self.displayLink = nil
+                        currentSpacing = activeAnimation.startSpacing + (activeAnimation.targetSpacing - activeAnimation.startSpacing) * easedProgress
+
+                        // Stop current animation for this specific range
+                        activeAnimation.displayLink.invalidate()
+                        activeAnimations.removeValue(forKey: topRange)
                     } else {
-                        // No animation in progress or new range, use stored value
+                        // No animation in progress for this range, use stored value
                         if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
                             currentSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
                         } else {
                             currentSpacing = parent.settings.defaultParagraphSpacing
                         }
                     }
-                    
+
                     self.initialSpacing = currentSpacing
                     self.currentDetent = currentSpacing
 
@@ -598,90 +603,100 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func startSpacingAnimation(from startValue: CGFloat, to targetValue: CGFloat, range: NSRange) {
-            animationStartTime = CACurrentMediaTime()
-            animationStartSpacing = startValue
-            animationTargetSpacing = targetValue
+            // Cancel any existing animation for this specific range
+            if let existingAnimation = activeAnimations[range] {
+                existingAnimation.displayLink.invalidate()
+                activeAnimations.removeValue(forKey: range)
+            }
 
-            // Clean up any existing animation
-            displayLink?.invalidate()
-            displayLink = nil
+            let startTime = CACurrentMediaTime()
+            let displayLink = CADisplayLink(target: self, selector: #selector(animateSpacingFrame))
 
-            // Start new display link animation
-            displayLink = CADisplayLink(target: self, selector: #selector(animateSpacingFrame))
-            displayLink?.add(to: .main, forMode: .common)
+            let animation = ActiveAnimation(
+                displayLink: displayLink,
+                startTime: startTime,
+                startSpacing: startValue,
+                targetSpacing: targetValue,
+                range: range
+            )
 
-            // Store range for animation callback
-            objc_setAssociatedObject(displayLink!, &animationRangeKey, range, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            activeAnimations[range] = animation
+            displayLink.add(to: .main, forMode: .common)
         }
-
-        private func animateSpacingStep(range: NSRange) {
-            guard let textView = textView else {
-                displayLink?.invalidate()
-                displayLink = nil
-                return
-            }
-
-            let elapsed = CACurrentMediaTime() - animationStartTime
-            let duration: CFTimeInterval = 1 // Animation duration in seconds
-
-            if elapsed >= duration {
-                // Animation complete
-                displayLink?.invalidate()
-                displayLink = nil
-
-                // Set final value
-                let finalParagraphStyle = NSMutableParagraphStyle()
-                if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
-                    finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
-                }
-                finalParagraphStyle.paragraphSpacing = animationTargetSpacing
-
-                textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
-                if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
-                    self.paragraphs[index].paragraphStyle = finalParagraphStyle
-                }
-
-                // Update parent text and clean up
-                self.parent.text = self.reconstructAttributedText()
-                self.initialSpacing = nil
-                self.affectedParagraphRange = nil
-                self.currentDetent = nil
-                self.lastClosestDetent = nil
-                self.pinchedParagraphIndices = []
-                self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
-                return
-            }
-
-            // Calculate interpolated value
-            let progress = CGFloat(elapsed / duration)
-            let easedProgress = EasingFunctions.easeOutBack(progress)
-            let currentSpacing = animationStartSpacing + (animationTargetSpacing - animationStartSpacing) * easedProgress
-
-            // Apply interpolated spacing
-            let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
-            let newParagraphStyle = NSMutableParagraphStyle()
-            newParagraphStyle.setParagraphStyle(currentStyle)
-            newParagraphStyle.paragraphSpacing = currentSpacing
-
-            textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
-            if let index = paragraphs.firstIndex(where: { $0.range == range }) {
-                paragraphs[index].paragraphStyle = newParagraphStyle
-            }
-
-            textView.layoutIfNeeded()
-            ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, pinchedParagraphIndices: pinchedParagraphIndices, currentGestureDetent: currentSpacing)
-        }
-
 
         @objc private func animateSpacingFrame() {
-            guard let displayLink = displayLink,
-                  let range = objc_getAssociatedObject(displayLink, &animationRangeKey) as? NSRange else {
-                displayLink?.invalidate()
-                self.displayLink = nil
+            guard let textView = textView else {
+                // Invalidate all animations if textView is gone
+                activeAnimations.values.forEach { $0.displayLink.invalidate() }
+                activeAnimations.removeAll()
                 return
             }
 
-            animateSpacingStep(range: range)
+            let currentTime = CACurrentMediaTime()
+            let duration: CFTimeInterval = 1 // Animation duration in seconds
+
+            // Process all active animations
+            var completedAnimations: [NSRange] = []
+
+            for (range, animation) in activeAnimations {
+                let elapsed = currentTime - animation.startTime
+
+                if elapsed >= duration {
+                    // Animation complete
+                    animation.displayLink.invalidate()
+                    completedAnimations.append(range)
+
+                    // Set final value
+                    let finalParagraphStyle = NSMutableParagraphStyle()
+                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                        finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
+                    }
+                    finalParagraphStyle.paragraphSpacing = animation.targetSpacing
+
+                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
+                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
+                        self.paragraphs[index].paragraphStyle = finalParagraphStyle
+                    }
+                } else {
+                    // Calculate interpolated value
+                    let progress = CGFloat(elapsed / duration)
+                    let easedProgress = EasingFunctions.easeOutBack(progress)
+                    let currentSpacing = animation.startSpacing + (animation.targetSpacing - animation.startSpacing) * easedProgress
+
+                    // Apply interpolated spacing
+                    let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
+                    let newParagraphStyle = NSMutableParagraphStyle()
+                    newParagraphStyle.setParagraphStyle(currentStyle)
+                    newParagraphStyle.paragraphSpacing = currentSpacing
+
+                    textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+                    if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                        paragraphs[index].paragraphStyle = newParagraphStyle
+                    }
+                }
+            }
+
+            // Remove completed animations
+            for range in completedAnimations {
+                activeAnimations.removeValue(forKey: range)
+            }
+
+            // Update UI if there are any animations still running or just completed
+            if !activeAnimations.isEmpty || !completedAnimations.isEmpty {
+                textView.layoutIfNeeded()
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+
+                // Clean up global state when all animations are complete
+                if activeAnimations.isEmpty {
+                    self.parent.text = self.reconstructAttributedText()
+                    self.initialSpacing = nil
+                    self.affectedParagraphRange = nil
+                    self.currentDetent = nil
+                    self.lastClosestDetent = nil
+                    self.pinchedParagraphIndices = []
+                    self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                }
+            }
         }
 
         func toggleAttribute(_ attribute: NoteTextAttribute) {
@@ -806,5 +821,3 @@ struct RichTextEditor: UIViewRepresentable {
         }
     }
 }
-
-private var animationRangeKey: UInt8 = 0
