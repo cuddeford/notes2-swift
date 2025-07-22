@@ -509,12 +509,6 @@ struct RichTextEditor: UIViewRepresentable {
 
                 // Start smooth animation from current spacing to target
                 startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
-
-                // Remove this pinched pair from active tracking
-                activePinchedPairs.removeValue(forKey: range)
-                
-                // Update overlays to reflect remaining active pinched pairs
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
             }
         }
 
@@ -703,9 +697,15 @@ struct RichTextEditor: UIViewRepresentable {
                     self.affectedParagraphRange = nil
                     self.currentDetent = nil
                     self.lastClosestDetent = nil
-                    // Update overlays with remaining active pinched pairs
-                    self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
                 }
+
+                // Remove pinched pairs for completed animations
+                for range in completedAnimations {
+                    activePinchedPairs.removeValue(forKey: range)
+                }
+
+                // Update overlays with remaining active pinched pairs
+                self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
             }
         }
 
