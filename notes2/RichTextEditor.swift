@@ -293,6 +293,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var animationStartTime: CFTimeInterval = 0
         private var animationStartSpacing: CGFloat = 0
         private var animationTargetSpacing: CGFloat = 0
+        private var pinchedParagraphIndices: [Int] = []
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -421,6 +422,7 @@ struct RichTextEditor: UIViewRepresentable {
                         ? paragraphs[index1].range
                         : paragraphs[index2].range
                     self.affectedParagraphRange = topRange
+                    self.pinchedParagraphIndices = [index1, index2]
 
                     // Get current spacing - either from animation or from paragraph style
                     let currentSpacing: CGFloat
@@ -450,7 +452,7 @@ struct RichTextEditor: UIViewRepresentable {
                     // Set the initial detent for color and haptics
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
 
-                    ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                    ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, pinchedParagraphIndices: pinchedParagraphIndices, currentGestureDetent: self.currentDetent)
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
@@ -486,7 +488,7 @@ struct RichTextEditor: UIViewRepresentable {
                 currentDetent = targetSpacing
 
                 textView.layoutIfNeeded()
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, pinchedParagraphIndices: pinchedParagraphIndices, currentGestureDetent: self.currentDetent)
                 ruledView?.setNeedsDisplay()
 
             } else if gesture.state == .ended || gesture.state == .cancelled {
@@ -645,6 +647,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.affectedParagraphRange = nil
                 self.currentDetent = nil
                 self.lastClosestDetent = nil
+                self.pinchedParagraphIndices = []
                 self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
                 return
             }
@@ -666,7 +669,7 @@ struct RichTextEditor: UIViewRepresentable {
             }
 
             textView.layoutIfNeeded()
-            ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView)
+            ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, pinchedParagraphIndices: pinchedParagraphIndices, currentGestureDetent: currentSpacing)
         }
 
 

@@ -20,7 +20,7 @@ class RuledView: UIView {
         self.isOpaque = false
     }
 
-    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView) {
+    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, pinchedParagraphIndices: [Int]? = nil, currentGestureDetent: CGFloat? = nil) {
         let inset = textView.textContainerInset
         let cornerRadius = 10.0
 
@@ -65,7 +65,14 @@ class RuledView: UIView {
                 path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
             }
 
-            let (fill, stroke) = colors()
+            let detent: CGFloat?
+            if let indices = pinchedParagraphIndices, indices.contains(index) {
+                // For pinched paragraphs, use the current gesture detent for consistent coloring
+                detent = currentGestureDetent
+            } else {
+                detent = nil
+            }
+            let (fill, stroke) = colors(for: detent ?? paragraph.paragraphStyle.paragraphSpacing, isPinched: pinchedParagraphIndices?.contains(index) ?? false)
 
             if index < paragraphOverlays.count {
                 // Update existing layer
@@ -94,15 +101,25 @@ class RuledView: UIView {
         }
     }
 
-    private func colors(for detent: CGFloat? = nil) -> (fill: UIColor, stroke: UIColor) {
+    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false) -> (fill: UIColor, stroke: UIColor) {
+        guard isPinched else {
+            // Default color for all non-pinched paragraphs
+            return (UIColor.label.withAlphaComponent(0.05), UIColor.label.withAlphaComponent(0.1))
+        }
+
+        // Dynamic colors for pinched paragraphs based on their relationship
+        // Both paragraphs in the pair should show the same color
         switch detent {
         case AppSettings.relatedParagraphSpacing:
             return (UIColor.green.withAlphaComponent(0.25), .green)
         case AppSettings.unrelatedParagraphSpacing:
             return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
         default:
-            // this doesn't auto update when toggling dark mode. TODO: trigger this
-            return (UIColor.label.withAlphaComponent(0.05), UIColor.label.withAlphaComponent(0.1))
+            // Intermediate spacing during gesture
+            let isRelated = (detent ?? 0) < (AppSettings.relatedParagraphSpacing + AppSettings.unrelatedParagraphSpacing) / 2
+            return isRelated
+                ? (UIColor.green.withAlphaComponent(0.15), UIColor.green.withAlphaComponent(0.8))
+                : (UIColor.yellow.withAlphaComponent(0.15), UIColor.yellow.withAlphaComponent(0.8))
         }
     }
 
