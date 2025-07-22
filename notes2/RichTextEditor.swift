@@ -322,7 +322,7 @@ struct RichTextEditor: UIViewRepresentable {
                 let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
                 let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
                 newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
-                print("Added empty paragraph for empty text. Range: \(emptyRange)")
+                // print("Added empty paragraph for empty text. Range: \(emptyRange)")
             } else {
                 let lines = string.components(separatedBy: "\n")
                 var currentLocation = 0
@@ -334,7 +334,7 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphRange = NSRange(location: currentLocation, length: paragraphLength)
 
                     guard paragraphRange.location + paragraphRange.length <= attributedText.length else {
-                        print("Error: Invalid range for paragraph \(index). Range: \(paragraphRange), Total Length: \(attributedText.length)")
+                        // print("Error: Invalid range for paragraph \(index). Range: \(paragraphRange), Total Length: \(attributedText.length)")
                         continue
                     }
 
@@ -344,7 +344,7 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
 
                     newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
-                    print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(paragraphRange)")
+                    // print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(paragraphRange)")
 
                     currentLocation += paragraphLength
                 }
@@ -353,8 +353,14 @@ struct RichTextEditor: UIViewRepresentable {
             self.paragraphs = newParagraphs
             updateParagraphSpatialProperties()
             if let tv = textView {
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: tv, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
-                print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: tv,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: nil,
+                    currentGestureRange: nil,
+                )
+                // print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
             }
         }
 
@@ -463,11 +469,16 @@ struct RichTextEditor: UIViewRepresentable {
                     activePinchedPairs[topRange] = [index1, index2]
 
                     // Update overlays with all active pinched pairs
-                    ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: self.currentDetent, currentGestureRange: topRange)
+                    ruledView?.updateAllParagraphOverlays(
+                        paragraphs: self.paragraphs,
+                        textView: textView,
+                        activePinchedPairs: activePinchedPairs,
+                        currentGestureDetent: self.currentDetent,
+                        currentGestureRange: topRange,
+                    )
                 }
                 gesture.scale = 1.0
                 hapticGenerator.prepare()
-
             } else if gesture.state == .changed {
                 guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
 
@@ -499,9 +510,14 @@ struct RichTextEditor: UIViewRepresentable {
                 currentDetent = targetSpacing
 
                 textView.layoutIfNeeded()
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: self.currentDetent, currentGestureRange: range)
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: self.currentDetent,
+                    currentGestureRange: range,
+                )
                 ruledView?.setNeedsDisplay()
-
             } else if gesture.state == .ended || gesture.state == .cancelled {
                 guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
 
@@ -621,7 +637,7 @@ struct RichTextEditor: UIViewRepresentable {
                 startTime: startTime,
                 startSpacing: startValue,
                 targetSpacing: targetValue,
-                range: range
+                range: range,
             )
 
             activeAnimations[range] = animation
@@ -688,7 +704,13 @@ struct RichTextEditor: UIViewRepresentable {
             // Update UI if there are any animations still running or just completed
             if !activeAnimations.isEmpty || !completedAnimations.isEmpty {
                 textView.layoutIfNeeded()
-                ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: nil,
+                    currentGestureRange: nil,
+                )
 
                 // Clean up global state when all animations are complete
                 if activeAnimations.isEmpty {
@@ -705,7 +727,13 @@ struct RichTextEditor: UIViewRepresentable {
                 }
 
                 // Update overlays with remaining active pinched pairs
-                self.ruledView?.updateAllParagraphOverlays(paragraphs: self.paragraphs, textView: textView, activePinchedPairs: activePinchedPairs, currentGestureDetent: nil, currentGestureRange: nil)
+                self.ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: nil,
+                    currentGestureRange: nil,
+                )
             }
         }
 

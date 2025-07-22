@@ -68,7 +68,7 @@ class RuledView: UIView {
             // Check if this paragraph is part of any active pinched pair
             var isPinched = false
             var useCurrentDetent = false
-            
+
             for (range, indices) in activePinchedPairs {
                 if indices.contains(index) {
                     isPinched = true
@@ -76,8 +76,10 @@ class RuledView: UIView {
                     break
                 }
             }
-            
-            let detent = (isPinched && useCurrentDetent) ? (currentGestureDetent ?? paragraph.paragraphStyle.paragraphSpacing) : paragraph.paragraphStyle.paragraphSpacing
+
+            let detent = (isPinched && useCurrentDetent)
+                ? (currentGestureDetent ?? paragraph.paragraphStyle.paragraphSpacing)
+                : paragraph.paragraphStyle.paragraphSpacing
             let (fill, stroke) = colors(for: detent, isPinched: isPinched)
 
             if index < paragraphOverlays.count {
