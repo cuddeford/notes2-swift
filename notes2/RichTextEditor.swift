@@ -299,7 +299,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
-        private var activePinchedPairs: [NSRange: [Int]] = [:]
+        private var activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:]
         private var pinchedParagraphIndices: [Int] = []
 
         @Published var paragraphs: [Paragraph] = []
@@ -466,7 +466,7 @@ struct RichTextEditor: UIViewRepresentable {
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
 
                     // Track this pinched pair like we track animations
-                    activePinchedPairs[topRange] = [index1, index2]
+                    activePinchedPairs[topRange] = (indices: [index1, index2], timestamp: CACurrentMediaTime())
 
                     // Update overlays with all active pinched pairs
                     ruledView?.updateAllParagraphOverlays(

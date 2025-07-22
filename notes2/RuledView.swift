@@ -20,7 +20,7 @@ class RuledView: UIView {
         self.isOpaque = false
     }
 
-    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: [Int]] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
+    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
         let inset = textView.textContainerInset
         let cornerRadius = 10.0
 
@@ -68,12 +68,15 @@ class RuledView: UIView {
             // Check if this paragraph is part of any active pinched pair
             var isPinched = false
             var useCurrentDetent = false
+            var latestTimestamp: CFTimeInterval = -1
 
-            for (range, indices) in activePinchedPairs {
-                if indices.contains(index) {
-                    isPinched = true
-                    useCurrentDetent = (range == currentGestureRange)
-                    break
+            for (range, pairInfo) in activePinchedPairs {
+                if pairInfo.indices.contains(index) {
+                    if pairInfo.timestamp > latestTimestamp {
+                        isPinched = true
+                        latestTimestamp = pairInfo.timestamp
+                        useCurrentDetent = (range == currentGestureRange)
+                    }
                 }
             }
 
@@ -85,13 +88,17 @@ class RuledView: UIView {
                     // This is part of a pair, but not the one being actively gestured.
                     // Find the primary paragraph of the pair to determine the color.
                     var primaryParagraphDetent = paragraph.paragraphStyle.paragraphSpacing
-                    for (range, indices) in activePinchedPairs {
-                        if indices.contains(index) {
-                            let primaryIndex = min(indices[0], indices[1])
-                            if paragraphs.indices.contains(primaryIndex) {
-                                primaryParagraphDetent = paragraphs[primaryIndex].paragraphStyle.paragraphSpacing
+                    var latestTimestamp: CFTimeInterval = -1
+
+                    for (range, pairInfo) in activePinchedPairs {
+                        if pairInfo.indices.contains(index) {
+                            if pairInfo.timestamp > latestTimestamp {
+                                latestTimestamp = pairInfo.timestamp
+                                let primaryIndex = min(pairInfo.indices[0], pairInfo.indices[1])
+                                if paragraphs.indices.contains(primaryIndex) {
+                                    primaryParagraphDetent = paragraphs[primaryIndex].paragraphStyle.paragraphSpacing
+                                }
                             }
-                            break
                         }
                     }
                     detent = primaryParagraphDetent
