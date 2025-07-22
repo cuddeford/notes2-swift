@@ -77,9 +77,29 @@ class RuledView: UIView {
                 }
             }
 
-            let detent = (isPinched && useCurrentDetent)
-                ? (currentGestureDetent ?? paragraph.paragraphStyle.paragraphSpacing)
-                : paragraph.paragraphStyle.paragraphSpacing
+            let detent: CGFloat
+            if isPinched {
+                if useCurrentDetent {
+                    detent = currentGestureDetent ?? paragraph.paragraphStyle.paragraphSpacing
+                } else {
+                    // This is part of a pair, but not the one being actively gestured.
+                    // Find the primary paragraph of the pair to determine the color.
+                    var primaryParagraphDetent = paragraph.paragraphStyle.paragraphSpacing
+                    for (range, indices) in activePinchedPairs {
+                        if indices.contains(index) {
+                            let primaryIndex = min(indices[0], indices[1])
+                            if paragraphs.indices.contains(primaryIndex) {
+                                primaryParagraphDetent = paragraphs[primaryIndex].paragraphStyle.paragraphSpacing
+                            }
+                            break
+                        }
+                    }
+                    detent = primaryParagraphDetent
+                }
+            } else {
+                detent = paragraph.paragraphStyle.paragraphSpacing
+            }
+
             let (fill, stroke) = colors(for: detent, isPinched: isPinched)
 
             if index < paragraphOverlays.count {

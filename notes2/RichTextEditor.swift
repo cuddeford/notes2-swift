@@ -690,7 +690,7 @@ struct RichTextEditor: UIViewRepresentable {
                     newParagraphStyle.paragraphSpacing = currentSpacing
 
                     textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
-                    if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
                         paragraphs[index].paragraphStyle = newParagraphStyle
                     }
                 }
