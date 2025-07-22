@@ -65,14 +65,10 @@ class RuledView: UIView {
                 path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
             }
 
-            let detent: CGFloat?
-            if let indices = pinchedParagraphIndices, indices.contains(index) {
-                // For pinched paragraphs, use the current gesture detent for consistent coloring
-                detent = currentGestureDetent
-            } else {
-                detent = nil
-            }
-            let (fill, stroke) = colors(for: detent ?? paragraph.paragraphStyle.paragraphSpacing, isPinched: pinchedParagraphIndices?.contains(index) ?? false)
+            // Use current gesture detent for pinched paragraphs, actual spacing for others
+            let useGestureDetent = pinchedParagraphIndices?.contains(index) ?? false
+            let detent = useGestureDetent ? (currentGestureDetent ?? paragraph.paragraphStyle.paragraphSpacing) : paragraph.paragraphStyle.paragraphSpacing
+            let (fill, stroke) = colors(for: detent, isPinched: useGestureDetent)
 
             if index < paragraphOverlays.count {
                 // Update existing layer
