@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import QuartzCore
 
 class CustomTextView: UITextView {
     weak var coordinator: RichTextEditor.Coordinator?
@@ -288,7 +289,7 @@ struct RichTextEditor: UIViewRepresentable {
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
-        private var animationTimer: Timer?
+        private var displayLink: CADisplayLink?
         private var animationStartTime: CFTimeInterval = 0
         private var animationStartSpacing: CGFloat = 0
         private var animationTargetSpacing: CGFloat = 0
@@ -582,18 +583,21 @@ struct RichTextEditor: UIViewRepresentable {
             animationTargetSpacing = targetValue
             
             // Clean up any existing animation
-            animationTimer?.invalidate()
+            displayLink?.invalidate()
+            displayLink = nil
             
-            // Start new animation
-            animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] timer in
-                self?.animateSpacingStep(range: range)
-            }
+            // Start new display link animation
+            displayLink = CADisplayLink(target: self, selector: #selector(animateSpacingFrame))
+            displayLink?.add(to: .main, forMode: .common)
+            
+            // Store range for animation callback
+            objc_setAssociatedObject(displayLink!, &animationRangeKey, range, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
         
         private func animateSpacingStep(range: NSRange) {
             guard let textView = textView else {
-                animationTimer?.invalidate()
-                animationTimer = nil
+                displayLink?.invalidate()
+                displayLink = nil
                 return
             }
             
@@ -602,8 +606,8 @@ struct RichTextEditor: UIViewRepresentable {
             
             if elapsed >= duration {
                 // Animation complete
-                animationTimer?.invalidate()
-                animationTimer = nil
+                displayLink?.invalidate()
+                displayLink = nil
                 
                 // Set final value
                 let finalParagraphStyle = NSMutableParagraphStyle()
@@ -649,6 +653,17 @@ struct RichTextEditor: UIViewRepresentable {
         
         private func easeOutCubic(_ t: CGFloat) -> CGFloat {
             return 1 - pow(1 - t, 3)
+        }
+        
+        @objc private func animateSpacingFrame() {
+            guard let displayLink = displayLink,
+                  let range = objc_getAssociatedObject(displayLink, &animationRangeKey) as? NSRange else {
+                displayLink?.invalidate()
+                self.displayLink = nil
+                return
+            }
+            
+            animateSpacingStep(range: range)
         }
         
         func toggleAttribute(_ attribute: NoteTextAttribute) {
@@ -773,3 +788,5 @@ struct RichTextEditor: UIViewRepresentable {
         }
     }
 }
+
+private var animationRangeKey: UInt8 = 0
