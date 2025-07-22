@@ -295,7 +295,7 @@ struct RichTextEditor: UIViewRepresentable {
         // Detents for paragraph spacing adjustments
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
-        private let animationDuration: CFTimeInterval = 5
+        private let animationDuration: CFTimeInterval = 0.5
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
