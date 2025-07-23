@@ -9,7 +9,7 @@ class RuledView: UIView {
     private var hapticBorderStates: [NSRange: HapticBorderState] = [:]
     private let baseBorderWidth: CGFloat = 2.0
     private let heavyHapticAddition: CGFloat = 20.0
-    private let lightHapticAddition: CGFloat = 10.0
+    private let lightHapticAddition: CGFloat = 6.0
     private let animationDuration: CFTimeInterval = 0.15
 
     override init(frame: CGRect) {
