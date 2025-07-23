@@ -739,7 +739,13 @@ struct RichTextEditor: UIViewRepresentable {
 
                     // Completion haptic
                     completionHapticGenerator.impactOccurred()
-
+                    if activeAnimations.isEmpty {
+                        self.parent.text = self.reconstructAttributedText()
+                        self.initialSpacing = nil
+                        self.affectedParagraphRange = nil
+                        self.currentDetent = nil
+                        self.lastClosestDetent = nil
+                    }
                 } else {
                     let progress = CGFloat(elapsed / duration)
                     let easedProgress = EasingFunctions.easeOutBack(progress)
