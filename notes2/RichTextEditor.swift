@@ -519,14 +519,9 @@ struct RichTextEditor: UIViewRepresentable {
                     hapticGenerator.prepare()
                     lastClosestDetent = closestDetentForColor
                     
-                    // Trigger heavy haptic border effect for both paragraphs in the pair
-                    if affectedParagraphRange != nil, pinchedParagraphIndices.count == 2 {
-                        // Trigger for both paragraphs in the pinched pair
-                        for index in pinchedParagraphIndices {
-                            if index < paragraphs.count {
-                                ruledView?.triggerHapticFeedback(for: paragraphs[index].range, type: .heavy)
-                            }
-                        }
+                    // Trigger heavy haptic border effect once using the primary paragraph
+                    if let range = affectedParagraphRange {
+                        ruledView?.triggerHapticFeedback(for: range, type: .heavy)
                     }
                 } else if isFullyExtendedOrContracted {
                     var shouldTriggerLight = false
@@ -549,13 +544,9 @@ struct RichTextEditor: UIViewRepresentable {
                         lightHapticGenerator.prepare()
                         hasTriggeredLightHaptic = true
                         
-                        // Trigger light haptic border effect for both paragraphs in the pair
-                        if pinchedParagraphIndices.count == 2 {
-                            for index in pinchedParagraphIndices {
-                                if index < paragraphs.count {
-                                    ruledView?.triggerHapticFeedback(for: paragraphs[index].range, type: .light)
-                                }
-                            }
+                        // Trigger light haptic border effect once using the primary paragraph
+                        if let range = affectedParagraphRange {
+                            ruledView?.triggerHapticFeedback(for: range, type: .light)
                         }
                     }
                 } else {
@@ -754,20 +745,8 @@ struct RichTextEditor: UIViewRepresentable {
                     // Provide light haptic feedback when animation completes
                     completionHapticGenerator.impactOccurred()
                     
-                    // Trigger light haptic border effect for animation completion
+                    // Trigger light haptic border effect for animation completion once
                     ruledView?.triggerHapticFeedback(for: range, type: .light)
-                    
-                    // Find and trigger for the paired paragraph if this was a spacing adjustment
-                    for (pairRange, pairInfo) in activePinchedPairs {
-                        if pairRange == range, pairInfo.indices.count == 2 {
-                            for index in pairInfo.indices {
-                                if index < paragraphs.count {
-                                    ruledView?.triggerHapticFeedback(for: paragraphs[index].range, type: .light)
-                                }
-                            }
-                            break
-                        }
-                    }
                 } else {
                     // Calculate interpolated value
                     let progress = CGFloat(elapsed / duration)
