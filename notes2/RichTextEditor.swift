@@ -293,12 +293,14 @@ struct RichTextEditor: UIViewRepresentable {
         private var affectedParagraphRange: NSRange?
         private let hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
         private let completionHapticGenerator = UIImpactFeedbackGenerator(style: .light)
+        private let mediumHapticGenerator = UIImpactFeedbackGenerator(style: .medium)
         // Detents for paragraph spacing adjustments
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
         private let animationDuration: CFTimeInterval = 0.5
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
+        private var wasAtLimit: Bool = false
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
         private var activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:]
         private var pinchedParagraphIndices: [Int] = []
@@ -465,6 +467,7 @@ struct RichTextEditor: UIViewRepresentable {
 
                     // Set the initial detent for color and haptics
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
+                    self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < 0.1 }
 
                     // Track this pinched pair like we track animations
                     activePinchedPairs[topRange] = (indices: [index1, index2], timestamp: CACurrentMediaTime())
@@ -493,11 +496,25 @@ struct RichTextEditor: UIViewRepresentable {
 
                 let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
 
+                // Check if we're at full extension or contraction (matching a detent exactly)
+                let isFullyExtendedOrContracted = spacingDetents.contains { detent in
+                    abs(detent - targetSpacing) < 0.1
+                }
+                
                 if closestDetentForColor != lastClosestDetent {
                     hapticGenerator.impactOccurred()
                     hapticGenerator.prepare()
                     lastClosestDetent = closestDetentForColor
+                } else if isFullyExtendedOrContracted {
+                    // Provide medium feedback only when reaching the limit
+                    if !wasAtLimit {
+                        mediumHapticGenerator.impactOccurred()
+                        mediumHapticGenerator.prepare()
+                    }
                 }
+                
+                // Update limit state tracking
+                wasAtLimit = isFullyExtendedOrContracted
 
                 let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
                 let newParagraphStyle = NSMutableParagraphStyle()
