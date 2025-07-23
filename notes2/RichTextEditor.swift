@@ -293,7 +293,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var affectedParagraphRange: NSRange?
         private let hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
         private let completionHapticGenerator = UIImpactFeedbackGenerator(style: .light)
-        private let mediumHapticGenerator = UIImpactFeedbackGenerator(style: .medium)
+        private let mediumHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         // Detents for paragraph spacing adjustments
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
@@ -301,6 +301,9 @@ struct RichTextEditor: UIViewRepresentable {
         private var lastDetentIndex: Int = -1
         private var lastClosestDetent: CGFloat?
         private var wasAtLimit: Bool = false
+        private var startedAtLimit: Bool = false
+        private var initialLimitValue: CGFloat?
+        private var hasTriggeredMediumHaptic: Bool = false
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
         private var activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:]
         private var pinchedParagraphIndices: [Int] = []
@@ -469,6 +472,10 @@ struct RichTextEditor: UIViewRepresentable {
                     self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
                     self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < 0.1 }
 
+                    // Track if we started at a limit for direction-based haptic
+                    self.startedAtLimit = self.wasAtLimit
+                    self.initialLimitValue = self.wasAtLimit ? self.lastClosestDetent : nil
+
                     // Track this pinched pair like we track animations
                     activePinchedPairs[topRange] = (indices: [index1, index2], timestamp: CACurrentMediaTime())
 
@@ -500,19 +507,37 @@ struct RichTextEditor: UIViewRepresentable {
                 let isFullyExtendedOrContracted = spacingDetents.contains { detent in
                     abs(detent - targetSpacing) < 0.1
                 }
-                
+
                 if closestDetentForColor != lastClosestDetent {
                     hapticGenerator.impactOccurred()
                     hapticGenerator.prepare()
                     lastClosestDetent = closestDetentForColor
                 } else if isFullyExtendedOrContracted {
-                    // Provide medium feedback only when reaching the limit
+                    var shouldTriggerMedium = false
+                    
                     if !wasAtLimit {
+                        // Not previously at limit - trigger once
+                        shouldTriggerMedium = true
+                    } else if startedAtLimit && initialLimitValue == targetSpacing {
+                        // Started at this limit - check direction and if already triggered
+                        let direction = gesture.scale - 1.0
+                        let isMovingTowardLimit = (initialLimitValue == AppSettings.relatedParagraphSpacing && direction < 0) ||
+                                                (initialLimitValue == AppSettings.unrelatedParagraphSpacing && direction > 0)
+                        
+                        // Only trigger if moving toward limit and haven't triggered yet
+                        shouldTriggerMedium = isMovingTowardLimit && !hasTriggeredMediumHaptic
+                    }
+                    
+                    if shouldTriggerMedium {
                         mediumHapticGenerator.impactOccurred()
                         mediumHapticGenerator.prepare()
+                        hasTriggeredMediumHaptic = true
                     }
+                } else {
+                    // Reset trigger state when moving away from limit
+                    hasTriggeredMediumHaptic = false
                 }
-                
+
                 // Update limit state tracking
                 wasAtLimit = isFullyExtendedOrContracted
 
@@ -540,6 +565,11 @@ struct RichTextEditor: UIViewRepresentable {
                 guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
 
                 let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) }) ?? self.parent.settings.defaultParagraphSpacing
+
+                // Reset tracking variables
+                self.startedAtLimit = false
+                self.initialLimitValue = nil
+                self.hasTriggeredMediumHaptic = false
 
                 // Start smooth animation from current spacing to target
                 startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
@@ -695,7 +725,7 @@ struct RichTextEditor: UIViewRepresentable {
                     if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
                         self.paragraphs[index].paragraphStyle = finalParagraphStyle
                     }
-                    
+
                     // Provide light haptic feedback when animation completes
                     completionHapticGenerator.impactOccurred()
                 } else {
