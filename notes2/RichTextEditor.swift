@@ -208,7 +208,7 @@ struct RichTextEditor: UIViewRepresentable {
             self.parent = parent
             super.init()
         }
-        
+
         func parseAttributedText(_ attributedText: NSAttributedString) {
             var newParagraphs: [Paragraph] = []
             let string = attributedText.string
@@ -218,6 +218,7 @@ struct RichTextEditor: UIViewRepresentable {
                 let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
                 let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
                 newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
+                print("Added empty paragraph for empty text. Range: \(emptyRange)")
             } else {
                 let lines = string.components(separatedBy: "\n")
                 var currentLocation = 0
@@ -229,6 +230,7 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphRange = NSRange(location: currentLocation, length: paragraphLength)
 
                     guard paragraphRange.location + paragraphRange.length <= attributedText.length else {
+                        print("Error: Invalid range for paragraph \(index). Range: \(paragraphRange), Total Length: \(attributedText.length)")
                         continue
                     }
 
@@ -238,6 +240,7 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
 
                     newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
+                    print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(paragraphRange)")
                     currentLocation += paragraphLength
                 }
             }
@@ -252,9 +255,10 @@ struct RichTextEditor: UIViewRepresentable {
                     currentGestureDetent: nil,
                     currentGestureRange: nil,
                 )
+                print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
             }
         }
-        
+
         func updateParagraphSpatialProperties() {
             guard let textView = textView else { return }
             var updatedParagraphs = [Paragraph]()
@@ -269,14 +273,14 @@ struct RichTextEditor: UIViewRepresentable {
             }
             self.paragraphs = updatedParagraphs
         }
-        
+
         func updateRuledViewFrame() {
             guard let textView = textView, let ruledView = ruledView else { return }
             let contentSize = textView.contentSize
             ruledView.frame = CGRect(x: 0, y: 0, width: contentSize.width, height: contentSize.height)
             ruledView.setNeedsDisplay()
         }
-        
+
         func updateTypingAttributes() {
             guard let textView = textView else { return }
             let loc = max(0, min(textView.selectedRange.location - 1, textView.attributedText.length - 1))
@@ -292,7 +296,7 @@ struct RichTextEditor: UIViewRepresentable {
                 textView.typingAttributes = attrs
             }
         }
-        
+
         func centerCursorInTextView() {
             guard let textView = textView, let selectedTextRange = textView.selectedTextRange, textView.hasText else { return }
 
@@ -338,13 +342,13 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
         }
-        
+
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             updateParagraphSpatialProperties()
             self.contentOffset = scrollView.contentOffset
             ruledView?.setNeedsDisplay()
         }
-        
+
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
                 self.parent.text = textView.attributedText
@@ -364,7 +368,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.centerCursorInTextView()
             }
         }
-        
+
         func toggleAttribute(_ attribute: NoteTextAttribute) {
             let mutable = NSMutableAttributedString(attributedString: parent.text)
             var range = parent.selectedRange
@@ -485,7 +489,7 @@ struct RichTextEditor: UIViewRepresentable {
             self.parseAttributedText(mutable)
             self.updateTypingAttributes()
         }
-        
+
         private func reconstructAttributedText() -> NSAttributedString {
             let mutableAttributedText = NSMutableAttributedString()
             for paragraph in paragraphs {
@@ -502,13 +506,13 @@ struct RichTextEditor: UIViewRepresentable {
             }
             return mutableAttributedText
         }
-        
+
         private func startSpacingAnimation(from: CGFloat, to: CGFloat, range: NSRange) {
             let startTime = CACurrentMediaTime()
-            
+
             let displayLink = CADisplayLink(target: self, selector: #selector(self.updateSpacingAnimation(_:)))
             displayLink.add(to: RunLoop.main, forMode: RunLoop.Mode.common)
-            
+
             let animation = ActiveAnimation(
                 displayLink: displayLink,
                 startTime: startTime,
@@ -516,10 +520,10 @@ struct RichTextEditor: UIViewRepresentable {
                 targetSpacing: to,
                 range: range
             )
-            
+
             activeAnimations[range] = animation
         }
-        
+
 @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
             guard let textView = textView else { return }
 
@@ -531,7 +535,7 @@ struct RichTextEditor: UIViewRepresentable {
                 handlePinchEnded(gesture, textView: textView)
             }
         }
-        
+
         private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
             let location1 = gesture.location(ofTouch: 0, in: textView)
             let location2 = gesture.location(ofTouch: 1, in: textView)
@@ -605,7 +609,7 @@ struct RichTextEditor: UIViewRepresentable {
             gesture.scale = 1.0
             hapticGenerator.prepare()
         }
-        
+
         private func handlePinchChanged(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
             guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
 
@@ -628,14 +632,14 @@ struct RichTextEditor: UIViewRepresentable {
                 hapticGenerator.impactOccurred()
                 hapticGenerator.prepare()
                 lastClosestDetent = closestDetentForColor
-                
+
                 // Trigger heavy haptic border effect once using the primary paragraph
                 if let range = affectedParagraphRange {
                     ruledView?.triggerHapticFeedback(for: range, type: .heavy)
                 }
             } else if isFullyExtendedOrContracted {
                 var shouldTriggerLight = false
-                
+
                 if !wasAtLimit {
                     // Not previously at limit - trigger once
                     shouldTriggerLight = true
@@ -644,16 +648,16 @@ struct RichTextEditor: UIViewRepresentable {
                     let direction = gesture.scale - 1.0
                     let isMovingTowardLimit = (initialLimitValue == AppSettings.relatedParagraphSpacing && direction < 0) ||
                                             (initialLimitValue == AppSettings.unrelatedParagraphSpacing && direction > 0)
-                    
+
                     // Only trigger if moving toward limit and haven't triggered yet
                     shouldTriggerLight = isMovingTowardLimit && !hasTriggeredLightHaptic
                 }
-                
+
                 if shouldTriggerLight {
                     lightHapticGenerator.impactOccurred()
                     lightHapticGenerator.prepare()
                     hasTriggeredLightHaptic = true
-                    
+
                     // Trigger light haptic border effect once using the primary paragraph
                     if let range = affectedParagraphRange {
                         ruledView?.triggerHapticFeedback(for: range, type: .light)
@@ -688,7 +692,7 @@ struct RichTextEditor: UIViewRepresentable {
             )
             ruledView?.setNeedsDisplay()
         }
-        
+
         private func handlePinchEnded(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
             guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
 
@@ -702,32 +706,32 @@ struct RichTextEditor: UIViewRepresentable {
             // Start smooth animation from current spacing to target
             startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
         }
-        
+
         @objc private func updateSpacingAnimation(_ displayLink: CADisplayLink) {
             guard let textView = textView else { return }
-            
+
             for (range, animation) in activeAnimations {
                 let elapsed = CACurrentMediaTime() - animation.startTime
                 let duration = self.animationDuration
-                
+
                 if elapsed >= duration {
                     // Animation complete
                     animation.displayLink.invalidate()
                     activeAnimations.removeValue(forKey: range)
-                    
+
                     // Final update
                     let finalParagraphStyle = NSMutableParagraphStyle()
                     finalParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     finalParagraphStyle.paragraphSpacing = animation.targetSpacing
-                    
+
                     textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
                     if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                         paragraphs[index].paragraphStyle = finalParagraphStyle
                     }
-                    
+
                     // Clean up active pinched pairs
                     activePinchedPairs.removeValue(forKey: range)
-                    
+
                     textView.layoutIfNeeded()
                     ruledView?.updateAllParagraphOverlays(
                         paragraphs: self.paragraphs,
@@ -736,24 +740,24 @@ struct RichTextEditor: UIViewRepresentable {
                         currentGestureDetent: nil,
                         currentGestureRange: nil
                     )
-                    
+
                     // Completion haptic
                     completionHapticGenerator.impactOccurred()
-                    
+
                 } else {
                     let progress = CGFloat(elapsed / duration)
                     let easedProgress = EasingFunctions.easeOutBack(progress)
                     let currentSpacing = animation.startSpacing + (animation.targetSpacing - animation.startSpacing) * easedProgress
-                    
+
                     let currentParagraphStyle = NSMutableParagraphStyle()
                     currentParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     currentParagraphStyle.paragraphSpacing = currentSpacing
-                    
+
                     textView.textStorage.addAttribute(.paragraphStyle, value: currentParagraphStyle, range: range)
                     if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                         paragraphs[index].paragraphStyle = currentParagraphStyle
                     }
-                    
+
                     textView.layoutIfNeeded()
                     ruledView?.updateAllParagraphOverlays(
                         paragraphs: self.paragraphs,
