@@ -8,9 +8,9 @@ class RuledView: UIView {
     // Haptic feedback state for border thickness
     private var hapticBorderStates: [NSRange: HapticBorderState] = [:]
     private let baseBorderWidth: CGFloat = 2.0
-    private let heavyHapticAddition: CGFloat = 5.0
-    private let lightHapticAddition: CGFloat = 2.5
-    private let animationDuration: CFTimeInterval = 0.3
+    private let heavyHapticAddition: CGFloat = 20.0
+    private let lightHapticAddition: CGFloat = 10.0
+    private let animationDuration: CFTimeInterval = 0.15
 
     override init(frame: CGRect) {
         super.init(frame: frame)
