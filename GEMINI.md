@@ -10,6 +10,11 @@ This is a simple, distraction-free notes app for iOS and iPadOS, written in Swif
 
 The source folder is notes2/ so e.g. notes2/RichTextEditor.swift
 
+When building the project to test compilation use this command:
+```
+xcodebuild -project notes2.xcodeproj -scheme notes2 -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build)
+```
+
 *   **`notes2App.swift`**: The main entry point of the application. It sets up the main window and the SwiftData model container for the `Note` object, configured for iCloud synchronization using a specific app group.
 *   **`ContentView.swift`**: The main view of the app. It displays a list of notes, grouped by creation date (Today, Yesterday, etc.), and provides navigation to individual note views. It also features collapsible sections for "Pinned" and "Recent" notes. It handles a right-to-left swipe gesture to quickly navigate to the last edited note.
 *   **`Note.swift` (`@Model`)**: The SwiftData model for a single note. It includes properties for the note's content (stored as RTFD data), creation/update timestamps, cursor position, and a flag for pinning. The `firstLine` computed property truncates the note's first line to 70 characters.
