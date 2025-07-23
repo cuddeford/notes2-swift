@@ -16,17 +16,30 @@ struct EditorToolbar: View {
     var onBody: () -> Void
     @ObservedObject var settings: AppSettings
     @AppStorage("editorToolbarExpanded") private var isExpanded: Bool = true
+    @State private var hideTimer: Timer?
+
+    private func resetTimer() {
+        hideTimer?.invalidate()
+        hideTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { _ in
+            withAnimation(.easeInOut) {
+                isExpanded = false
+            }
+        }
+    }
+
+    private func buttonAction(action: @escaping () -> Void) {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        action()
+        resetTimer()
+    }
 
     var body: some View {
         HStack {
             if isExpanded {
                 HStack {
                     HStack {
-                        Button(action: {
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                            onBold()
-                        }) {
+                        Button(action: { buttonAction(action: onBold) }) {
                             Image(systemName: "bold")
                                 .padding(16)
                                 .background(
@@ -35,11 +48,7 @@ struct EditorToolbar: View {
                                 )
                         }
 
-                        Button(action: {
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                            onItalic()
-                        }) {
+                        Button(action: { buttonAction(action: onItalic) }) {
                             Image(systemName: "italic")
                                 .padding(16)
                                 .background(
@@ -48,11 +57,7 @@ struct EditorToolbar: View {
                                 )
                         }
 
-                        Button(action: {
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                            onUnderline()
-                        }) {
+                        Button(action: { buttonAction(action: onUnderline) }) {
                             Image(systemName: "underline")
                                 .padding(16)
                                 .background(
@@ -65,11 +70,7 @@ struct EditorToolbar: View {
                     Spacer()
 
                     HStack {
-                        Button(action: {
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                            onTitle1()
-                        }) {
+                        Button(action: { buttonAction(action: onTitle1) }) {
                             Text("h1")
                                 .bold()
                                 .padding(16)
@@ -78,11 +79,7 @@ struct EditorToolbar: View {
                                         .fill(.ultraThinMaterial)
                                 )
                         }
-                        Button(action: {
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                            onBody()
-                        }) {
+                        Button(action: { buttonAction(action: onBody) }) {
                             Text("body")
                                 .padding(10)
                                 .background(
@@ -111,6 +108,11 @@ struct EditorToolbar: View {
                 withAnimation(.easeInOut) {
                     isExpanded.toggle()
                 }
+                if isExpanded {
+                    resetTimer()
+                } else {
+                    hideTimer?.invalidate()
+                }
             }) {
                 Image(systemName: "chevron.down.circle.fill")
                     .padding(16)
@@ -125,5 +127,7 @@ struct EditorToolbar: View {
         .padding(.horizontal)
         .padding(.bottom, 32)
         .animation(.easeInOut, value: isExpanded)
+        .onAppear(perform: resetTimer)
+        .onDisappear(perform: { hideTimer?.invalidate() })
     }
 }
