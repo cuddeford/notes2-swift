@@ -292,6 +292,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var initialSpacing: CGFloat?
         private var affectedParagraphRange: NSRange?
         private let hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
+        private let completionHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         // Detents for paragraph spacing adjustments
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
@@ -677,6 +678,9 @@ struct RichTextEditor: UIViewRepresentable {
                     if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
                         self.paragraphs[index].paragraphStyle = finalParagraphStyle
                     }
+                    
+                    // Provide light haptic feedback when animation completes
+                    completionHapticGenerator.impactOccurred()
                 } else {
                     // Calculate interpolated value
                     let progress = CGFloat(elapsed / duration)
