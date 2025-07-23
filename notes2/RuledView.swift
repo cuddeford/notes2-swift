@@ -5,6 +5,23 @@ class RuledView: UIView {
 
     private var paragraphOverlays: [CAShapeLayer] = []
 
+    // Haptic feedback state for border thickness
+    private var hapticBorderStates: [NSRange: HapticBorderState] = [:]
+    private let baseBorderWidth: CGFloat = 2.0
+    private let heavyHapticAddition: CGFloat = 20.0
+    private let lightHapticAddition: CGFloat = 10.0
+    private let animationDuration: CFTimeInterval = 0.4
+
+    struct HapticBorderState {
+        let timestamp: CFTimeInterval
+        let type: HapticType
+    }
+
+    enum HapticType {
+        case heavy
+        case light
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupLayers()
@@ -108,6 +125,7 @@ class RuledView: UIView {
             }
 
             let (fill, stroke) = colors(for: detent, isPinched: isPinched)
+            let borderWidth = self.borderWidth(for: paragraphs[index].range)
 
             if index < paragraphOverlays.count {
                 // Update existing layer
@@ -115,10 +133,11 @@ class RuledView: UIView {
                 paragraphOverlays[index].fillColor = fill.cgColor
                 paragraphOverlays[index].strokeColor = stroke.cgColor
                 paragraphOverlays[index].opacity = 1
+                paragraphOverlays[index].lineWidth = borderWidth
             } else {
                 // Create new layer
                 let newLayer = CAShapeLayer()
-                newLayer.lineWidth = 2.0
+                newLayer.lineWidth = borderWidth
                 newLayer.fillColor = UIColor.clear.cgColor
                 newLayer.path = path
                 newLayer.fillColor = fill.cgColor
@@ -135,6 +154,84 @@ class RuledView: UIView {
             layer.opacity = 0
         }
     }
+
+    func triggerHapticFeedback(for range: NSRange, type: HapticType) {
+        hapticBorderStates[range] = HapticBorderState(timestamp: CACurrentMediaTime(), type: type)
+
+        // Update overlays to reflect new border thickness
+        if let coordinator = textView?.delegate as? RichTextEditor.Coordinator {
+            updateAllParagraphOverlays(
+                paragraphs: coordinator.paragraphs,
+                textView: textView!,
+                activePinchedPairs: coordinator.activePinchedPairs,
+                currentGestureDetent: nil,
+                currentGestureRange: nil
+            )
+        }
+
+        // Schedule cleanup after animation duration
+        DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) {
+            self.clearHapticState(for: range)
+        }
+    }
+
+    private func clearHapticState(for range: NSRange) {
+        hapticBorderStates.removeValue(forKey: range)
+
+        if let coordinator = textView?.delegate as? RichTextEditor.Coordinator {
+            updateAllParagraphOverlays(
+                paragraphs: coordinator.paragraphs,
+                textView: textView!,
+                activePinchedPairs: coordinator.activePinchedPairs,
+                currentGestureDetent: nil,
+                currentGestureRange: nil
+            )
+        }
+    }
+
+    private func borderWidth(for range: NSRange) -> CGFloat {
+        guard let hapticState = hapticBorderStates[range] else {
+            return baseBorderWidth
+        }
+
+        let elapsed = CACurrentMediaTime() - hapticState.timestamp
+        if elapsed > animationDuration {
+            return baseBorderWidth
+        }
+
+        let progress = CGFloat(elapsed / animationDuration)
+
+        // Create a pulse-like animation: go up to max, then back down to base
+        let pulseProgress: CGFloat
+        if progress < 0.5 {
+            // Going up: 0.0 -> 1.0
+            pulseProgress = progress * 2.0
+            let easedUp = 1.0 - (1.0 - pulseProgress) * (1.0 - pulseProgress) // ease out
+
+            let additionalWidth: CGFloat
+            switch hapticState.type {
+            case .heavy:
+                additionalWidth = heavyHapticAddition * easedUp
+            case .light:
+                additionalWidth = lightHapticAddition * easedUp
+            }
+            return baseBorderWidth + additionalWidth
+        } else {
+            // Going down: 1.0 -> 0.0
+            pulseProgress = (1.0 - progress) * 2.0
+            let easedDown = 1.0 - (1.0 - pulseProgress) * (1.0 - pulseProgress) // ease out
+
+            let additionalWidth: CGFloat
+            switch hapticState.type {
+            case .heavy:
+                additionalWidth = heavyHapticAddition * easedDown
+            case .light:
+                additionalWidth = lightHapticAddition * easedDown
+            }
+            return baseBorderWidth + additionalWidth
+        }
+    }
+
 
     private func colors(for detent: CGFloat? = nil, isPinched: Bool = false) -> (fill: UIColor, stroke: UIColor) {
         guard isPinched else {
