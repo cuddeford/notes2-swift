@@ -12,16 +12,6 @@ class RuledView: UIView {
     private let lightHapticAddition: CGFloat = 2.5
     private let animationDuration: CFTimeInterval = 0.3
 
-    struct HapticBorderState {
-        let timestamp: CFTimeInterval
-        let type: HapticType
-    }
-
-    enum HapticType {
-        case heavy
-        case light
-    }
-
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupLayers()

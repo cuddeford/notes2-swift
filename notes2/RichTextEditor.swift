@@ -8,115 +8,7 @@
 import SwiftUI
 import Combine
 import QuartzCore
-
-class CustomTextView: UITextView {
-    weak var coordinator: RichTextEditor.Coordinator?
-
-    override func caretRect(for position: UITextPosition) -> CGRect {
-        var originalRect = super.caretRect(for: position)
-
-        let offset = self.offset(from: beginningOfDocument, to: position)
-        if offset < attributedText.length {
-            let paragraphStyle = attributedText.attribute(.paragraphStyle, at: offset, effectiveRange: nil) as? NSParagraphStyle
-            let paragraphSpacing = paragraphStyle?.paragraphSpacing ?? 0.0
-
-            if originalRect.height - paragraphSpacing > 0 && originalRect.height - paragraphSpacing > paragraphStyle?.minimumLineHeight ?? paragraphSpacing {
-                originalRect.size.height -= paragraphSpacing
-            }
-        }
-
-        return originalRect
-    }
-
-    override func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
-        let originalRects = super.selectionRects(for: range)
-        var adjustedRects: [UITextSelectionRect] = []
-
-        for selectionRect in originalRects {
-            adjustedRects.append(CustomTextSelectionRect(
-                rect: CGRect(
-                    x: selectionRect.rect.minX,
-                    y: selectionRect.rect.minY,
-                    width: selectionRect.rect.width,
-                    height: originalRects[0].rect.height,
-                ),
-                writingDirection: selectionRect.writingDirection,
-                containsStart: selectionRect.containsStart,
-                containsEnd: selectionRect.containsEnd,
-                isVertical: selectionRect.isVertical
-            ))
-        }
-
-        return adjustedRects
-    }
-}
-
-class CustomTextSelectionRect: UITextSelectionRect {
-    private let _rect: CGRect
-    private let _writingDirection: NSWritingDirection
-    private let _containsStart: Bool
-    private let _containsEnd: Bool
-    private let _isVertical: Bool
-
-    init(rect: CGRect, writingDirection: NSWritingDirection, containsStart: Bool, containsEnd: Bool, isVertical: Bool) {
-        _rect = rect
-        _writingDirection = writingDirection
-        _containsStart = containsStart
-        _containsEnd = containsEnd
-        _isVertical = isVertical
-    }
-
-    override var rect: CGRect { return _rect }
-    override var writingDirection: NSWritingDirection { return _writingDirection }
-    override var containsStart: Bool { return _containsStart }
-    override var containsEnd: Bool { return _containsEnd }
-    override var isVertical: Bool { return _isVertical }
-}
-
-func paragraphRange(for text: NSAttributedString, at location: Int) -> NSRange {
-    let string = text.string as NSString
-    let length = string.length
-    if length == 0 {
-        return NSRange(location: 0, length: 0)
-    }
-    let safeLocation = min(max(location, 0), length)
-    return string.paragraphRange(for: NSRange(location: safeLocation, length: 0))
-}
-
-func wordRange(for text: NSAttributedString, at location: Int) -> NSRange {
-    let string = text.string as NSString
-    let length = string.length
-    guard length > 0 else { return NSRange(location: 0, length: 0) }
-    let safeLocation = min(max(location, 0), length - 1)
-    let range = string.rangeOfWord(at: safeLocation)
-    return range
-}
-
-extension NSString {
-    func rangeOfWord(at location: Int) -> NSRange {
-        let separators = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
-        let length = self.length
-        guard length > 0 else { return NSRange(location: 0, length: 0) }
-        var start = location
-        var end = location
-
-        // Move start to the beginning of the word
-        while start > 0 && !separators.contains(UnicodeScalar(character(at: start - 1))!) {
-            start -= 1
-        }
-        // Move end to the end of the word
-        while end < length && !separators.contains(UnicodeScalar(character(at: end))!) {
-            end += 1
-        }
-        return NSRange(location: start, length: end - start)
-    }
-}
-
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
-}
+import UIKit
 
 enum NoteTextAttribute {
     case bold
@@ -281,14 +173,6 @@ struct RichTextEditor: UIViewRepresentable {
         return coordinator
     }
 
-    private struct ActiveAnimation {
-        let displayLink: CADisplayLink
-        let startTime: CFTimeInterval
-        let startSpacing: CGFloat
-        let targetSpacing: CGFloat
-        let range: NSRange
-    }
-
     class Coordinator: NSObject, UITextViewDelegate {
         var parent: RichTextEditor
         weak var textView: UITextView?
@@ -324,7 +208,7 @@ struct RichTextEditor: UIViewRepresentable {
             self.parent = parent
             super.init()
         }
-
+        
         func parseAttributedText(_ attributedText: NSAttributedString) {
             var newParagraphs: [Paragraph] = []
             let string = attributedText.string
@@ -334,7 +218,6 @@ struct RichTextEditor: UIViewRepresentable {
                 let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
                 let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
                 newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
-                // print("Added empty paragraph for empty text. Range: \(emptyRange)")
             } else {
                 let lines = string.components(separatedBy: "\n")
                 var currentLocation = 0
@@ -346,7 +229,6 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphRange = NSRange(location: currentLocation, length: paragraphLength)
 
                     guard paragraphRange.location + paragraphRange.length <= attributedText.length else {
-                        // print("Error: Invalid range for paragraph \(index). Range: \(paragraphRange), Total Length: \(attributedText.length)")
                         continue
                     }
 
@@ -356,8 +238,6 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
 
                     newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
-                    // print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(paragraphRange)")
-
                     currentLocation += paragraphLength
                 }
             }
@@ -372,10 +252,9 @@ struct RichTextEditor: UIViewRepresentable {
                     currentGestureDetent: nil,
                     currentGestureRange: nil,
                 )
-                // print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
             }
         }
-
+        
         func updateParagraphSpatialProperties() {
             guard let textView = textView else { return }
             var updatedParagraphs = [Paragraph]()
@@ -390,228 +269,14 @@ struct RichTextEditor: UIViewRepresentable {
             }
             self.paragraphs = updatedParagraphs
         }
-
-        func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            updateParagraphSpatialProperties()
-            self.contentOffset = scrollView.contentOffset
-            ruledView?.setNeedsDisplay()
-        }
-
+        
         func updateRuledViewFrame() {
             guard let textView = textView, let ruledView = ruledView else { return }
             let contentSize = textView.contentSize
             ruledView.frame = CGRect(x: 0, y: 0, width: contentSize.width, height: contentSize.height)
             ruledView.setNeedsDisplay()
         }
-
-        private func reconstructAttributedText() -> NSAttributedString {
-            let mutableAttributedText = NSMutableAttributedString()
-            for paragraph in paragraphs {
-                let paragraphContent = NSMutableAttributedString(attributedString: paragraph.content)
-                let contentRange = NSRange(location: 0, length: paragraphContent.length)
-
-                // Apply the stored paragraph style over the entire range of the paragraph content.
-                // This ensures that any updates (like from the pinch gesture) are reflected.
-                if contentRange.length > 0 {
-                    paragraphContent.addAttribute(.paragraphStyle, value: paragraph.paragraphStyle, range: contentRange)
-                }
-
-                mutableAttributedText.append(paragraphContent)
-            }
-            return mutableAttributedText
-        }
-
-        @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
-            guard let textView = textView else { return }
-
-            if gesture.state == .began && gesture.numberOfTouches >= 2 {
-                let location1 = gesture.location(ofTouch: 0, in: textView)
-                let location2 = gesture.location(ofTouch: 1, in: textView)
-
-                if let position1 = textView.closestPosition(to: location1), let position2 = textView.closestPosition(to: location2) {
-                    let range1 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position1))
-                    let range2 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position2))
-
-                    guard let index1 = paragraphs.firstIndex(where: { ($0.range == range1) || ($0.range.location == range1.location && $0.range.length == range1.length - 1) }),
-                          let index2 = paragraphs.firstIndex(where: { ($0.range == range2) || ($0.range.location == range2.location && $0.range.length == range2.length - 1) }) else {
-                        gesture.state = .cancelled
-                        return
-                    }
-
-                    if index1 == index2 || abs(index1 - index2) != 1 {
-                        gesture.state = .cancelled
-                        return
-                    }
-
-                    let topRange = paragraphs[index1].range.location < paragraphs[index2].range.location
-                        ? paragraphs[index1].range
-                        : paragraphs[index2].range
-                    self.affectedParagraphRange = topRange
-                    self.pinchedParagraphIndices = [index1, index2]
-
-                    // Get current spacing - either from animation or from paragraph style
-                    let currentSpacing: CGFloat
-                    if let activeAnimation = activeAnimations[topRange] {
-                        // Animation is in progress for this same range, calculate current position
-                        let elapsed = CACurrentMediaTime() - activeAnimation.startTime
-                        let duration = self.animationDuration
-                        let progress = CGFloat(min(elapsed / duration, 1.0))
-                        let easedProgress = EasingFunctions.easeOutBack(progress)
-                        currentSpacing = activeAnimation.startSpacing + (activeAnimation.targetSpacing - activeAnimation.startSpacing) * easedProgress
-
-                        // Stop current animation for this specific range
-                        activeAnimation.displayLink.invalidate()
-                        activeAnimations.removeValue(forKey: topRange)
-                    } else {
-                        // No animation in progress for this range, use stored value
-                        if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
-                            currentSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
-                        } else {
-                            currentSpacing = parent.settings.defaultParagraphSpacing
-                        }
-                    }
-
-                    self.initialSpacing = currentSpacing
-                    self.currentDetent = currentSpacing
-
-                    // Set the initial detent for color and haptics
-                    self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
-                    self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < 0.1 }
-
-                    // Track if we started at a limit for direction-based haptic
-                    self.startedAtLimit = self.wasAtLimit
-                    self.initialLimitValue = self.wasAtLimit ? self.lastClosestDetent : nil
-
-                    // Track this pinched pair like we track animations
-                    activePinchedPairs[topRange] = (indices: [index1, index2], timestamp: CACurrentMediaTime())
-
-                    // Update overlays with all active pinched pairs
-                    ruledView?.updateAllParagraphOverlays(
-                        paragraphs: self.paragraphs,
-                        textView: textView,
-                        activePinchedPairs: activePinchedPairs,
-                        currentGestureDetent: self.currentDetent,
-                        currentGestureRange: topRange,
-                    )
-                }
-                gesture.scale = 1.0
-                hapticGenerator.prepare()
-            } else if gesture.state == .changed {
-                guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
-
-                // Symmetrical scaling logic
-                let gestureRange = AppSettings.unrelatedParagraphSpacing - AppSettings.relatedParagraphSpacing
-                let gestureProgress = (gesture.scale - 1.0) * gestureRange
-                var targetSpacing = initialSpacing + gestureProgress
-
-                // Clamp the spacing to the defined detents
-                targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
-
-                let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
-
-                // Check if we're at full extension or contraction (matching a detent exactly)
-                let isFullyExtendedOrContracted = spacingDetents.contains { detent in
-                    abs(detent - targetSpacing) < 0.1
-                }
-
-                if closestDetentForColor != lastClosestDetent {
-                    hapticGenerator.impactOccurred()
-                    hapticGenerator.prepare()
-                    lastClosestDetent = closestDetentForColor
-                    
-                    // Trigger heavy haptic border effect once using the primary paragraph
-                    if let range = affectedParagraphRange {
-                        ruledView?.triggerHapticFeedback(for: range, type: .heavy)
-                    }
-                } else if isFullyExtendedOrContracted {
-                    var shouldTriggerLight = false
-                    
-                    if !wasAtLimit {
-                        // Not previously at limit - trigger once
-                        shouldTriggerLight = true
-                    } else if startedAtLimit && initialLimitValue == targetSpacing {
-                        // Started at this limit - check direction and if already triggered
-                        let direction = gesture.scale - 1.0
-                        let isMovingTowardLimit = (initialLimitValue == AppSettings.relatedParagraphSpacing && direction < 0) ||
-                                                (initialLimitValue == AppSettings.unrelatedParagraphSpacing && direction > 0)
-                        
-                        // Only trigger if moving toward limit and haven't triggered yet
-                        shouldTriggerLight = isMovingTowardLimit && !hasTriggeredLightHaptic
-                    }
-                    
-                    if shouldTriggerLight {
-                        lightHapticGenerator.impactOccurred()
-                        lightHapticGenerator.prepare()
-                        hasTriggeredLightHaptic = true
-                        
-                        // Trigger light haptic border effect once using the primary paragraph
-                        if let range = affectedParagraphRange {
-                            ruledView?.triggerHapticFeedback(for: range, type: .light)
-                        }
-                    }
-                } else {
-                    // Reset trigger state when moving away from limit
-                    hasTriggeredLightHaptic = false
-                }
-
-                // Update limit state tracking
-                wasAtLimit = isFullyExtendedOrContracted
-
-                let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
-                let newParagraphStyle = NSMutableParagraphStyle()
-                newParagraphStyle.setParagraphStyle(currentStyle)
-                newParagraphStyle.paragraphSpacing = targetSpacing
-
-                textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
-                if let index = paragraphs.firstIndex(where: { $0.range == range }) {
-                    paragraphs[index].paragraphStyle = newParagraphStyle
-                }
-                currentDetent = targetSpacing
-
-                textView.layoutIfNeeded()
-                ruledView?.updateAllParagraphOverlays(
-                    paragraphs: self.paragraphs,
-                    textView: textView,
-                    activePinchedPairs: activePinchedPairs,
-                    currentGestureDetent: self.currentDetent,
-                    currentGestureRange: range,
-                )
-                ruledView?.setNeedsDisplay()
-            } else if gesture.state == .ended || gesture.state == .cancelled {
-                guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
-
-                let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) }) ?? self.parent.settings.defaultParagraphSpacing
-
-                // Reset tracking variables
-                self.startedAtLimit = false
-                self.initialLimitValue = nil
-                self.hasTriggeredLightHaptic = false
-
-                // Start smooth animation from current spacing to target
-                startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
-            }
-        }
-
-        func textViewDidChange(_ textView: UITextView) {
-            DispatchQueue.main.async {
-                self.parent.text = textView.attributedText
-                self.parseAttributedText(textView.attributedText)
-                self.centerCursorInTextView()
-                self.updateRuledViewFrame()
-            }
-        }
-
-        func textViewDidChangeSelection(_ textView: UITextView) {
-            DispatchQueue.main.async {
-                self.parent.selectedRange = textView.selectedRange
-                self.updateTypingAttributes()
-                if textView.selectedRange.length == 0 {
-                    self.parent.note.cursorLocation = textView.selectedRange.location
-                }
-                self.centerCursorInTextView()
-            }
-        }
-
+        
         func updateTypingAttributes() {
             guard let textView = textView else { return }
             let loc = max(0, min(textView.selectedRange.location - 1, textView.attributedText.length - 1))
@@ -627,7 +292,7 @@ struct RichTextEditor: UIViewRepresentable {
                 textView.typingAttributes = attrs
             }
         }
-
+        
         func centerCursorInTextView() {
             guard let textView = textView, let selectedTextRange = textView.selectedTextRange, textView.hasText else { return }
 
@@ -673,140 +338,33 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
         }
-
-        func printRawString(_ textView: UITextView) {
-            print("---")
-            textView.attributedText.enumerateAttributes(
-                in: NSRange(location: 0, length: textView.attributedText.length),
-                options: []
-            ) { attrs, range, _ in
-                let substring = textView.attributedText.attributedSubstring(from: range).string
-                print("\"\(substring)\" has attributes: \(attrs)")
-            }
-            print("---")
+        
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            updateParagraphSpatialProperties()
+            self.contentOffset = scrollView.contentOffset
+            ruledView?.setNeedsDisplay()
         }
-
-        private func startSpacingAnimation(from startValue: CGFloat, to targetValue: CGFloat, range: NSRange) {
-            // Cancel any existing animation for this specific range
-            if let existingAnimation = activeAnimations[range] {
-                existingAnimation.displayLink.invalidate()
-                activeAnimations.removeValue(forKey: range)
-            }
-
-            let startTime = CACurrentMediaTime()
-            let displayLink = CADisplayLink(target: self, selector: #selector(animateSpacingFrame))
-
-            let animation = ActiveAnimation(
-                displayLink: displayLink,
-                startTime: startTime,
-                startSpacing: startValue,
-                targetSpacing: targetValue,
-                range: range,
-            )
-
-            activeAnimations[range] = animation
-            displayLink.add(to: .main, forMode: .common)
-        }
-
-        @objc private func animateSpacingFrame() {
-            guard let textView = textView else {
-                // Invalidate all animations if textView is gone
-                activeAnimations.values.forEach { $0.displayLink.invalidate() }
-                activeAnimations.removeAll()
-                return
-            }
-
-            let currentTime = CACurrentMediaTime()
-            let duration = self.animationDuration
-
-            // Process all active animations
-            var completedAnimations: [NSRange] = []
-
-            for (range, animation) in activeAnimations {
-                let elapsed = currentTime - animation.startTime
-
-                if elapsed >= duration {
-                    // Animation complete
-                    animation.displayLink.invalidate()
-                    completedAnimations.append(range)
-
-                    // Set final value
-                    let finalParagraphStyle = NSMutableParagraphStyle()
-                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
-                        finalParagraphStyle.setParagraphStyle(self.paragraphs[index].paragraphStyle)
-                    }
-                    finalParagraphStyle.paragraphSpacing = animation.targetSpacing
-
-                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
-                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
-                        self.paragraphs[index].paragraphStyle = finalParagraphStyle
-                    }
-
-                    // Provide light haptic feedback when animation completes
-                    completionHapticGenerator.impactOccurred()
-                    
-                    // Trigger light haptic border effect for animation completion once
-                    ruledView?.triggerHapticFeedback(for: range, type: .light)
-                } else {
-                    // Calculate interpolated value
-                    let progress = CGFloat(elapsed / duration)
-                    let easedProgress = EasingFunctions.easeOutBack(progress)
-                    let currentSpacing = animation.startSpacing + (animation.targetSpacing - animation.startSpacing) * easedProgress
-
-                    // Apply interpolated spacing
-                    let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
-                    let newParagraphStyle = NSMutableParagraphStyle()
-                    newParagraphStyle.setParagraphStyle(currentStyle)
-                    newParagraphStyle.paragraphSpacing = currentSpacing
-
-                    textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
-                    if let index = self.paragraphs.firstIndex(where: { $0.range == range }) {
-                        paragraphs[index].paragraphStyle = newParagraphStyle
-                    }
-                }
-            }
-
-            // Remove completed animations
-            for range in completedAnimations {
-                activeAnimations.removeValue(forKey: range)
-            }
-
-            // Update UI if there are any animations still running or just completed
-            if !activeAnimations.isEmpty || !completedAnimations.isEmpty {
-                textView.layoutIfNeeded()
-                ruledView?.updateAllParagraphOverlays(
-                    paragraphs: self.paragraphs,
-                    textView: textView,
-                    activePinchedPairs: activePinchedPairs,
-                    currentGestureDetent: nil,
-                    currentGestureRange: nil,
-                )
-
-                // Clean up global state when all animations are complete
-                if activeAnimations.isEmpty {
-                    self.parent.text = self.reconstructAttributedText()
-                    self.initialSpacing = nil
-                    self.affectedParagraphRange = nil
-                    self.currentDetent = nil
-                    self.lastClosestDetent = nil
-                }
-
-                // Remove pinched pairs for completed animations
-                for range in completedAnimations {
-                    activePinchedPairs.removeValue(forKey: range)
-                }
-
-                // Update overlays with remaining active pinched pairs
-                self.ruledView?.updateAllParagraphOverlays(
-                    paragraphs: self.paragraphs,
-                    textView: textView,
-                    activePinchedPairs: activePinchedPairs,
-                    currentGestureDetent: nil,
-                    currentGestureRange: nil,
-                )
+        
+        func textViewDidChange(_ textView: UITextView) {
+            DispatchQueue.main.async {
+                self.parent.text = textView.attributedText
+                self.parseAttributedText(textView.attributedText)
+                self.centerCursorInTextView()
+                self.updateRuledViewFrame()
             }
         }
 
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            DispatchQueue.main.async {
+                self.parent.selectedRange = textView.selectedRange
+                self.updateTypingAttributes()
+                if textView.selectedRange.length == 0 {
+                    self.parent.note.cursorLocation = textView.selectedRange.location
+                }
+                self.centerCursorInTextView()
+            }
+        }
+        
         func toggleAttribute(_ attribute: NoteTextAttribute) {
             let mutable = NSMutableAttributedString(attributedString: parent.text)
             var range = parent.selectedRange
@@ -926,6 +484,286 @@ struct RichTextEditor: UIViewRepresentable {
             parent.text = mutable
             self.parseAttributedText(mutable)
             self.updateTypingAttributes()
+        }
+        
+        private func reconstructAttributedText() -> NSAttributedString {
+            let mutableAttributedText = NSMutableAttributedString()
+            for paragraph in paragraphs {
+                let paragraphContent = NSMutableAttributedString(attributedString: paragraph.content)
+                let contentRange = NSRange(location: 0, length: paragraphContent.length)
+
+                // Apply the stored paragraph style over the entire range of the paragraph content.
+                // This ensures that any updates (like from the pinch gesture) are reflected.
+                if contentRange.length > 0 {
+                    paragraphContent.addAttribute(.paragraphStyle, value: paragraph.paragraphStyle, range: contentRange)
+                }
+
+                mutableAttributedText.append(paragraphContent)
+            }
+            return mutableAttributedText
+        }
+        
+        private func startSpacingAnimation(from: CGFloat, to: CGFloat, range: NSRange) {
+            let startTime = CACurrentMediaTime()
+            
+            let displayLink = CADisplayLink(target: self, selector: #selector(self.updateSpacingAnimation(_:)))
+            displayLink.add(to: RunLoop.main, forMode: RunLoop.Mode.common)
+            
+            let animation = ActiveAnimation(
+                displayLink: displayLink,
+                startTime: startTime,
+                startSpacing: from,
+                targetSpacing: to,
+                range: range
+            )
+            
+            activeAnimations[range] = animation
+        }
+        
+@objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
+            guard let textView = textView else { return }
+
+            if gesture.state == .began && gesture.numberOfTouches >= 2 {
+                handlePinchBegan(gesture, textView: textView)
+            } else if gesture.state == .changed {
+                handlePinchChanged(gesture, textView: textView)
+            } else if gesture.state == .ended || gesture.state == .cancelled {
+                handlePinchEnded(gesture, textView: textView)
+            }
+        }
+        
+        private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
+            let location1 = gesture.location(ofTouch: 0, in: textView)
+            let location2 = gesture.location(ofTouch: 1, in: textView)
+
+            if let position1 = textView.closestPosition(to: location1), let position2 = textView.closestPosition(to: location2) {
+                let range1 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position1))
+                let range2 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position2))
+
+                guard let index1 = paragraphs.firstIndex(where: { ($0.range == range1) || ($0.range.location == range1.location && $0.range.length == range1.length - 1) }),
+                      let index2 = paragraphs.firstIndex(where: { ($0.range == range2) || ($0.range.location == range2.location && $0.range.length == range2.length - 1) }) else {
+                    gesture.state = .cancelled
+                    return
+                }
+
+                if index1 == index2 || abs(index1 - index2) != 1 {
+                    gesture.state = .cancelled
+                    return
+                }
+
+                let topRange = paragraphs[index1].range.location < paragraphs[index2].range.location
+                    ? paragraphs[index1].range
+                    : paragraphs[index2].range
+                self.affectedParagraphRange = topRange
+                self.pinchedParagraphIndices = [index1, index2]
+
+                // Get current spacing - either from animation or from paragraph style
+                let currentSpacing: CGFloat
+                if let activeAnimation = activeAnimations[topRange] {
+                    // Animation is in progress for this same range, calculate current position
+                    let elapsed = CACurrentMediaTime() - activeAnimation.startTime
+                    let duration = self.animationDuration
+                    let progress = CGFloat(min(elapsed / duration, 1.0))
+                    let easedProgress = EasingFunctions.easeOutBack(progress)
+                    currentSpacing = activeAnimation.startSpacing + (activeAnimation.targetSpacing - activeAnimation.startSpacing) * easedProgress
+
+                    // Stop current animation for this specific range
+                    activeAnimation.displayLink.invalidate()
+                    activeAnimations.removeValue(forKey: topRange)
+                } else {
+                    // No animation in progress for this range, use stored value
+                    if let index = paragraphs.firstIndex(where: { $0.range == topRange }) {
+                        currentSpacing = paragraphs[index].paragraphStyle.paragraphSpacing
+                    } else {
+                        currentSpacing = parent.settings.defaultParagraphSpacing
+                    }
+                }
+
+                self.initialSpacing = currentSpacing
+                self.currentDetent = currentSpacing
+
+                // Set the initial detent for color and haptics
+                self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
+                self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < 0.1 }
+
+                // Track if we started at a limit for direction-based haptic
+                self.startedAtLimit = self.wasAtLimit
+                self.initialLimitValue = self.wasAtLimit ? self.lastClosestDetent : nil
+
+                // Track this pinched pair like we track animations
+                activePinchedPairs[topRange] = (indices: [index1, index2], timestamp: CACurrentMediaTime())
+
+                // Update overlays with all active pinched pairs
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: self.currentDetent,
+                    currentGestureRange: topRange,
+                )
+            }
+            gesture.scale = 1.0
+            hapticGenerator.prepare()
+        }
+        
+        private func handlePinchChanged(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
+            guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
+
+            // Symmetrical scaling logic
+            let gestureRange = AppSettings.unrelatedParagraphSpacing - AppSettings.relatedParagraphSpacing
+            let gestureProgress = (gesture.scale - 1.0) * gestureRange
+            var targetSpacing = initialSpacing + gestureProgress
+
+            // Clamp the spacing to the defined detents
+            targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
+
+            let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
+
+            // Check if we're at full extension or contraction (matching a detent exactly)
+            let isFullyExtendedOrContracted = spacingDetents.contains { detent in
+                abs(detent - targetSpacing) < 0.1
+            }
+
+            if closestDetentForColor != lastClosestDetent {
+                hapticGenerator.impactOccurred()
+                hapticGenerator.prepare()
+                lastClosestDetent = closestDetentForColor
+                
+                // Trigger heavy haptic border effect once using the primary paragraph
+                if let range = affectedParagraphRange {
+                    ruledView?.triggerHapticFeedback(for: range, type: .heavy)
+                }
+            } else if isFullyExtendedOrContracted {
+                var shouldTriggerLight = false
+                
+                if !wasAtLimit {
+                    // Not previously at limit - trigger once
+                    shouldTriggerLight = true
+                } else if startedAtLimit && initialLimitValue == targetSpacing {
+                    // Started at this limit - check direction and if already triggered
+                    let direction = gesture.scale - 1.0
+                    let isMovingTowardLimit = (initialLimitValue == AppSettings.relatedParagraphSpacing && direction < 0) ||
+                                            (initialLimitValue == AppSettings.unrelatedParagraphSpacing && direction > 0)
+                    
+                    // Only trigger if moving toward limit and haven't triggered yet
+                    shouldTriggerLight = isMovingTowardLimit && !hasTriggeredLightHaptic
+                }
+                
+                if shouldTriggerLight {
+                    lightHapticGenerator.impactOccurred()
+                    lightHapticGenerator.prepare()
+                    hasTriggeredLightHaptic = true
+                    
+                    // Trigger light haptic border effect once using the primary paragraph
+                    if let range = affectedParagraphRange {
+                        ruledView?.triggerHapticFeedback(for: range, type: .light)
+                    }
+                }
+            } else {
+                // Reset trigger state when moving away from limit
+                hasTriggeredLightHaptic = false
+            }
+
+            // Update limit state tracking
+            wasAtLimit = isFullyExtendedOrContracted
+
+            let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
+            let newParagraphStyle = NSMutableParagraphStyle()
+            newParagraphStyle.setParagraphStyle(currentStyle)
+            newParagraphStyle.paragraphSpacing = targetSpacing
+
+            textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+            if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                paragraphs[index].paragraphStyle = newParagraphStyle
+            }
+            currentDetent = targetSpacing
+
+            textView.layoutIfNeeded()
+            ruledView?.updateAllParagraphOverlays(
+                paragraphs: self.paragraphs,
+                textView: textView,
+                activePinchedPairs: activePinchedPairs,
+                currentGestureDetent: self.currentDetent,
+                currentGestureRange: range,
+            )
+            ruledView?.setNeedsDisplay()
+        }
+        
+        private func handlePinchEnded(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
+            guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
+
+            let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) }) ?? self.parent.settings.defaultParagraphSpacing
+
+            // Reset tracking variables
+            self.startedAtLimit = false
+            self.initialLimitValue = nil
+            self.hasTriggeredLightHaptic = false
+
+            // Start smooth animation from current spacing to target
+            startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
+        }
+        
+        @objc private func updateSpacingAnimation(_ displayLink: CADisplayLink) {
+            guard let textView = textView else { return }
+            
+            for (range, animation) in activeAnimations {
+                let elapsed = CACurrentMediaTime() - animation.startTime
+                let duration = self.animationDuration
+                
+                if elapsed >= duration {
+                    // Animation complete
+                    animation.displayLink.invalidate()
+                    activeAnimations.removeValue(forKey: range)
+                    
+                    // Final update
+                    let finalParagraphStyle = NSMutableParagraphStyle()
+                    finalParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
+                    finalParagraphStyle.paragraphSpacing = animation.targetSpacing
+                    
+                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
+                    if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                        paragraphs[index].paragraphStyle = finalParagraphStyle
+                    }
+                    
+                    // Clean up active pinched pairs
+                    activePinchedPairs.removeValue(forKey: range)
+                    
+                    textView.layoutIfNeeded()
+                    ruledView?.updateAllParagraphOverlays(
+                        paragraphs: self.paragraphs,
+                        textView: textView,
+                        activePinchedPairs: activePinchedPairs,
+                        currentGestureDetent: nil,
+                        currentGestureRange: nil
+                    )
+                    
+                    // Completion haptic
+                    completionHapticGenerator.impactOccurred()
+                    
+                } else {
+                    let progress = CGFloat(elapsed / duration)
+                    let easedProgress = EasingFunctions.easeOutBack(progress)
+                    let currentSpacing = animation.startSpacing + (animation.targetSpacing - animation.startSpacing) * easedProgress
+                    
+                    let currentParagraphStyle = NSMutableParagraphStyle()
+                    currentParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
+                    currentParagraphStyle.paragraphSpacing = currentSpacing
+                    
+                    textView.textStorage.addAttribute(.paragraphStyle, value: currentParagraphStyle, range: range)
+                    if let index = paragraphs.firstIndex(where: { $0.range == range }) {
+                        paragraphs[index].paragraphStyle = currentParagraphStyle
+                    }
+                    
+                    textView.layoutIfNeeded()
+                    ruledView?.updateAllParagraphOverlays(
+                        paragraphs: self.paragraphs,
+                        textView: textView,
+                        activePinchedPairs: activePinchedPairs,
+                        currentGestureDetent: nil,
+                        currentGestureRange: nil
+                    )
+                }
+            }
         }
     }
 }
