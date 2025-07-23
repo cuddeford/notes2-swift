@@ -293,7 +293,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var affectedParagraphRange: NSRange?
         private let hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
         private let completionHapticGenerator = UIImpactFeedbackGenerator(style: .light)
-        private let mediumHapticGenerator = UIImpactFeedbackGenerator(style: .light)
+        private let lightHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         // Detents for paragraph spacing adjustments
         // min is for related paragraphs, max is for unrelated paragraphs
         private let spacingDetents: [CGFloat] = [AppSettings.relatedParagraphSpacing, AppSettings.unrelatedParagraphSpacing]
@@ -303,7 +303,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var wasAtLimit: Bool = false
         private var startedAtLimit: Bool = false
         private var initialLimitValue: CGFloat?
-        private var hasTriggeredMediumHaptic: Bool = false
+        private var hasTriggeredLightHaptic: Bool = false
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
         private var activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:]
         private var pinchedParagraphIndices: [Int] = []
@@ -513,11 +513,11 @@ struct RichTextEditor: UIViewRepresentable {
                     hapticGenerator.prepare()
                     lastClosestDetent = closestDetentForColor
                 } else if isFullyExtendedOrContracted {
-                    var shouldTriggerMedium = false
+                    var shouldTriggerLight = false
                     
                     if !wasAtLimit {
                         // Not previously at limit - trigger once
-                        shouldTriggerMedium = true
+                        shouldTriggerLight = true
                     } else if startedAtLimit && initialLimitValue == targetSpacing {
                         // Started at this limit - check direction and if already triggered
                         let direction = gesture.scale - 1.0
@@ -525,17 +525,17 @@ struct RichTextEditor: UIViewRepresentable {
                                                 (initialLimitValue == AppSettings.unrelatedParagraphSpacing && direction > 0)
                         
                         // Only trigger if moving toward limit and haven't triggered yet
-                        shouldTriggerMedium = isMovingTowardLimit && !hasTriggeredMediumHaptic
+                        shouldTriggerLight = isMovingTowardLimit && !hasTriggeredLightHaptic
                     }
                     
-                    if shouldTriggerMedium {
-                        mediumHapticGenerator.impactOccurred()
-                        mediumHapticGenerator.prepare()
-                        hasTriggeredMediumHaptic = true
+                    if shouldTriggerLight {
+                        lightHapticGenerator.impactOccurred()
+                        lightHapticGenerator.prepare()
+                        hasTriggeredLightHaptic = true
                     }
                 } else {
                     // Reset trigger state when moving away from limit
-                    hasTriggeredMediumHaptic = false
+                    hasTriggeredLightHaptic = false
                 }
 
                 // Update limit state tracking
@@ -569,7 +569,7 @@ struct RichTextEditor: UIViewRepresentable {
                 // Reset tracking variables
                 self.startedAtLimit = false
                 self.initialLimitValue = nil
-                self.hasTriggeredMediumHaptic = false
+                self.hasTriggeredLightHaptic = false
 
                 // Start smooth animation from current spacing to target
                 startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
