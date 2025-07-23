@@ -24,20 +24,73 @@ struct NoteView: View {
     @State private var dragLocation: CGPoint = .zero
     @State private var isDragging = false
 
+    static private func noteTextStyle(for aFont: UIFont) -> NoteTextStyle {
+        let title1Size = UIFont.preferredFont(forTextStyle: .title1).pointSize
+        let title2Size = UIFont.preferredFont(forTextStyle: .title2).pointSize
+
+        switch aFont.pointSize {
+        case title1Size:
+            return .title1
+        case title2Size:
+            return .title2
+        default:
+            return .body
+        }
+    }
+
     init(note: Note, selectedNoteID: Binding<UUID?>) {
         self._selectedNoteID = selectedNoteID
         self._note = Bindable(wrappedValue: note)
 
+        var loadedText: NSAttributedString
+        // Attempt to load attributed string from note data
         if let attr = try? NSAttributedString(
             data: note.content,
             options: [.documentType: NSAttributedString.DocumentType.rtfd],
             documentAttributes: nil
-        ) {
-            _noteText = State(initialValue: attr)
+        ), attr.length > 0 {
+            // If successful and not empty, reconstruct attributes to ensure correct metrics
+            let mutableAttr = NSMutableAttributedString(attributedString: attr)
+            mutableAttr.beginEditing()
+            mutableAttr.enumerateAttributes(in: NSRange(location: 0, length: mutableAttr.length), options: []) { attributes, range, _ in
+                guard let oldFont = attributes[.font] as? UIFont else { return }
+
+                // Determine style and traits from the old font
+                let style = NoteView.noteTextStyle(for: oldFont)
+                let traits = oldFont.fontDescriptor.symbolicTraits
+
+                // Create a fresh font with the correct metrics
+                let newFont = UIFont.noteStyle(style, traits: traits)
+
+                // Create a fresh paragraph style, preserving original spacing
+                let oldParagraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
+                let newParagraphStyle = (oldParagraphStyle?.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+                newParagraphStyle.minimumLineHeight = newFont.lineHeight
+                newParagraphStyle.maximumLineHeight = newFont.lineHeight
+
+                // Apply the fresh attributes
+                mutableAttr.addAttribute(.font, value: newFont, range: range)
+                mutableAttr.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+            }
+            mutableAttr.endEditing()
+            loadedText = mutableAttr
         } else {
-            _noteText = State(initialValue: NSAttributedString(string: ""))
+            // If loading fails or note is empty, create a new note with default title style
+            let newFont = UIFont.noteStyle(.title1, traits: .traitBold)
+            let newParagraphStyle = NSMutableParagraphStyle()
+            newParagraphStyle.paragraphSpacing = AppSettings.shared.defaultParagraphSpacing
+            newParagraphStyle.minimumLineHeight = newFont.lineHeight
+            newParagraphStyle.maximumLineHeight = newFont.lineHeight
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: newFont,
+                .paragraphStyle: newParagraphStyle,
+                .foregroundColor: UIColor.label
+            ]
+            // Create an empty string but with these typing attributes for the editor
+            loadedText = NSAttributedString(string: "", attributes: attributes)
         }
 
+        _noteText = State(initialValue: loadedText)
         _selectedRange = State(initialValue: NSRange(location: note.cursorLocation, length: 0))
     }
 

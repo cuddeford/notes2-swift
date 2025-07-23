@@ -218,7 +218,6 @@ struct RichTextEditor: UIViewRepresentable {
                 let emptyAttributes: [NSAttributedString.Key: Any] = textView?.typingAttributes ?? [:]
                 let emptyParagraphStyle = (emptyAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
                 newParagraphs.append(Paragraph(content: NSAttributedString(string: ""), range: emptyRange, paragraphStyle: emptyParagraphStyle))
-                print("Added empty paragraph for empty text. Range: \(emptyRange)")
             } else {
                 let lines = string.components(separatedBy: "\n")
                 var currentLocation = 0
@@ -230,7 +229,6 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphRange = NSRange(location: currentLocation, length: paragraphLength)
 
                     guard paragraphRange.location + paragraphRange.length <= attributedText.length else {
-                        print("Error: Invalid range for paragraph \(index). Range: \(paragraphRange), Total Length: \(attributedText.length)")
                         continue
                     }
 
@@ -240,7 +238,6 @@ struct RichTextEditor: UIViewRepresentable {
                     let paragraphStyle = (currentAttributes[.paragraphStyle] as? NSParagraphStyle) ?? NSParagraphStyle.default
 
                     newParagraphs.append(Paragraph(content: paragraphContent, range: paragraphRange, paragraphStyle: paragraphStyle))
-                    print("Parsed paragraph: \"\(paragraphContent.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \(paragraphRange)")
                     currentLocation += paragraphLength
                 }
             }
@@ -255,7 +252,6 @@ struct RichTextEditor: UIViewRepresentable {
                     currentGestureDetent: nil,
                     currentGestureRange: nil,
                 )
-                print(newParagraphs.map { "\"\($0.content.string.replacingOccurrences(of: "\n", with: "\\n"))\" Range: \($0.range), lineHeight: \(tv.font!.lineHeight), minLineHeight: \($0.paragraphStyle.minimumLineHeight), maxLineHeight: \($0.paragraphStyle.maximumLineHeight)" })
             }
         }
 
