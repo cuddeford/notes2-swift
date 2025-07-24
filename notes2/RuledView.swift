@@ -15,16 +15,35 @@ class RuledView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupLayers()
+        registerForTraitChanges()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupLayers()
+        registerForTraitChanges()
     }
 
     private func setupLayers() {
         self.backgroundColor = .clear
         self.isOpaque = false
+    }
+
+    // listen for dark mode change to refresh the UILabel colors on the overlays
+    private func registerForTraitChanges() {
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: RuledView, previousTraitCollection: UITraitCollection?) in
+            guard let strongSelf = self else { return }
+            if strongSelf.traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+                if let coordinator = strongSelf.textView?.delegate as? RichTextEditor.Coordinator,
+                   let textView = strongSelf.textView {
+                    strongSelf.updateAllParagraphOverlays(
+                        paragraphs: coordinator.paragraphs,
+                        textView: textView,
+                        activePinchedPairs: coordinator.activePinchedPairs
+                    )
+                }
+            }
+        }
     }
 
     func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
