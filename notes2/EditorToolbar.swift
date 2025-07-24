@@ -116,14 +116,11 @@ struct EditorToolbar: View {
             }) {
                 Image(systemName: "chevron.right.circle.fill")
                     .font(.system(size: 24, weight: .medium))
-                    .border(Color.yellow, width: 1)
                     .padding(16)
                     .foregroundColor(.accentColor)
-                    .border(Color.green, width: 1)
                     .opacity(isExpanded ? 1 : 0.5)
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
             }
-            .border(Color.red, width: 1)
         }
         .padding(.horizontal)
         .padding(.bottom, 32)

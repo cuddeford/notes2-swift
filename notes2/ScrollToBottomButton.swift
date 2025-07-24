@@ -14,11 +14,8 @@ struct ScrollToBottomButton: View {
         Button(action: action) {
             Image(systemName: "chevron.down.circle.fill")
                 .font(.system(size: 24, weight: .medium))
-                .border(Color.yellow, width: 1)
                 .padding(16)
                 .foregroundColor(.accentColor)
-                .border(Color.green, width: 1)
         }
-        .border(Color.red, width: 1)
     }
 }
