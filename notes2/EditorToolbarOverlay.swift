@@ -31,9 +31,10 @@ struct EditorToolbarOverlay: View {
                     settings: settings
                 )
                 .padding(.bottom, keyboard.keyboardHeight)
-                .transition(.move(edge: .bottom))
+                .transition(.opacity)
             }
         }
+        .animation(.linear(duration: 0.15), value: keyboard.keyboardHeight)
         .edgesIgnoringSafeArea(.bottom)
     }
 }
