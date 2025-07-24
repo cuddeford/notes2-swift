@@ -86,6 +86,7 @@ struct ContentView: View {
                                         Text(day.formattedDate())
                                         Spacer()
                                         Text(day.relativeDate())
+                                            .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
                                             .foregroundStyle(.secondary)
                                     }
                                 }
