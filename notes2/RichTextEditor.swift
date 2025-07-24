@@ -104,10 +104,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         context.coordinator.updateRuledViewFrame()
-
         context.coordinator.updateTypingAttributes()
-
-
 
         // --- Typewriter Scrolling Insets ---
         let baseInset: CGFloat = settings.padding
