@@ -29,7 +29,7 @@ struct RichTextEditor: UIViewRepresentable {
 
     var keyboard: KeyboardObserver
     var onCoordinatorReady: ((Coordinator) -> Void)? = nil
-    
+
     @Binding var isAtBottom: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
@@ -317,10 +317,12 @@ struct RichTextEditor: UIViewRepresentable {
             updateParagraphSpatialProperties()
             self.contentOffset = scrollView.contentOffset
             ruledView?.setNeedsDisplay()
-            
+
             // Check if scrolled to bottom
-            let bottomOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
-            let isAtBottom = abs(scrollView.contentOffset.y - bottomOffset) < 1.0
+            let contentHeight = scrollView.contentSize.height
+            let boundsHeight = scrollView.bounds.height - scrollView.adjustedContentInset.top - scrollView.adjustedContentInset.bottom
+            let maxOffset = max(0, contentHeight - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
+            let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 15.0)
             self.parent.isAtBottom = isAtBottom
         }
 
@@ -750,14 +752,14 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
         }
-        
+
         func scrollToBottom() {
             guard let textView = self.textView else { return }
-            let bottomOffset = CGPoint(
-                x: 0,
-                y: max(0, textView.contentSize.height - textView.bounds.height + textView.contentInset.bottom)
-            )
-            
+            let contentHeight = textView.contentSize.height
+            let boundsHeight = textView.bounds.height - textView.adjustedContentInset.top - textView.adjustedContentInset.bottom
+            let maxOffset = max(0, contentHeight - textView.bounds.height + textView.adjustedContentInset.bottom)
+            let bottomOffset = CGPoint(x: 0, y: maxOffset)
+
             UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
                 textView.setContentOffset(bottomOffset, animated: false)
             }, completion: nil)
