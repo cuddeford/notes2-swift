@@ -166,6 +166,18 @@ struct NoteView: View {
         )
         .ignoresSafeArea()
         .toolbar(UIDevice.current.userInterfaceIdiom == .phone ? .hidden : .visible, for: .navigationBar)
+        .overlay(
+            EditorToolbarOverlay(
+                keyboard: keyboard,
+                settings: settings,
+                onBold: { editorCoordinator?.toggleAttribute(.bold) },
+                onItalic: { editorCoordinator?.toggleAttribute(.italic) },
+                onUnderline: { editorCoordinator?.toggleAttribute(.underline) },
+                onTitle1: { editorCoordinator?.toggleAttribute(.title1) },
+                onTitle2: { editorCoordinator?.toggleAttribute(.title2) },
+                onBody: { editorCoordinator?.toggleAttribute(.body) }
+            )
+        )
         .onAppear {
             UserDefaults.standard.set(note.id.uuidString, forKey: "lastOpenedNoteID")
         }

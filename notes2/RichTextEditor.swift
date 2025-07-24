@@ -78,22 +78,7 @@ struct RichTextEditor: UIViewRepresentable {
             textView.typingAttributes = initialAttributes
         }
 
-        // --- Add the SwiftUI toolbar as inputAccessoryView ---
-        let toolbar = EditorToolbar(
-            onBold: { context.coordinator.toggleAttribute(.bold) },
-            onItalic: { context.coordinator.toggleAttribute(.italic) },
-            onUnderline: { context.coordinator.toggleAttribute(.underline) },
-            onTitle1: { context.coordinator.toggleAttribute(.title1) },
-            onTitle2: { context.coordinator.toggleAttribute(.title2) },
-            onBody: { context.coordinator.toggleAttribute(.body) },
-            settings: settings
-        )
-        let hostingController = UIHostingController(rootView: toolbar)
-        hostingController.view.backgroundColor = .clear
-        hostingController.view.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60)
-        textView.inputAccessoryView = hostingController.view
-        context.coordinator.toolbarHostingController = hostingController
-        // -----------------------------------------------------
+
 
         let pinchGesture = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePinchGesture(_:)))
         textView.addGestureRecognizer(pinchGesture)
@@ -122,19 +107,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         context.coordinator.updateTypingAttributes()
 
-        // Update the toolbar if settings changed
-        if let hostingController = context.coordinator.toolbarHostingController {
-            hostingController.rootView = EditorToolbar(
-                onBold: { context.coordinator.toggleAttribute(.bold) },
-                onItalic: { context.coordinator.toggleAttribute(.italic) },
-                onUnderline: { context.coordinator.toggleAttribute(.underline) },
-                onTitle1: { context.coordinator.toggleAttribute(.title1) },
-                onTitle2: { context.coordinator.toggleAttribute(.title2) },
-                onBody: { context.coordinator.toggleAttribute(.body) },
-                settings: settings
-            )
-            hostingController.view.setNeedsLayout()
-        }
+
 
         // --- Typewriter Scrolling Insets ---
         let baseInset: CGFloat = settings.padding
@@ -155,7 +128,7 @@ struct RichTextEditor: UIViewRepresentable {
         let newContentInsets = UIEdgeInsets(
             top: 0,
             left: 0,
-            bottom: bottomContentInset,
+            bottom: bottomContentInset + 60,
             right: 0
         )
 
@@ -178,7 +151,7 @@ struct RichTextEditor: UIViewRepresentable {
         weak var textView: UITextView?
         weak var ruledView: RuledView?
         private var debounceWorkItem: DispatchWorkItem?
-        var toolbarHostingController: UIHostingController<EditorToolbar>?
+
         private var initialSpacing: CGFloat?
         private var affectedParagraphRange: NSRange?
         private let hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)

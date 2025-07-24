@@ -23,6 +23,7 @@ xcodebuild -quiet -project notes2.xcodeproj -scheme notes2 -configuration Debug 
 *   **`Paragraph.swift`**: A data structure representing a paragraph, holding its content, range, style, and spatial properties like height and on-screen position.
 *   **`RuledView.swift`**: A `UIView` subclass used by `RichTextEditor` to draw visual overlays for the paragraph spacing gesture. It has been updated to use timestamps to correctly render visual feedback for paragraph relationships, even when gestures overlap.
 *   **`EditorToolbar.swift`**: A SwiftUI view that provides a collapsible toolbar with buttons for text formatting (bold, italic, underline, headings). It's displayed above the keyboard when editing a note.
+*   **`EditorToolbarOverlay.swift`**: A SwiftUI view that acts as an overlay for `RichTextEditor`, dynamically positioning the `EditorToolbar` above the keyboard and handling its presentation.
 *   **`NoteRow.swift`**: A SwiftUI view for displaying a single note in the main list. It handles swipe actions for pinning and deleting notes.
 *   **`KeyboardObserver.swift`**: A helper class that observes keyboard visibility and height changes, allowing the UI to adjust accordingly.
 *   **`Date+Helpers.swift`**: An extension on `Date` to provide formatted and relative date strings (e.g., "Today", "Yesterday", "Last Wednesday").
@@ -50,4 +51,4 @@ xcodebuild -quiet -project notes2.xcodeproj -scheme notes2 -configuration Debug 
 
 ### Last Reviewed
 
-2025-07-22 22:06:44
+2025-07-24 16:55:00
