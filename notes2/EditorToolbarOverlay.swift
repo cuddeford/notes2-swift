@@ -30,7 +30,7 @@ struct EditorToolbarOverlay: View {
                     onBody: onBody,
                     settings: settings
                 )
-                .padding(.bottom, keyboard.keyboardHeight)
+                .padding(.bottom, keyboard.keyboardHeight - 15)
                 .transition(.opacity)
             }
         }
