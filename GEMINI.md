@@ -10,9 +10,9 @@ This is a simple, distraction-free notes app for iOS and iPadOS, written in Swif
 
 The source folder is notes2/ so e.g. notes2/RichTextEditor.swift
 
-When building the project to test compilation use this command:
+When building the project to test compilation use this command. It's important to keep the -quiet flag to save on input tokens:
 ```
-xcodebuild -project notes2.xcodeproj -scheme notes2 -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build)
+xcodebuild -quiet -project notes2.xcodeproj -scheme notes2 -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build)
 ```
 
 *   **`notes2App.swift`**: The main entry point of the application. It sets up the main window and the SwiftData model container for the `Note` object, configured for iCloud synchronization using a specific app group.
