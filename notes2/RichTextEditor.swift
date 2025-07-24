@@ -320,7 +320,6 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Check if scrolled to bottom
             let contentHeight = scrollView.contentSize.height
-            let boundsHeight = scrollView.bounds.height - scrollView.adjustedContentInset.top - scrollView.adjustedContentInset.bottom
             let maxOffset = max(0, contentHeight - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 15.0)
             self.parent.isAtBottom = isAtBottom
@@ -756,7 +755,6 @@ struct RichTextEditor: UIViewRepresentable {
         func scrollToBottom() {
             guard let textView = self.textView else { return }
             let contentHeight = textView.contentSize.height
-            let boundsHeight = textView.bounds.height - textView.adjustedContentInset.top - textView.adjustedContentInset.bottom
             let maxOffset = max(0, contentHeight - textView.bounds.height + textView.adjustedContentInset.bottom)
             let bottomOffset = CGPoint(x: 0, y: maxOffset)
 
