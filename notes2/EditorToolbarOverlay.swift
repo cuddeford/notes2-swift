@@ -18,21 +18,19 @@ struct EditorToolbarOverlay: View {
     var onBody: () -> Void
     var onScrollToBottom: () -> Void
     var isAtBottom: Bool
-    
+
     var body: some View {
-        let toolbarBottomPadding = max(keyboard.keyboardHeight - 15, isAtBottom && keyboard.keyboardHeight == 0 ? 40 : 15)
-        
+        let toolbarBottomPadding = max(keyboard.keyboardHeight - 10, 60)
+
         VStack {
             Spacer()
-            VStack(spacing: 8) {
-                if !isAtBottom {
-                    HStack() {
-                        Spacer()
-                        ScrollToBottomButton(action: onScrollToBottom)
-                            .padding(16)
-                            .transition(.opacity)
-                    }
+            VStack() {
+                HStack() {
+                    Spacer()
+                    ScrollToBottomButton(action: onScrollToBottom)
+                        .padding(16)
                 }
+                .opacity(isAtBottom ? 0 : 1)
 
                 if keyboard.keyboardHeight > 0 {
                     EditorToolbar(

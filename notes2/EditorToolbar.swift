@@ -123,7 +123,6 @@ struct EditorToolbar: View {
             }
         }
         .padding(.horizontal)
-        .padding(.bottom, 32)
         .animation(.easeInOut, value: isExpanded)
         .onAppear(perform: resetTimer)
         .onDisappear(perform: { hideTimer?.invalidate() })
