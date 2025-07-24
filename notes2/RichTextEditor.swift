@@ -133,9 +133,11 @@ struct RichTextEditor: UIViewRepresentable {
         )
 
         if uiView.contentInset != newContentInsets {
-            uiView.contentInset = newContentInsets
-            // Also adjust the scroll indicators to match
-            uiView.scrollIndicatorInsets = newContentInsets
+            UIView.animate(withDuration: 0.25) { // Use a standard animation duration
+                uiView.contentInset = newContentInsets
+                // Also adjust the scroll indicators to match
+                uiView.scrollIndicatorInsets = newContentInsets
+            }
         }
         context.coordinator.textViewWidth = uiView.bounds.width
     }
