@@ -92,6 +92,24 @@ class RuledView: UIView {
                 path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
             }
 
+            // weird little hack for height spacing on the penultimate paragraph
+            if index == paragraphs.count - 2 {
+                if paragraphs.indices.contains(index + 1) {
+                    let lastIsEmpty = paragraphs[index + 1].content.string.isEmpty
+
+                    if lastIsEmpty {
+                        let heightFixRect = CGRect(
+                            x: drawingRect.minX,
+                            y: drawingRect.minY,
+                            width: drawingRect.width,
+                            height: drawingRect.height - 0.5,
+                        )
+                        
+                        path = UIBezierPath(roundedRect: heightFixRect, cornerRadius: cornerRadius).cgPath
+                    }
+                }
+            }
+
             // Check if this paragraph is part of any active pinched pair
             var isPinched = false
             var useCurrentDetent = false
