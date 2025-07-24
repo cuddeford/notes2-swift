@@ -19,6 +19,17 @@ class CustomTextView: UITextView {
         return originalRect
     }
 
+    override func paste(_ sender: Any?) {
+        if let pastedText = UIPasteboard.general.string {
+            let attributes = self.typingAttributes
+            let attributedString = NSAttributedString(string: pastedText, attributes: attributes)
+            self.textStorage.replaceCharacters(in: self.selectedRange, with: attributedString)
+            self.delegate?.textViewDidChange?(self)
+        } else {
+            super.paste(sender)
+        }
+    }
+
     override func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
         let originalRects = super.selectionRects(for: range)
         var adjustedRects: [UITextSelectionRect] = []
