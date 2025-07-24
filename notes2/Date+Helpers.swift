@@ -26,9 +26,6 @@ extension Date {
 
     func relativeDate() -> String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(self) { return "Today" }
-        if calendar.isDateInYesterday(self) { return "Yesterday" }
-
         let now = Date()
         let startOfToday = calendar.startOfDay(for: now)
         let startOfDate = calendar.startOfDay(for: self)
@@ -37,15 +34,36 @@ extension Date {
             return ""
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE"
-
-        if daysDifference > 1 && daysDifference < 7 {
+        switch daysDifference {
+        case 0:
+            return "Today"
+        case 1:
+            return "Yesterday"
+        case 2..<7:
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
             return formatter.string(from: self)
-        } else if daysDifference >= 7 && daysDifference < 14 {
+        case 7..<14:
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
             return "Last \(formatter.string(from: self))"
-        }
+        default:
+            let years = calendar.dateComponents([.year], from: startOfDate, to: startOfToday).year ?? 0
+            if years > 0 {
+                return years == 1 ? "Last year" : "\(years) years ago"
+            }
 
-        return ""
+            let months = calendar.dateComponents([.month], from: startOfDate, to: startOfToday).month ?? 0
+            if months > 0 {
+                return months == 1 ? "Last month" : "\(months) months ago"
+            }
+
+            let weeks = daysDifference / 7
+            if weeks >= 2 {
+                return "\(weeks) weeks ago"
+            }
+            
+            return ""
+        }
     }
 }
