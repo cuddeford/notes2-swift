@@ -58,10 +58,11 @@ class RuledView: UIView {
             paragraphOverlays.removeLast(paragraphOverlays.count - paragraphs.count)
         }
 
+        let overlayPadding = 10.0
         // Update existing layers or create new ones
         for (index, paragraph) in paragraphs.enumerated() {
             let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
-            var drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top)
+            var drawingRect = rect.offsetBy(dx: inset.left, dy: inset.top).insetBy(dx: -overlayPadding, dy: 0)
 
             if index == paragraphs.count - 2 {
                 if paragraphs[paragraphs.count - 1].content.string.isEmpty {
@@ -76,9 +77,9 @@ class RuledView: UIView {
             if index == paragraphs.count - 1 {
                 let lastIsEmpty = paragraph.content.string.isEmpty
                 // force paragraph blocks when single lines, rather than inline
-                var width = textView.textContainer.size.width - 10.0
+                var width = textView.textContainer.size.width + overlayPadding
                 if paragraphs.indices.contains(index - 1) {
-                    width = textView.layoutManager.boundingRect(forGlyphRange: paragraphs[index - 1].range, in: textView.textContainer).offsetBy(dx: inset.left, dy: inset.top).width - (lastIsEmpty ? 5.0 : 0)
+                    width = textView.layoutManager.boundingRect(forGlyphRange: paragraphs[index - 1].range, in: textView.textContainer).offsetBy(dx: inset.left, dy: inset.top).insetBy(dx: -overlayPadding, dy: 0).width - (lastIsEmpty ? 5.0 : 0)
                 }
 
                 let blockRect = CGRect(
