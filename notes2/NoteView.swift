@@ -23,6 +23,7 @@ struct NoteView: View {
     @State private var dragOffset: CGSize = .zero
     @State private var dragLocation: CGPoint = .zero
     @State private var isDragging = false
+    @State private var isAtBottom = true
 
     static private func noteTextStyle(for aFont: UIFont) -> NoteTextStyle {
         let title1Size = UIFont.preferredFont(forTextStyle: .title1).pointSize
@@ -103,7 +104,8 @@ struct NoteView: View {
                 keyboard: keyboard,
                 onCoordinatorReady: { coordinator in
                     self.editorCoordinator = coordinator
-                }
+                },
+                isAtBottom: $isAtBottom
             )
             .onAppear {
                 // Initial parsing and spatial property update when the view appears
@@ -175,7 +177,9 @@ struct NoteView: View {
                 onUnderline: { editorCoordinator?.toggleAttribute(.underline) },
                 onTitle1: { editorCoordinator?.toggleAttribute(.title1) },
                 onTitle2: { editorCoordinator?.toggleAttribute(.title2) },
-                onBody: { editorCoordinator?.toggleAttribute(.body) }
+                onBody: { editorCoordinator?.toggleAttribute(.body) },
+                onScrollToBottom: { editorCoordinator?.scrollToBottom() },
+                isAtBottom: isAtBottom
             )
         )
         .onAppear {

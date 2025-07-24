@@ -29,6 +29,8 @@ struct RichTextEditor: UIViewRepresentable {
 
     var keyboard: KeyboardObserver
     var onCoordinatorReady: ((Coordinator) -> Void)? = nil
+    
+    @Binding var isAtBottom: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
         let textView = CustomTextView()
@@ -315,6 +317,11 @@ struct RichTextEditor: UIViewRepresentable {
             updateParagraphSpatialProperties()
             self.contentOffset = scrollView.contentOffset
             ruledView?.setNeedsDisplay()
+            
+            // Check if scrolled to bottom
+            let bottomOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
+            let isAtBottom = abs(scrollView.contentOffset.y - bottomOffset) < 1.0
+            self.parent.isAtBottom = isAtBottom
         }
 
         func textViewDidChange(_ textView: UITextView) {
@@ -742,6 +749,18 @@ struct RichTextEditor: UIViewRepresentable {
                     )
                 }
             }
+        }
+        
+        func scrollToBottom() {
+            guard let textView = self.textView else { return }
+            let bottomOffset = CGPoint(
+                x: 0,
+                y: max(0, textView.contentSize.height - textView.bounds.height + textView.contentInset.bottom)
+            )
+            
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
+                textView.setContentOffset(bottomOffset, animated: false)
+            }, completion: nil)
         }
     }
 }
