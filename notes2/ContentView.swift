@@ -34,6 +34,7 @@ struct ContentView: View {
     @State private var listDragOffset: CGSize = .zero
     @State private var listDragLocation: CGPoint = .zero
     @State private var isListDragging = false
+    @State private var searchText = ""
 
     private func binding(for day: Date) -> Binding<Bool> {
         let key = ISO8601DateFormatter().string(from: day)
@@ -52,59 +53,83 @@ struct ContentView: View {
     }
 
     var body: some View {
-        let groupedNotes = Dictionary(grouping: notes) { note in
+        let filteredNotes = searchText.isEmpty ? notes : notes.filter { note in
+            let searchLower = searchText.lowercased()
+            return note.firstLine.lowercased().localizedCaseInsensitiveContains(searchLower) || 
+                   note.plain.lowercased().localizedCaseInsensitiveContains(searchLower)
+        }
+        
+        let groupedNotes = Dictionary(grouping: filteredNotes) { note in
             Calendar.current.startOfDay(for: note.createdAt)
         }
         let sortedDays = groupedNotes.keys.sorted(by: >)
 
-        let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
-        let pinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
+        let recentNotes = filteredNotes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
+        let pinnedNotes = filteredNotes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
 
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ZStack {
                 List(selection: $selectedCompositeID) {
-                    if pinnedVisible && !pinnedNotes.isEmpty {
-                        Section(isExpanded: $pinnedExpanded) {
-                            ForEach(pinnedNotes) { note in
-                                NoteRow(note: note)
-                                    .tag("pinned-\(note.id)")
+                    if !searchText.isEmpty {
+                        if filteredNotes.isEmpty {
+                            Section {
+                                Text("No notes found matching \"​\(searchText)\"")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.vertical, 20)
                             }
-                        } header: {
-                            Label("Pinned", systemImage: "pin.fill")
-                        }
-                    }
-
-                    if recentsVisible && !recentNotes.isEmpty {
-                        Section(isExpanded: $recentsExpanded) {
-                            ForEach(recentNotes) { note in
-                                NoteRow(note: note)
-                                    .tag("recents-\(note.id)")
-                            }
-                        } header: {
-                            Label("Recents", systemImage: "clock.fill")
-                        }
-                    }
-
-                    if historyVisible {
-                        Section(isExpanded: $historyExpanded) {
-                            ForEach(sortedDays, id: \.self) { day in
-                                Section(isExpanded: binding(for: day)) {
-                                    ForEach(groupedNotes[day] ?? []) { note in
-                                        NoteRow(note: note)
-                                        .tag("history-\(note.id)")
-                                    }
-                                } header: {
-                                    HStack {
-                                        Text(day.formattedDate())
-                                        Spacer()
-                                        Text(day.relativeDate())
-                                            .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
-                                            .foregroundStyle(.secondary)
-                                    }
+                        } else {
+                            Section(header: Text("Search Results")) {
+                                ForEach(filteredNotes) { note in
+                                    NoteRow(note: note)
+                                        .tag("search-\(note.id)")
                                 }
                             }
-                        } header: {
-                            Label("History", systemImage: "calendar")
+                        }
+                    } else {
+                        if pinnedVisible && !pinnedNotes.isEmpty {
+                            Section(isExpanded: $pinnedExpanded) {
+                                ForEach(pinnedNotes) { note in
+                                    NoteRow(note: note)
+                                        .tag("pinned-\(note.id)")
+                                }
+                            } header: {
+                                Label("Pinned", systemImage: "pin.fill")
+                            }
+                        }
+
+                        if recentsVisible && !recentNotes.isEmpty {
+                            Section(isExpanded: $recentsExpanded) {
+                                ForEach(recentNotes) { note in
+                                    NoteRow(note: note)
+                                        .tag("recents-\(note.id)")
+                                }
+                            } header: {
+                                Label("Recents", systemImage: "clock.fill")
+                            }
+                        }
+
+                        if historyVisible {
+                            Section(isExpanded: $historyExpanded) {
+                                ForEach(sortedDays, id: \.self) { day in
+                                    Section(isExpanded: binding(for: day)) {
+                                        ForEach(groupedNotes[day] ?? []) { note in
+                                            NoteRow(note: note)
+                                            .tag("history-\(note.id)")
+                                        }
+                                    } header: {
+                                        HStack {
+                                            Text(day.formattedDate())
+                                            Spacer()
+                                            Text(day.relativeDate())
+                                                .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            } header: {
+                                Label("History", systemImage: "calendar")
+                            }
                         }
                     }
                 }
@@ -116,6 +141,7 @@ struct ContentView: View {
                 .animation(.default, value: recentsVisible)
                 .animation(.default, value: historyVisible)
                 .navigationTitle("Notes2")
+                .searchable(text: $searchText, placement: .automatic, prompt: "Search notes...")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
