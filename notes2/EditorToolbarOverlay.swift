@@ -20,8 +20,28 @@ struct EditorToolbarOverlay: View {
     var isAtBottom: Bool
     var canScroll: Bool
 
+    private var isLandscape: Bool {
+        UIDevice.current.orientation.isLandscape || 
+        (UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.interfaceOrientation.isLandscape ?? false)
+    }
+    
+    private var toolbarBottomPadding: CGFloat {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        
+        if isPad {
+            return isLandscape ?
+                max(keyboard.keyboardHeight - 120, 0) :
+                max(keyboard.keyboardHeight + 10, 80)
+        } else {
+            return isLandscape ? 
+                max(keyboard.keyboardHeight - 100, 0) :
+                max(keyboard.keyboardHeight - 10, 60)
+        }
+    }
+    
     var body: some View {
-        let toolbarBottomPadding = max(keyboard.keyboardHeight - 10, 60)
 
         VStack {
             Spacer()
