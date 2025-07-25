@@ -11,6 +11,7 @@ import Foundation
 import UIKit
 import Combine
 
+
 struct ContentView: View {
     @Query(sort: \Note.createdAt, order: .reverse) var notes: [Note]
     @Environment(\.modelContext) private var context
@@ -22,6 +23,7 @@ struct ContentView: View {
     @State private var historicalExpanded: [String: Bool] = [:]
     @State private var hasRestoredLastOpenedNote = false
     @State private var selectedNoteID: UUID?
+    @State private var selectedCompositeID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @AppStorage("collapseSidebarInLandscape") private var collapseSidebarInLandscape = false
     
@@ -56,12 +58,12 @@ struct ContentView: View {
         
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ZStack {
-                List(selection: $selectedNoteID) {
+                List(selection: $selectedCompositeID) {
                     if !pinnedNotes.isEmpty {
                         Section(isExpanded: $pinnedExpanded) {
                             ForEach(pinnedNotes) { note in
                                 NoteRow(note: note)
-                                    .tag(note.id)
+                                    .tag("pinned-\(note.id)")
                             }
                         } header: {
                             Label("Pinned", systemImage: "pin.fill")
@@ -72,7 +74,7 @@ struct ContentView: View {
                         Section(isExpanded: $recentsExpanded) {
                             ForEach(recentNotes) { note in
                                 NoteRow(note: note)
-                                    .tag(note.id)
+                                    .tag("recents-\(note.id)")
                             }
                         } header: {
                             Label("Recents", systemImage: "clock.fill")
@@ -84,7 +86,7 @@ struct ContentView: View {
                             Section(isExpanded: binding(for: day)) {
                                 ForEach(groupedNotes[day] ?? []) { note in
                                     NoteRow(note: note)
-                                        .tag(note.id)
+                                        .tag("history-\(note.id)")
                                 }
                             } header: {
                                 HStack {
@@ -206,6 +208,17 @@ struct ContentView: View {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     columnVisibility = .detailOnly
                 }
+            }
+        }
+        .onChange(of: selectedCompositeID) { oldValue, newValue in
+            // Extract the actual note ID from composite identifier
+            if let compositeID = newValue {
+                let parts = compositeID.split(separator: "-", maxSplits: 1)
+                if parts.count > 1, let noteID = UUID(uuidString: String(parts[1])) {
+                    selectedNoteID = noteID
+                }
+            } else {
+                selectedNoteID = nil
             }
         }
         .onChange(of: selectedNoteID) { oldValue, newValue in
