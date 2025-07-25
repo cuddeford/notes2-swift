@@ -31,6 +31,7 @@ struct RichTextEditor: UIViewRepresentable {
     var onCoordinatorReady: ((Coordinator) -> Void)? = nil
 
     @Binding var isAtBottom: Bool
+    @Binding var canScroll: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
         let textView = CustomTextView()
@@ -318,10 +319,14 @@ struct RichTextEditor: UIViewRepresentable {
             self.contentOffset = scrollView.contentOffset
             ruledView?.setNeedsDisplay()
 
-            // Check if scrolled to bottom
+            // Check if content is scrollable and if scrolled to bottom
             let contentHeight = scrollView.contentSize.height
+            let boundsHeight = scrollView.bounds.height - scrollView.adjustedContentInset.top - scrollView.adjustedContentInset.bottom
+            let canScroll = contentHeight > boundsHeight
             let maxOffset = max(0, contentHeight - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
+            
+            self.parent.canScroll = canScroll
             self.parent.isAtBottom = isAtBottom
         }
 

@@ -18,6 +18,7 @@ struct EditorToolbarOverlay: View {
     var onBody: () -> Void
     var onScrollToBottom: () -> Void
     var isAtBottom: Bool
+    var canScroll: Bool
 
     var body: some View {
         let toolbarBottomPadding = max(keyboard.keyboardHeight - 10, 60)
@@ -30,7 +31,7 @@ struct EditorToolbarOverlay: View {
                     ScrollToBottomButton(action: onScrollToBottom)
                         .padding(16)
                 }
-                .opacity(isAtBottom ? 0 : 1)
+                .opacity((isAtBottom || !canScroll) ? 0 : 1)
 
                 if keyboard.keyboardHeight > 0 {
                     EditorToolbar(
