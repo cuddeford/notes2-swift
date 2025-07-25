@@ -97,6 +97,11 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
   - Two detent system: Related (32pt) vs Unrelated (250pt) spacing
   - Haptic feedback: Heavy at limits, light during transitions
   - Visual feedback: Color-coded overlays (green=related, yellow=unrelated)
+- **Magnetic Paragraph Scrolling**: Instagram Reels-style snap-to-top behavior
+  - Selection haptics on zone enter/exit (100pt activation window)
+  - Light haptic on snap initiation
+  - Excludes first paragraph for free scrolling
+  - Smooth spring animations with 0.3s duration
 - **Swipe Gestures**:
   - **ContentView**: Right-to-left from edge navigates to last edited note
   - **NoteView**: Right-to-left swipe creates new note
@@ -172,4 +177,4 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
 ### Last Updated
 When generating this timestamp be sure to run `date "+%Y-%m-%d %H:%M:%S"` to get the actual date.
 
-2025-07-25 14:57:57
+2025-07-25 21:44:52
