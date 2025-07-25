@@ -17,6 +17,9 @@ struct ContentView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    @AppStorage("recentsVisible") private var recentsVisible = true
+    @AppStorage("historyVisible") private var historyVisible = true
+    @AppStorage("pinnedVisible") private var pinnedVisible = true
     @AppStorage("recentsExpanded") private var recentsExpanded = true
     @AppStorage("historyExpanded") private var historyExpanded = true
     @AppStorage("pinnedExpanded") private var pinnedExpanded = true
@@ -60,7 +63,7 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ZStack {
                 List(selection: $selectedCompositeID) {
-                    if !pinnedNotes.isEmpty {
+                    if pinnedVisible && !pinnedNotes.isEmpty {
                         Section(isExpanded: $pinnedExpanded) {
                             ForEach(pinnedNotes) { note in
                                 NoteRow(note: note)
@@ -71,7 +74,7 @@ struct ContentView: View {
                         }
                     }
 
-                    if !recentNotes.isEmpty {
+                    if recentsVisible && !recentNotes.isEmpty {
                         Section(isExpanded: $recentsExpanded) {
                             ForEach(recentNotes) { note in
                                 NoteRow(note: note)
@@ -82,31 +85,36 @@ struct ContentView: View {
                         }
                     }
 
-                    Section(isExpanded: $historyExpanded) {
-                        ForEach(sortedDays, id: \.self) { day in
-                            Section(isExpanded: binding(for: day)) {
-                                ForEach(groupedNotes[day] ?? []) { note in
-                                    NoteRow(note: note)
+                    if historyVisible {
+                        Section(isExpanded: $historyExpanded) {
+                            ForEach(sortedDays, id: \.self) { day in
+                                Section(isExpanded: binding(for: day)) {
+                                    ForEach(groupedNotes[day] ?? []) { note in
+                                        NoteRow(note: note)
                                         .tag("history-\(note.id)")
-                                }
-                            } header: {
-                                HStack {
-                                    Text(day.formattedDate())
-                                    Spacer()
-                                    Text(day.relativeDate())
-                                        .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
-                                        .foregroundStyle(.secondary)
+                                    }
+                                } header: {
+                                    HStack {
+                                        Text(day.formattedDate())
+                                        Spacer()
+                                        Text(day.relativeDate())
+                                            .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
+                        } header: {
+                            Label("History", systemImage: "calendar")
                         }
-                    } header: {
-                        Label("History", systemImage: "calendar")
                     }
                 }
                 .animation(.default, value: pinnedExpanded)
                 .animation(.default, value: recentsExpanded)
                 .animation(.default, value: historyExpanded)
                 .animation(.default, value: historicalExpanded)
+                .animation(.default, value: pinnedVisible)
+                .animation(.default, value: recentsVisible)
+                .animation(.default, value: historyVisible)
                 .navigationTitle("Notes2")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -127,9 +135,42 @@ struct ContentView: View {
                                 Toggle("Collapse sidebar in landscape", isOn: $collapseSidebarInLandscape)
                                 Toggle("Collapse sidebar in portrait", isOn: $collapseSidebarInPortrait)
                                 Divider()
-                                Toggle("Show pinned section", isOn: $pinnedExpanded)
-                                Toggle("Show recents section", isOn: $recentsExpanded)
-                                Toggle("Show history section", isOn: $historyExpanded)
+                                Toggle("Show pinned section", isOn: Binding(
+                                    get: { pinnedVisible },
+                                    set: { newValue in
+                                        if !newValue {
+                                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                                            if visibleCount <= 1 {
+                                                return // Don't allow hiding the last visible section
+                                            }
+                                        }
+                                        pinnedVisible = newValue
+                                    }
+                                ))
+                                Toggle("Show recents section", isOn: Binding(
+                                    get: { recentsVisible },
+                                    set: { newValue in
+                                        if !newValue {
+                                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                                            if visibleCount <= 1 {
+                                                return // Don't allow hiding the last visible section
+                                            }
+                                        }
+                                        recentsVisible = newValue
+                                    }
+                                ))
+                                Toggle("Show history section", isOn: Binding(
+                                    get: { historyVisible },
+                                    set: { newValue in
+                                        if !newValue {
+                                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                                            if visibleCount <= 1 {
+                                                return // Don't allow hiding the last visible section
+                                            }
+                                        }
+                                        historyVisible = newValue
+                                    }
+                                ))
                             } label: {
                                 Image(systemName: "gear")
                             }
