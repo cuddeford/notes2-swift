@@ -17,6 +17,7 @@ class RuledView: UIView {
         setupLayers()
         registerForTraitChanges()
         registerForOrientationChanges()
+        registerForSidebarChanges()
     }
 
     required init?(coder: NSCoder) {
@@ -24,6 +25,7 @@ class RuledView: UIView {
         setupLayers()
         registerForTraitChanges()
         registerForOrientationChanges()
+        registerForSidebarChanges()
     }
 
     private func setupLayers() {
@@ -51,9 +53,25 @@ class RuledView: UIView {
         )
     }
 
+    private func registerForSidebarChanges() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sidebarStateChanged),
+            name: .sidebarStateChanged,
+            object: nil
+        )
+    }
+
     @objc private func orientationChanged() {
         // Use a small delay to ensure layout is complete after rotation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.reflowText()
+        }
+    }
+
+    @objc private func sidebarStateChanged() {
+        // Use a small delay to ensure layout is complete after sidebar animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             self?.reflowText()
         }
     }

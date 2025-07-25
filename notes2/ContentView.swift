@@ -294,9 +294,21 @@ struct ContentView: View {
                 }
             }
         }
+        .onChange(of: columnVisibility) { oldValue, newValue in
+            // Broadcast sidebar state change for text reflow
+            NotificationCenter.default.post(
+                name: .sidebarStateChanged,
+                object: nil,
+                userInfo: ["visibility": newValue]
+            )
+        }
     }
 }
 
 #Preview {
     ContentView()
+}
+
+extension Notification.Name {
+    static let sidebarStateChanged = Notification.Name("SidebarStateChangedNotification")
 }
