@@ -9,10 +9,12 @@ import SwiftUI
 import SwiftData
 import Foundation
 import UIKit
+import Combine
 
 struct ContentView: View {
     @Query(sort: \Note.createdAt, order: .reverse) var notes: [Note]
     @Environment(\.modelContext) private var context
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     @AppStorage("recentsExpanded") private var recentsExpanded = true
     @AppStorage("historyExpanded") private var historyExpanded = true
@@ -20,6 +22,8 @@ struct ContentView: View {
     @State private var historicalExpanded: [String: Bool] = [:]
     @State private var hasRestoredLastOpenedNote = false
     @State private var selectedNoteID: UUID?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var isPortrait: Bool = UIDevice.current.orientation.isPortrait || UIDevice.current.orientation == .unknown
     
     @State private var listDragOffset: CGSize = .zero
     @State private var listDragLocation: CGPoint = .zero
@@ -42,7 +46,7 @@ struct ContentView: View {
         let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
         let pinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
         
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             ZStack {
                 List(selection: $selectedNoteID) {
                     if !pinnedNotes.isEmpty {
@@ -178,6 +182,28 @@ struct ContentView: View {
             } else {
                 Text("Select a note")
                     .foregroundStyle(.secondary)
+            }
+        }
+        .onChange(of: selectedNoteID) { oldValue, newValue in
+            if newValue != nil && horizontalSizeClass == .compact {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    columnVisibility = .detailOnly
+                }
+            }
+        }
+        .onChange(of: selectedNoteID) { oldValue, newValue in
+            if newValue != nil {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if UIDevice.current.userInterfaceIdiom == .pad {
+                        columnVisibility = .detailOnly
+                    }
+                }
+            } else {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if UIDevice.current.userInterfaceIdiom == .pad {
+                        columnVisibility = .automatic
+                    }
+                }
             }
         }
     }
