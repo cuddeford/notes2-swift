@@ -789,10 +789,23 @@ struct RichTextEditor: UIViewRepresentable {
                 paragraph.range.contains(cursorLocation)
             }
             
-            guard let cursorIndex = cursorParagraphIndex, cursorIndex > 0 else { return }
+            // Determine which paragraph to animate
+            let animateIndex: Int
             
-            // The paragraph to animate is the one immediately before the new paragraph
-            let animateIndex = cursorIndex - 1
+            if let cursorIndex = cursorParagraphIndex {
+                // Cursor is inside an existing paragraph (middle insertion)
+                guard cursorIndex > 0 else { return }
+                animateIndex = cursorIndex - 1
+            } else if cursorLocation >= textView.text.count {
+                // Cursor is at the very end, new paragraph after last
+                guard paragraphs.count >= 2 else { return }
+                animateIndex = paragraphs.count - 2
+            } else {
+                return
+            }
+            
+            // Ensure animateIndex is valid
+            guard animateIndex < paragraphs.count else { return }
             let animateParagraph = paragraphs[animateIndex]
             let currentSpacing = animateParagraph.paragraphStyle.paragraphSpacing
             
