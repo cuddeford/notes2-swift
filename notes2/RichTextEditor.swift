@@ -327,49 +327,55 @@ struct RichTextEditor: UIViewRepresentable {
             let canScroll = contentHeight > boundsHeight
             let maxOffset = max(0, contentHeight - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
-            
+
             self.parent.canScroll = canScroll
             self.parent.isAtBottom = isAtBottom
         }
 
         // MARK: - Instagram Reels-Style Magnetic Paragraph Scrolling
-        
+
         private func findParagraphToSnap() -> Paragraph? {
-            guard let textView = textView, !paragraphs.isEmpty else { return nil }
-            
+            guard let textView = textView, paragraphs.count > 1 else { return nil }
+
             let screenTopY = textView.contentOffset.y + textView.textContainerInset.top
-            let activationWindow: CGFloat = 80.0 // ±40pt from screen top
-            
-            // Find the paragraph whose top edge is closest to screen top
+            let activationWindow: CGFloat = 100.0 // ±40pt from screen top
+
+            // Find the paragraph whose top edge is closest to screen top, excluding first paragraph
             var closestParagraph: Paragraph?
             var minDistance: CGFloat = .infinity
-            
-            for paragraph in paragraphs {
+
+            for (index, paragraph) in paragraphs.enumerated() {
+                // Skip the first paragraph
+                guard index > 0 else { continue }
+                
                 let paragraphTop = paragraph.screenPosition.y
                 let distance = abs(paragraphTop - screenTopY)
-                
+
                 // Only consider paragraphs within the activation window
                 if distance <= activationWindow && distance < minDistance {
                     closestParagraph = paragraph
                     minDistance = distance
                 }
             }
-            
+
             return closestParagraph
         }
-        
+
         private func applyMagneticSnap(to paragraph: Paragraph) {
             guard let textView = textView else { return }
-            
-            let targetOffsetY = paragraph.screenPosition.y - textView.textContainerInset.top
+
+            let targetOffsetY = paragraph.screenPosition.y - textView.textContainerInset.top - 45
             let maxOffsetY = max(0, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
             let finalOffsetY = max(0, min(targetOffsetY, maxOffsetY))
+
+            let lightHapticGenerator = UIImpactFeedbackGenerator(style: .light)
+            lightHapticGenerator.impactOccurred()
             
             // Instagram Reels-style smooth snap animation
             UIView.animate(
                 withDuration: 0.3,
                 delay: 0,
-                usingSpringWithDamping: 0.85,
+                usingSpringWithDamping: 0.5,
                 initialSpringVelocity: 0.5,
                 options: [.curveEaseOut, .allowUserInteraction],
                 animations: {
@@ -378,14 +384,14 @@ struct RichTextEditor: UIViewRepresentable {
                 completion: nil
             )
         }
-        
+
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
             // Trigger magnetic snap after deceleration
             if let paragraphToSnap = findParagraphToSnap() {
                 applyMagneticSnap(to: paragraphToSnap)
             }
         }
-        
+
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             // Only snap if not decelerating (immediate release)
             if !decelerate {
@@ -398,18 +404,18 @@ struct RichTextEditor: UIViewRepresentable {
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
                 let cursorLocation = textView.selectedRange.location
-                
+
                 self.parent.text = textView.attributedText
                 let oldParagraphs = self.paragraphs
                 self.parseAttributedText(textView.attributedText)
                 let newParagraphs = self.paragraphs
-                
+
                 // Check if new paragraphs were added by comparing counts
                 if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
                     self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
                 }
                 self.lastParagraphCount = newParagraphs.count
-                
+
                 self.centerCursorInTextView()
                 self.updateRuledViewFrame()
             }
@@ -844,18 +850,18 @@ struct RichTextEditor: UIViewRepresentable {
                 textView.setContentOffset(bottomOffset, animated: false)
             }, completion: nil)
         }
-        
+
         private func animateNewParagraphSpacing(cursorLocation: Int) {
             guard let textView = textView, paragraphs.count >= 2 else { return }
-            
+
             // Find which paragraph contains the cursor (the new paragraph)
             let cursorParagraphIndex = paragraphs.firstIndex { paragraph in
                 paragraph.range.contains(cursorLocation)
             }
-            
+
             // Determine which paragraph to animate
             let animateIndex: Int
-            
+
             if let cursorIndex = cursorParagraphIndex {
                 // Cursor is inside an existing paragraph (middle insertion)
                 guard cursorIndex > 0 else { return }
@@ -867,14 +873,14 @@ struct RichTextEditor: UIViewRepresentable {
             } else {
                 return
             }
-            
+
             // Ensure animateIndex is valid
             guard animateIndex < paragraphs.count else { return }
             let animateParagraph = paragraphs[animateIndex]
             let currentSpacing = animateParagraph.paragraphStyle.paragraphSpacing
-            
+
             let animateRange = animateParagraph.range
-            
+
             // Animate to unrelated spacing
             let startSpacing = 0.0
             let targetSpacing = currentSpacing
@@ -884,12 +890,12 @@ struct RichTextEditor: UIViewRepresentable {
             displayLink.add(to: .main, forMode: .common)
             let animation = ActiveAnimation(displayLink: displayLink, startTime: CACurrentMediaTime(), startSpacing: startSpacing, targetSpacing: targetSpacing, range: animateRange)
             activeAnimations[animateRange] = animation
-            
+
             // Set initial spacing immediately
             let initialParagraphStyle = NSMutableParagraphStyle()
             initialParagraphStyle.setParagraphStyle(animateParagraph.paragraphStyle)
             initialParagraphStyle.paragraphSpacing = startSpacing
-            
+
             textView.textStorage.addAttribute(.paragraphStyle, value: initialParagraphStyle, range: animateRange)
             if let index = paragraphs.firstIndex(where: { $0.range == animateRange }) {
                 paragraphs[index].paragraphStyle = initialParagraphStyle
