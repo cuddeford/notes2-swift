@@ -34,13 +34,14 @@ class CustomTextView: UITextView {
         let originalRects = super.selectionRects(for: range)
         var adjustedRects: [UITextSelectionRect] = []
 
+        let smallestHeight = originalRects.reduce(CGFloat.greatestFiniteMagnitude) { min($0, $1.rect.height) }
         for selectionRect in originalRects {
             adjustedRects.append(CustomTextSelectionRect(
                 rect: CGRect(
                     x: selectionRect.rect.minX,
                     y: selectionRect.rect.minY,
                     width: selectionRect.rect.width,
-                    height: originalRects[0].rect.height,
+                    height: smallestHeight,
                 ),
                 writingDirection: selectionRect.writingDirection,
                 containsStart: selectionRect.containsStart,
