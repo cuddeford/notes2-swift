@@ -41,7 +41,9 @@ class CustomTextView: UITextView {
                     x: selectionRect.rect.minX,
                     y: selectionRect.rect.minY,
                     width: selectionRect.rect.width,
-                    height: smallestHeight,
+                    height: selectionRect.rect.width == 0.0
+                        ? smallestHeight
+                        : selectionRect.rect.height,
                 ),
                 writingDirection: selectionRect.writingDirection,
                 containsStart: selectionRect.containsStart,
