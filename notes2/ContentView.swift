@@ -285,13 +285,6 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onChange(of: selectedNoteID) { oldValue, newValue in
-            if newValue != nil && horizontalSizeClass == .compact {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    columnVisibility = .detailOnly
-                }
-            }
-        }
         .onChange(of: selectedCompositeID) { oldValue, newValue in
             // Extract the actual note ID from composite identifier
             if let compositeID = newValue {
@@ -306,7 +299,9 @@ struct ContentView: View {
         .onChange(of: selectedNoteID) { oldValue, newValue in
             if newValue != nil {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    if UIDevice.current.userInterfaceIdiom == .pad {
+                    if horizontalSizeClass == .compact {
+                        columnVisibility = .detailOnly
+                    } else if UIDevice.current.userInterfaceIdiom == .pad {
                         if (isPortrait && collapseSidebarInPortrait) || (!isPortrait && collapseSidebarInLandscape) {
                             columnVisibility = .detailOnly
                         }
