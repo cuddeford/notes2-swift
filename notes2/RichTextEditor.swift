@@ -531,6 +531,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
+            textView.endEditing(true)
             let location1 = gesture.location(ofTouch: 0, in: textView)
             let location2 = gesture.location(ofTouch: 1, in: textView)
 
