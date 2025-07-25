@@ -11,7 +11,11 @@ struct ScrollToBottomButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+            action()
+        }) {
             Image(systemName: "chevron.down.circle.fill")
                 .font(.system(size: 24, weight: .medium))
                 .padding(16)
