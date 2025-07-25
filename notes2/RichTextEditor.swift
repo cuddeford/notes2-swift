@@ -332,6 +332,69 @@ struct RichTextEditor: UIViewRepresentable {
             self.parent.isAtBottom = isAtBottom
         }
 
+        // MARK: - Instagram Reels-Style Magnetic Paragraph Scrolling
+        
+        private func findParagraphToSnap() -> Paragraph? {
+            guard let textView = textView, !paragraphs.isEmpty else { return nil }
+            
+            let screenTopY = textView.contentOffset.y + textView.textContainerInset.top
+            let activationWindow: CGFloat = 80.0 // ±40pt from screen top
+            
+            // Find the paragraph whose top edge is closest to screen top
+            var closestParagraph: Paragraph?
+            var minDistance: CGFloat = .infinity
+            
+            for paragraph in paragraphs {
+                let paragraphTop = paragraph.screenPosition.y
+                let distance = abs(paragraphTop - screenTopY)
+                
+                // Only consider paragraphs within the activation window
+                if distance <= activationWindow && distance < minDistance {
+                    closestParagraph = paragraph
+                    minDistance = distance
+                }
+            }
+            
+            return closestParagraph
+        }
+        
+        private func applyMagneticSnap(to paragraph: Paragraph) {
+            guard let textView = textView else { return }
+            
+            let targetOffsetY = paragraph.screenPosition.y - textView.textContainerInset.top
+            let maxOffsetY = max(0, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
+            let finalOffsetY = max(0, min(targetOffsetY, maxOffsetY))
+            
+            // Instagram Reels-style smooth snap animation
+            UIView.animate(
+                withDuration: 0.3,
+                delay: 0,
+                usingSpringWithDamping: 0.85,
+                initialSpringVelocity: 0.5,
+                options: [.curveEaseOut, .allowUserInteraction],
+                animations: {
+                    textView.setContentOffset(CGPoint(x: 0, y: finalOffsetY), animated: false)
+                },
+                completion: nil
+            )
+        }
+        
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+            // Trigger magnetic snap after deceleration
+            if let paragraphToSnap = findParagraphToSnap() {
+                applyMagneticSnap(to: paragraphToSnap)
+            }
+        }
+        
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            // Only snap if not decelerating (immediate release)
+            if !decelerate {
+                if let paragraphToSnap = findParagraphToSnap() {
+                    applyMagneticSnap(to: paragraphToSnap)
+                }
+            }
+        }
+
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
                 let cursorLocation = textView.selectedRange.location
