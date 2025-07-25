@@ -16,12 +16,14 @@ class RuledView: UIView {
         super.init(frame: frame)
         setupLayers()
         registerForTraitChanges()
+        registerForOrientationChanges()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupLayers()
         registerForTraitChanges()
+        registerForOrientationChanges()
     }
 
     private func setupLayers() {
@@ -34,15 +36,36 @@ class RuledView: UIView {
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: RuledView, previousTraitCollection: UITraitCollection?) in
             guard let strongSelf = self else { return }
             if strongSelf.traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
-                if let coordinator = strongSelf.textView?.delegate as? RichTextEditor.Coordinator,
-                   let textView = strongSelf.textView {
-                    strongSelf.updateAllParagraphOverlays(
-                        paragraphs: coordinator.paragraphs,
-                        textView: textView,
-                        activePinchedPairs: coordinator.activePinchedPairs
-                    )
-                }
+                strongSelf.reflowText()
             }
+        }
+    }
+
+    // listen for orientation changes to reflow the textView
+    private func registerForOrientationChanges() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(orientationChanged),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func orientationChanged() {
+        // Use a small delay to ensure layout is complete after rotation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.reflowText()
+        }
+    }
+
+    private func reflowText() {
+        if let coordinator = textView?.delegate as? RichTextEditor.Coordinator,
+           let textView = textView {
+            updateAllParagraphOverlays(
+                paragraphs: coordinator.paragraphs,
+                textView: textView,
+                activePinchedPairs: coordinator.activePinchedPairs
+            )
         }
     }
 
@@ -347,5 +370,9 @@ class RuledView: UIView {
 
             glyphIndex = NSMaxRange(glyphRange)
         }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
