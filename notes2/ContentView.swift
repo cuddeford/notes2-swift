@@ -190,7 +190,7 @@ struct ContentView: View {
                        let uuid = UUID(uuidString: idString),
                        let note = notes.first(where: { $0.id == uuid }) {
                         selectedNoteID = note.id
-                        
+
                         // Set the composite selection ID based on which section the note is in
                         if pinnedNotes.contains(where: { $0.id == uuid }) {
                             selectedCompositeID = "pinned-\(uuid)"
@@ -299,7 +299,7 @@ struct ContentView: View {
             NotificationCenter.default.post(
                 name: .sidebarStateChanged,
                 object: nil,
-                userInfo: ["visibility": newValue]
+                userInfo: ["visibility": newValue, "oldValue": oldValue]
             )
         }
     }

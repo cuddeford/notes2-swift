@@ -70,21 +70,30 @@ class RuledView: UIView {
     }
 
     @objc private func sidebarStateChanged() {
-        // Use a small delay to ensure layout is complete after sidebar animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+        // Force layout pass and then reflow
+        DispatchQueue.main.async { [weak self] in
+            self?.textView?.layoutIfNeeded()
+            self?.reflowText()
+        }
+
+        // Additional attempt, delay for layout completion
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.textView?.layoutIfNeeded()
             self?.reflowText()
         }
     }
 
     private func reflowText() {
-        if let coordinator = textView?.delegate as? RichTextEditor.Coordinator,
-           let textView = textView {
-            updateAllParagraphOverlays(
-                paragraphs: coordinator.paragraphs,
-                textView: textView,
-                activePinchedPairs: coordinator.activePinchedPairs
-            )
+        guard let coordinator = textView?.delegate as? RichTextEditor.Coordinator,
+              let textView = textView else {
+            return
         }
+
+        updateAllParagraphOverlays(
+            paragraphs: coordinator.paragraphs,
+            textView: textView,
+            activePinchedPairs: coordinator.activePinchedPairs
+        )
     }
 
     func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
@@ -145,7 +154,7 @@ class RuledView: UIView {
                             width: drawingRect.width,
                             height: drawingRect.height - 0.5,
                         )
-                        
+
                         path = UIBezierPath(roundedRect: heightFixRect, cornerRadius: cornerRadius).cgPath
                     }
                 }
