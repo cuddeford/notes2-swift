@@ -809,16 +809,12 @@ struct RichTextEditor: UIViewRepresentable {
             let animateParagraph = paragraphs[animateIndex]
             let currentSpacing = animateParagraph.paragraphStyle.paragraphSpacing
             
-            // Only animate if the existing paragraph had unrelated spacing
-            // Use exact comparison since spacing values are exact constants
-            guard currentSpacing == AppSettings.unrelatedParagraphSpacing else { return }
-            
             let animateRange = animateParagraph.range
             
-            // Start with related spacing and animate to unrelated spacing
-            let startSpacing = AppSettings.relatedParagraphSpacing
-            let targetSpacing = AppSettings.unrelatedParagraphSpacing
-            
+            // Animate to unrelated spacing
+            let startSpacing = 0.0
+            let targetSpacing = currentSpacing
+
             // Create animation state
             let displayLink = CADisplayLink(target: self, selector: #selector(updateSpacingAnimation(_:)))
             displayLink.add(to: .main, forMode: .common)
