@@ -23,7 +23,7 @@ struct ContentView: View {
     @State private var hasRestoredLastOpenedNote = false
     @State private var selectedNoteID: UUID?
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
-    @State private var isPortrait: Bool = UIDevice.current.orientation.isPortrait || UIDevice.current.orientation == .unknown
+    @AppStorage("collapseSidebarInLandscape") private var collapseSidebarInLandscape = false
     
     @State private var listDragOffset: CGSize = .zero
     @State private var listDragLocation: CGPoint = .zero
@@ -35,6 +35,14 @@ struct ContentView: View {
             get: { self.historicalExpanded[key, default: true] },
             set: { self.historicalExpanded[key] = $0 }
         )
+    }
+    
+    private var isPortrait: Bool {
+        UIDevice.current.orientation.isPortrait || 
+        UIDevice.current.orientation == .unknown ||
+        (UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.interfaceOrientation.isPortrait ?? true)
     }
     
     var body: some View {
@@ -107,6 +115,15 @@ struct ContentView: View {
                             HStack {
                                 Image(systemName: "plus")
                                 Text("New note")
+                            }
+                        }
+                    }
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        if UIDevice.current.userInterfaceIdiom == .pad {
+                            Menu {
+                                Toggle("Collapse sidebar in landscape", isOn: $collapseSidebarInLandscape)
+                            } label: {
+                                Image(systemName: "gear")
                             }
                         }
                     }
@@ -195,7 +212,9 @@ struct ContentView: View {
             if newValue != nil {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     if UIDevice.current.userInterfaceIdiom == .pad {
-                        columnVisibility = .detailOnly
+                        if isPortrait || collapseSidebarInLandscape {
+                            columnVisibility = .detailOnly
+                        }
                     }
                 }
             } else {
