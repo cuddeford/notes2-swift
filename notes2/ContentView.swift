@@ -319,6 +319,15 @@ struct ContentView: View {
                     }
                 }
             }
+            
+            // Trigger reflow when note selection changes
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: .sidebarStateChanged,
+                    object: nil,
+                    userInfo: ["trigger": "noteSelectionChanged"]
+                )
+            }
         }
         .onChange(of: columnVisibility) { oldValue, newValue in
             // Broadcast sidebar state change for text reflow
