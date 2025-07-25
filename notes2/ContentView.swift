@@ -182,7 +182,7 @@ struct ContentView: View {
                         UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
                     }
                 }
-                .task {
+                .onAppear {
                     guard !hasRestoredLastOpenedNote else { return }
                     hasRestoredLastOpenedNote = true
 
@@ -190,6 +190,15 @@ struct ContentView: View {
                        let uuid = UUID(uuidString: idString),
                        let note = notes.first(where: { $0.id == uuid }) {
                         selectedNoteID = note.id
+                        
+                        // Set the composite selection ID based on which section the note is in
+                        if pinnedNotes.contains(where: { $0.id == uuid }) {
+                            selectedCompositeID = "pinned-\(uuid)"
+                        } else if recentNotes.contains(where: { $0.id == uuid }) {
+                            selectedCompositeID = "recents-\(uuid)"
+                        } else {
+                            selectedCompositeID = "history-\(uuid)"
+                        }
                     }
 
                     if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
