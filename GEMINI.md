@@ -48,7 +48,8 @@ xcodebuild -quiet -project notes2.xcodeproj -scheme notes2 -configuration Debug 
 *   **Swipe to New Note**: A right-to-left swipe gesture from the right edge of `NoteView` allows for quick creation of a new note.
 *   **Swipe to Last Edited Note**: A right-to-left swipe gesture from the right edge of `ContentView` allows for quick navigation to the most recently edited note.
 *   **Paragraph Spacing Gesture**: Users can adjust the spacing between adjacent paragraphs using a pinch gesture, with visual feedback. The gesture logic correctly handles multiple, overlapping gestures.
+*   **Animated New Paragraph Spacing**: When creating a new paragraph (by pressing Enter), the spacing animates.
 
 ### Last Reviewed
 
-2025-07-24 16:55:00
+2025-07-25 02:58:00
