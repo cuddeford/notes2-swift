@@ -55,10 +55,10 @@ struct ContentView: View {
     var body: some View {
         let filteredNotes = searchText.isEmpty ? notes : notes.filter { note in
             let searchLower = searchText.lowercased()
-            return note.firstLine.lowercased().localizedCaseInsensitiveContains(searchLower) || 
+            return note.firstLine.lowercased().localizedCaseInsensitiveContains(searchLower) ||
                    note.plain.lowercased().localizedCaseInsensitiveContains(searchLower)
         }
-        
+
         let groupedNotes = Dictionary(grouping: filteredNotes) { note in
             Calendar.current.startOfDay(for: note.createdAt)
         }
@@ -285,6 +285,13 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .onChange(of: selectedNoteID) { oldValue, newValue in
+            if newValue != nil && horizontalSizeClass == .compact {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    columnVisibility = .detailOnly
+                }
+            }
+        }
         .onChange(of: selectedCompositeID) { oldValue, newValue in
             // Extract the actual note ID from composite identifier
             if let compositeID = newValue {
@@ -299,9 +306,7 @@ struct ContentView: View {
         .onChange(of: selectedNoteID) { oldValue, newValue in
             if newValue != nil {
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    if horizontalSizeClass == .compact {
-                        columnVisibility = .detailOnly
-                    } else if UIDevice.current.userInterfaceIdiom == .pad {
+                    if UIDevice.current.userInterfaceIdiom == .pad {
                         if (isPortrait && collapseSidebarInPortrait) || (!isPortrait && collapseSidebarInLandscape) {
                             columnVisibility = .detailOnly
                         }
@@ -314,7 +319,7 @@ struct ContentView: View {
                     }
                 }
             }
-            
+
             // Trigger reflow when note selection changes
             DispatchQueue.main.async {
                 NotificationCenter.default.post(
