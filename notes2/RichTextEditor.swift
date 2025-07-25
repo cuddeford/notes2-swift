@@ -784,14 +784,21 @@ struct RichTextEditor: UIViewRepresentable {
         private func animateNewParagraphSpacing(cursorLocation: Int) {
             guard let textView = textView, paragraphs.count >= 2 else { return }
             
-            // Always animate the second-to-last paragraph (the one before the new paragraph)
-            let animateIndex = paragraphs.count - 2
+            // Find which paragraph contains the cursor (the new paragraph)
+            let cursorParagraphIndex = paragraphs.firstIndex { paragraph in
+                paragraph.range.contains(cursorLocation)
+            }
+            
+            guard let cursorIndex = cursorParagraphIndex, cursorIndex > 0 else { return }
+            
+            // The paragraph to animate is the one immediately before the new paragraph
+            let animateIndex = cursorIndex - 1
             let animateParagraph = paragraphs[animateIndex]
             let currentSpacing = animateParagraph.paragraphStyle.paragraphSpacing
             
             // Only animate if the existing paragraph had unrelated spacing
-            // Use a more lenient comparison for floating point values
-            guard abs(currentSpacing - AppSettings.unrelatedParagraphSpacing) < 1.0 else { return }
+            // Use exact comparison since spacing values are exact constants
+            guard currentSpacing == AppSettings.unrelatedParagraphSpacing else { return }
             
             let animateRange = animateParagraph.range
             
