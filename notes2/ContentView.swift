@@ -156,50 +156,50 @@ struct ContentView: View {
                         }
                     }
                     ToolbarItem(placement: .navigationBarLeading) {
-                        if UIDevice.current.userInterfaceIdiom == .pad {
-                            Menu {
+                        Menu {
+                            if UIDevice.current.userInterfaceIdiom == .pad {
                                 Toggle("Collapse sidebar in landscape", isOn: $collapseSidebarInLandscape)
                                 Toggle("Collapse sidebar in portrait", isOn: $collapseSidebarInPortrait)
                                 Divider()
-                                Toggle("Show pinned section", isOn: Binding(
-                                    get: { pinnedVisible },
-                                    set: { newValue in
-                                        if !newValue {
-                                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
-                                            if visibleCount <= 1 {
-                                                return // Don't allow hiding the last visible section
-                                            }
-                                        }
-                                        pinnedVisible = newValue
-                                    }
-                                ))
-                                Toggle("Show recents section", isOn: Binding(
-                                    get: { recentsVisible },
-                                    set: { newValue in
-                                        if !newValue {
-                                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
-                                            if visibleCount <= 1 {
-                                                return // Don't allow hiding the last visible section
-                                            }
-                                        }
-                                        recentsVisible = newValue
-                                    }
-                                ))
-                                Toggle("Show history section", isOn: Binding(
-                                    get: { historyVisible },
-                                    set: { newValue in
-                                        if !newValue {
-                                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
-                                            if visibleCount <= 1 {
-                                                return // Don't allow hiding the last visible section
-                                            }
-                                        }
-                                        historyVisible = newValue
-                                    }
-                                ))
-                            } label: {
-                                Image(systemName: "gear")
                             }
+                            Toggle("Show pinned section", isOn: Binding(
+                                get: { pinnedVisible },
+                                set: { newValue in
+                                    if !newValue {
+                                        let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                                        if visibleCount <= 1 {
+                                            return // Don't allow hiding the last visible section
+                                        }
+                                    }
+                                    pinnedVisible = newValue
+                                }
+                            ))
+                            Toggle("Show recents section", isOn: Binding(
+                                get: { recentsVisible },
+                                set: { newValue in
+                                    if !newValue {
+                                        let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                                        if visibleCount <= 1 {
+                                            return // Don't allow hiding the last visible section
+                                        }
+                                    }
+                                    recentsVisible = newValue
+                                }
+                            ))
+                            Toggle("Show history section", isOn: Binding(
+                                get: { historyVisible },
+                                set: { newValue in
+                                    if !newValue {
+                                        let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                                        if visibleCount <= 1 {
+                                            return // Don't allow hiding the last visible section
+                                        }
+                                    }
+                                    historyVisible = newValue
+                                }
+                            ))
+                        } label: {
+                            Image(systemName: "gear")
                         }
                     }
                 }
