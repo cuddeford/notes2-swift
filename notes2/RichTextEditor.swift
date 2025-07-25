@@ -347,13 +347,13 @@ struct RichTextEditor: UIViewRepresentable {
             let screenTopY = textView.contentOffset.y + textView.textContainerInset.top
             let activationWindow: CGFloat = 100.0 // ±40pt from screen top
 
-            // Find the paragraph whose top edge is closest to screen top, excluding first paragraph
+            // Find the paragraph whose top edge is closest to screen top, excluding first and last paragraphs
             var closestParagraph: Paragraph?
             var minDistance: CGFloat = .infinity
 
             for (index, paragraph) in paragraphs.enumerated() {
-                // Skip the first paragraph
-                guard index > 0 else { continue }
+                // Skip the first and last paragraphs
+                guard index > 0 && index < paragraphs.count - 1 else { continue }
                 
                 let paragraphTop = paragraph.screenPosition.y
                 let distance = abs(paragraphTop - screenTopY)
