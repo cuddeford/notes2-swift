@@ -330,9 +330,15 @@ struct RichTextEditor: UIViewRepresentable {
 
             self.parent.canScroll = canScroll
             self.parent.isAtBottom = isAtBottom
+            
+            // Check for magnetic zone transitions during scrolling
+            checkMagneticZoneTransition()
         }
 
         // MARK: - Instagram Reels-Style Magnetic Paragraph Scrolling
+        
+        private var currentMagneticParagraph: Paragraph? = nil
+        private let selectionHapticGenerator = UISelectionFeedbackGenerator()
 
         private func findParagraphToSnap() -> Paragraph? {
             guard let textView = textView, paragraphs.count > 1 else { return nil }
@@ -359,6 +365,17 @@ struct RichTextEditor: UIViewRepresentable {
             }
 
             return closestParagraph
+        }
+        
+        private func checkMagneticZoneTransition() {
+            let paragraphInZone = findParagraphToSnap()
+            
+            // Check if paragraph entered or exited the activation zone
+            if paragraphInZone?.id != currentMagneticParagraph?.id {
+                // Trigger selection haptic on transition
+                selectionHapticGenerator.selectionChanged()
+                currentMagneticParagraph = paragraphInZone
+            }
         }
 
         private func applyMagneticSnap(to paragraph: Paragraph) {
