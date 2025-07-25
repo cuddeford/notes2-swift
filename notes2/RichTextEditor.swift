@@ -331,7 +331,7 @@ struct RichTextEditor: UIViewRepresentable {
             self.parent.canScroll = canScroll
             self.parent.isAtBottom = isAtBottom
             
-            // Check for magnetic zone transitions during scrolling
+            // Check for magnetic zone transitions during scrolling, but only when user is dragging
             checkMagneticZoneTransition()
         }
 
@@ -339,6 +339,7 @@ struct RichTextEditor: UIViewRepresentable {
         
         private var currentMagneticParagraph: Paragraph? = nil
         private let selectionHapticGenerator = UISelectionFeedbackGenerator()
+        private var isUserDragging: Bool = false
 
         private func findParagraphToSnap() -> Paragraph? {
             guard let textView = textView, paragraphs.count > 1 else { return nil }
@@ -372,8 +373,10 @@ struct RichTextEditor: UIViewRepresentable {
             
             // Check if paragraph entered or exited the activation zone
             if paragraphInZone?.id != currentMagneticParagraph?.id {
-                // Trigger selection haptic on transition
-                selectionHapticGenerator.selectionChanged()
+                // Only trigger selection haptic on transition if user is actively dragging
+                if isUserDragging {
+                    selectionHapticGenerator.selectionChanged()
+                }
                 currentMagneticParagraph = paragraphInZone
             }
         }
@@ -402,6 +405,10 @@ struct RichTextEditor: UIViewRepresentable {
             )
         }
 
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            isUserDragging = true
+        }
+
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
             // Trigger magnetic snap after deceleration
             if let paragraphToSnap = findParagraphToSnap() {
@@ -410,6 +417,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            isUserDragging = false
             // Only snap if not decelerating (immediate release)
             if !decelerate {
                 if let paragraphToSnap = findParagraphToSnap() {
