@@ -334,16 +334,18 @@ struct RichTextEditor: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             DispatchQueue.main.async {
-                let oldCount = self.lastParagraphCount
-                self.parent.text = textView.attributedText
-                self.parseAttributedText(textView.attributedText)
+                let cursorLocation = textView.selectedRange.location
                 
-                // Check if new paragraphs were added
-                let newCount = self.paragraphs.count
-                if newCount > oldCount && oldCount > 0 {
-                    self.animateNewParagraphSpacing()
+                self.parent.text = textView.attributedText
+                let oldParagraphs = self.paragraphs
+                self.parseAttributedText(textView.attributedText)
+                let newParagraphs = self.paragraphs
+                
+                // Check if new paragraphs were added by comparing counts
+                if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
+                    self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
                 }
-                self.lastParagraphCount = newCount
+                self.lastParagraphCount = newParagraphs.count
                 
                 self.centerCursorInTextView()
                 self.updateRuledViewFrame()
@@ -779,31 +781,44 @@ struct RichTextEditor: UIViewRepresentable {
             }, completion: nil)
         }
         
-        private func animateNewParagraphSpacing() {
+        private func animateNewParagraphSpacing(cursorLocation: Int) {
             guard let textView = textView, paragraphs.count >= 2 else { return }
             
-            // Get the second-to-last paragraph (the one before the new paragraph)
-            let previousParagraphIndex = paragraphs.count - 2
-            let previousParagraph = paragraphs[previousParagraphIndex]
-            let previousRange = previousParagraph.range
+            // Find which paragraph contains the cursor (the new paragraph)
+            let cursorParagraphIndex = paragraphs.firstIndex { paragraph in
+                paragraph.range.contains(cursorLocation)
+            }
             
-            // Start with related spacing (minimum) and animate to unrelated spacing (maximum)
+            guard let cursorIndex = cursorParagraphIndex, cursorIndex > 0 else { return }
+            
+            // The paragraph to animate is the one before the new paragraph
+            let animateIndex = cursorIndex - 1
+            let animateParagraph = paragraphs[animateIndex]
+            let currentSpacing = animateParagraph.paragraphStyle.paragraphSpacing
+            
+            // Only animate if the existing paragraph had unrelated spacing
+            // Use a more lenient comparison for floating point values
+            guard abs(currentSpacing - AppSettings.unrelatedParagraphSpacing) < 1.0 else { return }
+            
+            let animateRange = animateParagraph.range
+            
+            // Start with related spacing and animate to unrelated spacing
             let startSpacing = AppSettings.relatedParagraphSpacing
             let targetSpacing = AppSettings.unrelatedParagraphSpacing
             
             // Create animation state
             let displayLink = CADisplayLink(target: self, selector: #selector(updateSpacingAnimation(_:)))
             displayLink.add(to: .main, forMode: .common)
-            let animation = ActiveAnimation(displayLink: displayLink, startTime: CACurrentMediaTime(), startSpacing: startSpacing, targetSpacing: targetSpacing, range: previousRange)
-            activeAnimations[previousRange] = animation
+            let animation = ActiveAnimation(displayLink: displayLink, startTime: CACurrentMediaTime(), startSpacing: startSpacing, targetSpacing: targetSpacing, range: animateRange)
+            activeAnimations[animateRange] = animation
             
             // Set initial spacing immediately
             let initialParagraphStyle = NSMutableParagraphStyle()
-            initialParagraphStyle.setParagraphStyle(previousParagraph.paragraphStyle)
+            initialParagraphStyle.setParagraphStyle(animateParagraph.paragraphStyle)
             initialParagraphStyle.paragraphSpacing = startSpacing
             
-            textView.textStorage.addAttribute(.paragraphStyle, value: initialParagraphStyle, range: previousRange)
-            if let index = paragraphs.firstIndex(where: { $0.range == previousRange }) {
+            textView.textStorage.addAttribute(.paragraphStyle, value: initialParagraphStyle, range: animateRange)
+            if let index = paragraphs.firstIndex(where: { $0.range == animateRange }) {
                 paragraphs[index].paragraphStyle = initialParagraphStyle
             }
         }
