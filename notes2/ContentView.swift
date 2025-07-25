@@ -119,7 +119,7 @@ struct ContentView: View {
                         }
                     }
                     ToolbarItem(placement: .navigationBarLeading) {
-                        if UIDevice.current.userInterfaceIdiom == .pad {
+                        if UIDevice.current.userInterfaceIdiom == .pad && !isPortrait {
                             Menu {
                                 Toggle("Collapse sidebar in landscape", isOn: $collapseSidebarInLandscape)
                             } label: {
