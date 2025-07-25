@@ -44,86 +44,72 @@ struct ContentView: View {
 
         NavigationSplitView(columnVisibility: .constant(.all)) {
             ZStack {
-                NavigationStack {
-                    List(selection: $selectedNoteID) {
-                        if !pinnedNotes.isEmpty {
-                            Section(isExpanded: $pinnedExpanded) {
-                                ForEach(pinnedNotes) { note in
-                                    NavigationLink(value: note.id) {
-                                        NoteRow(note: note)
-                                    }
+                List(selection: $selectedNoteID) {
+                    if !pinnedNotes.isEmpty {
+                        Section(isExpanded: $pinnedExpanded) {
+                            ForEach(pinnedNotes) { note in
+                                NoteRow(note: note)
                                     .tag(note.id)
-                                }
-                            } header: {
-                                Label("Pinned", systemImage: "pin.fill")
-                            }
-                        }
-
-                        if !recentNotes.isEmpty {
-                            Section(isExpanded: $recentsExpanded) {
-                                ForEach(recentNotes) { note in
-                                    NavigationLink(value: note.id) {
-                                        NoteRow(note: note)
-                                    }
-                                    .tag(note.id)
-                                }
-                            } header: {
-                                Label("Recents", systemImage: "clock.fill")
-                            }
-                        }
-
-                        Section(isExpanded: $historyExpanded) {
-                            ForEach(sortedDays, id: \.self) { day in
-                                Section(isExpanded: binding(for: day)) {
-                                    ForEach(groupedNotes[day] ?? []) { note in
-                                    NavigationLink(value: note.id) {
-                                        NoteRow(note: note)
-                                    }
-                                    .tag(note.id)
-                                }
-                                } header: {
-                                    HStack {
-                                        Text(day.formattedDate())
-                                        Spacer()
-                                        Text(day.relativeDate())
-                                            .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
                             }
                         } header: {
-                            Label("History", systemImage: "calendar")
+                            Label("Pinned", systemImage: "pin.fill")
                         }
                     }
-                    .animation(.default, value: pinnedExpanded)
-                    .animation(.default, value: recentsExpanded)
-                    .animation(.default, value: historyExpanded)
-                    .animation(.default, value: historicalExpanded)
-                    .navigationTitle("Notes2")
-                    .navigationDestination(for: UUID.self) { noteID in
-                        if let note = notes.first(where: { $0.id == noteID }) {
-                            NoteView(note: note, selectedNoteID: $selectedNoteID)
-                                .environment(\.modelContext, context)
+
+                    if !recentNotes.isEmpty {
+                        Section(isExpanded: $recentsExpanded) {
+                            ForEach(recentNotes) { note in
+                                NoteRow(note: note)
+                                    .tag(note.id)
+                            }
+                        } header: {
+                            Label("Recents", systemImage: "clock.fill")
                         }
                     }
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button {
-                                let newNote = Note()
-                                context.insert(newNote)
-                                selectedNoteID = newNote.id
-                            } label: {
+
+                    Section(isExpanded: $historyExpanded) {
+                        ForEach(sortedDays, id: \.self) { day in
+                            Section(isExpanded: binding(for: day)) {
+                                ForEach(groupedNotes[day] ?? []) { note in
+                                NoteRow(note: note)
+                                    .tag(note.id)
+                            }
+                            } header: {
                                 HStack {
-                                    Image(systemName: "plus")
-                                    Text("New note")
+                                    Text(day.formattedDate())
+                                    Spacer()
+                                    Text(day.relativeDate())
+                                        .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                         }
+                    } header: {
+                        Label("History", systemImage: "calendar")
                     }
-                    .onChange(of: historicalExpanded) { oldValue, newValue in
-                        if let encoded = try? JSONEncoder().encode(newValue) {
-                            UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
+                }
+                .animation(.default, value: pinnedExpanded)
+                .animation(.default, value: recentsExpanded)
+                .animation(.default, value: historyExpanded)
+                .animation(.default, value: historicalExpanded)
+                .navigationTitle("Notes2")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            let newNote = Note()
+                            context.insert(newNote)
+                            selectedNoteID = newNote.id
+                        } label: {
+                            HStack {
+                                Image(systemName: "plus")
+                                Text("New note")
+                            }
                         }
+                    }
+                }
+                .onChange(of: historicalExpanded) { oldValue, newValue in
+                    if let encoded = try? JSONEncoder().encode(newValue) {
+                        UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
                     }
                 }
                 .task {
