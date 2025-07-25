@@ -244,31 +244,6 @@ struct ContentView: View {
                 }
             }
         }
-        .onChange(of: collapseSidebarInPortrait) { oldValue, newValue in
-            if UIDevice.current.userInterfaceIdiom == .pad && isPortrait && selectedNoteID != nil {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    columnVisibility = newValue ? .detailOnly : .automatic
-                }
-            }
-        }
-        .onChange(of: collapseSidebarInLandscape) { oldValue, newValue in
-            if UIDevice.current.userInterfaceIdiom == .pad && !isPortrait && selectedNoteID != nil {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    columnVisibility = newValue ? .detailOnly : .automatic
-                }
-            }
-        }
-        .onChange(of: isPortrait) { oldValue, newValue in
-            if UIDevice.current.userInterfaceIdiom == .pad && selectedNoteID != nil {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    if (newValue && collapseSidebarInPortrait) || (!newValue && collapseSidebarInLandscape) {
-                        columnVisibility = .detailOnly
-                    } else {
-                        columnVisibility = .automatic
-                    }
-                }
-            }
-        }
     }
 }
 
