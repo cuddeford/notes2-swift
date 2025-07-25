@@ -325,7 +325,6 @@ class RuledView: UIView {
             pulseProgress = EasingFunctions.easeInOutQuad((1.0 - progress) * 2.0)
         }
 
-
         let additionalWidth: CGFloat
         switch hapticState.type {
         case .heavy:
@@ -336,7 +335,6 @@ class RuledView: UIView {
 
         return baseBorderWidth + additionalWidth
     }
-
 
     private func colors(for detent: CGFloat? = nil, isPinched: Bool = false) -> (fill: UIColor, stroke: UIColor) {
         guard isPinched else {
