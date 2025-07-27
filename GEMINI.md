@@ -107,6 +107,12 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
   - **NoteView**: Right-to-left swipe creates new note
   - **Swipe actions**: Pin/unpin and delete notes with confirmation
 - **Drag System**: Custom overlay indicators with 60fps animations
+- **Drag-to-Reorder**: Long-press to drag paragraphs with ghost overlay and target indicators
+  - **Ghost Technique**: Original paragraph fades to 30% opacity with floating ghost overlay
+  - **Target Indicators**: Blue highlighted zones between paragraphs show drop locations
+  - **Multitouch Support**: One finger holds paragraph, second finger scrolls
+  - **Smooth Animations**: 0.2s fade transitions for visual feedback
+  - **Haptic Feedback**: Light impact on drop, selection feedback on target changes
 
 **Visual System:**
 - **RuledView**: Real-time paragraph visualization with semi-transparent overlays
@@ -177,4 +183,4 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
 ### Last Updated
 When generating this timestamp be sure to run `date "+%Y-%m-%d %H:%M:%S"` to get the actual date.
 
-2025-07-25 21:44:52
+2025-07-25 22:51:18

@@ -4,6 +4,13 @@ class RuledView: UIView {
     weak var textView: UITextView?
 
     private var paragraphOverlays: [CAShapeLayer] = []
+    private var targetIndicatorLayers: [CAShapeLayer] = []
+    private var dragState: DragState = .none
+    
+    enum DragState {
+        case none
+        case dragging(sourceIndex: Int, targetIndex: Int?)
+    }
 
     // Haptic feedback state for border thickness
     private var hapticBorderStates: [NSRange: HapticBorderState] = [:]
@@ -231,6 +238,97 @@ class RuledView: UIView {
         for layer in paragraphOverlays {
             layer.opacity = 0
         }
+    }
+
+    // MARK: - Drag-to-Reorder Visual Support
+    
+    func updateParagraphOverlayOpacity(index: Int, opacity: Float) {
+        guard index < paragraphOverlays.count else { return }
+        paragraphOverlays[index].opacity = opacity
+    }
+    
+    func updateTargetIndicators(targetIndex: Int?) {
+        // Clear existing target indicators
+        for layer in targetIndicatorLayers {
+            layer.removeFromSuperlayer()
+        }
+        targetIndicatorLayers.removeAll()
+        
+        guard let textView = textView, 
+              let coordinator = textView.delegate as? RichTextEditor.Coordinator,
+              let targetIndex = targetIndex else { return }
+        
+        let paragraphs = coordinator.paragraphs
+        let inset = textView.textContainerInset
+        let indicatorHeight: CGFloat = 4
+        let indicatorWidth: CGFloat = textView.textContainer.size.width
+        let cornerRadius: CGFloat = 2
+        
+        // Calculate position for target indicator
+        var yPosition: CGFloat
+        
+        if targetIndex == 0 {
+            // Before first paragraph
+            if paragraphs.count > 0 {
+                let firstParagraph = paragraphs[0]
+                let rect = textView.layoutManager.boundingRect(forGlyphRange: firstParagraph.range, in: textView.textContainer)
+                yPosition = rect.origin.y + inset.top - 10
+            } else {
+                yPosition = inset.top
+            }
+        } else if targetIndex == paragraphs.count {
+            // After last paragraph
+            if paragraphs.count > 0 {
+                let lastParagraph = paragraphs[paragraphs.count - 1]
+                let rect = textView.layoutManager.boundingRect(forGlyphRange: lastParagraph.range, in: textView.textContainer)
+                yPosition = rect.origin.y + rect.height + inset.top + 10
+            } else {
+                yPosition = inset.top
+            }
+        } else {
+            // Between paragraphs
+            let prevParagraph = paragraphs[targetIndex - 1]
+            let prevRect = textView.layoutManager.boundingRect(forGlyphRange: prevParagraph.range, in: textView.textContainer)
+            yPosition = prevRect.origin.y + prevRect.height + inset.top + (prevParagraph.paragraphStyle.paragraphSpacing / 2)
+        }
+        
+        let indicatorRect = CGRect(
+            x: inset.left,
+            y: yPosition - indicatorHeight / 2,
+            width: indicatorWidth,
+            height: indicatorHeight
+        )
+        
+        let indicatorLayer = CAShapeLayer()
+        indicatorLayer.path = UIBezierPath(roundedRect: indicatorRect, cornerRadius: cornerRadius).cgPath
+        indicatorLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
+        indicatorLayer.opacity = 0
+        
+        layer.addSublayer(indicatorLayer)
+        targetIndicatorLayers.append(indicatorLayer)
+        
+        // Animate appearance
+        let animation = CABasicAnimation(keyPath: "opacity")
+        animation.fromValue = 0
+        animation.toValue = 1
+        animation.duration = 0.2
+        indicatorLayer.add(animation, forKey: "fadeIn")
+        indicatorLayer.opacity = 1
+    }
+    
+    func clearTargetIndicators() {
+        for layer in targetIndicatorLayers {
+            let animation = CABasicAnimation(keyPath: "opacity")
+            animation.fromValue = 1
+            animation.toValue = 0
+            animation.duration = 0.2
+            layer.add(animation, forKey: "fadeOut")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                layer.removeFromSuperlayer()
+            }
+        }
+        targetIndicatorLayers.removeAll()
     }
 
     func triggerHapticFeedback(for range: NSRange, type: HapticType) {
