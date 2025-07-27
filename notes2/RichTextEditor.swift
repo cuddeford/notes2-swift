@@ -178,7 +178,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var lastParagraphCount: Int = 0
         var activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:]
         private var pinchedParagraphIndices: [Int] = []
-        private var isPinching: Bool = false
+        var isPinching: Bool = false
 
         // Drag-to-reorder state
         private var draggingParagraphIndex: Int?
@@ -668,7 +668,6 @@ struct RichTextEditor: UIViewRepresentable {
 
         private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
             self.isPinching = true
-            textView.endEditing(true)
 
             let location1 = gesture.location(ofTouch: 0, in: textView)
             let location2 = gesture.location(ofTouch: 1, in: textView)

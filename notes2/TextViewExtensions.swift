@@ -54,6 +54,15 @@ class CustomTextView: UITextView {
 
         return adjustedRects
     }
+
+    // Prevent scrolling during pinch gesture
+    override func scrollRectToVisible(_ rect: CGRect, animated: Bool) {
+        if coordinator?.isPinching == true {
+            return
+        }
+
+        super.scrollRectToVisible(rect, animated: animated)
+    }
 }
 
 class CustomTextSelectionRect: UITextSelectionRect {
