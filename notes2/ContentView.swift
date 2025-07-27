@@ -148,6 +148,7 @@ struct ContentView: View {
                             let newNote = Note()
                             context.insert(newNote)
                             selectedNoteID = newNote.id
+                            selectedCompositeID = "recents-\(newNote.id)"
                         } label: {
                             HStack {
                                 Image(systemName: "plus")
