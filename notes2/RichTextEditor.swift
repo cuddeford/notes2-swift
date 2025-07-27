@@ -360,7 +360,7 @@ struct RichTextEditor: UIViewRepresentable {
             guard let textView = textView, paragraphs.count > 1 else { return nil }
 
             let screenTopY = textView.contentOffset.y + textView.textContainerInset.top
-            let activationWindow: CGFloat = 40.0 // ±50pt from screen top
+            let activationWindow: CGFloat = 40.0 // ±20pt from screen top
 
             // Find the paragraph whose top edge is closest to screen top, excluding first and last paragraphs
             var closestParagraph: Paragraph?
