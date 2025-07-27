@@ -387,7 +387,7 @@ struct RichTextEditor: UIViewRepresentable {
             guard let textView = textView, paragraphs.count > 1 else { return nil }
 
             let screenTopY = textView.contentOffset.y + textView.textContainerInset.top
-            let centerThreshold: CGFloat = 2.0 // ±2pt tolerance for center detection
+            let centerThreshold: CGFloat = 10.0 // ±2pt tolerance for center detection
 
             // Find the paragraph whose top edge is exactly at screen top, excluding first and last paragraphs
             for (index, paragraph) in paragraphs.enumerated() {
