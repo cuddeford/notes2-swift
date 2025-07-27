@@ -654,7 +654,7 @@ struct RichTextEditor: UIViewRepresentable {
             activeAnimations[range] = animation
         }
 
-@objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
+        @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
             guard let textView = textView else { return }
 
             if gesture.state == .began && gesture.numberOfTouches >= 2 {
