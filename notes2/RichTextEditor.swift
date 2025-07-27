@@ -345,7 +345,9 @@ struct RichTextEditor: UIViewRepresentable {
             self.parent.isAtBottom = isAtBottom
             
             // Check for magnetic zone transitions during scrolling, but only when user is dragging
-            checkMagneticZoneTransition()
+            if parent.settings.magneticScrollingEnabled {
+                checkMagneticZoneTransition()
+            }
         }
 
         // MARK: - Instagram Reels-Style Magnetic Paragraph Scrolling
@@ -424,15 +426,15 @@ struct RichTextEditor: UIViewRepresentable {
 
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
             // Trigger magnetic snap after deceleration
-            if let paragraphToSnap = findParagraphToSnap() {
+            if parent.settings.magneticScrollingEnabled, let paragraphToSnap = findParagraphToSnap() {
                 applyMagneticSnap(to: paragraphToSnap)
             }
         }
 
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             isUserDragging = false
-            // Only snap if not decelerating (immediate release)
-            if !decelerate {
+            // Always snap immediately when gesture ends, regardless of deceleration
+            if parent.settings.magneticScrollingEnabled {
                 if let paragraphToSnap = findParagraphToSnap() {
                     applyMagneticSnap(to: paragraphToSnap)
                 }

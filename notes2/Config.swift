@@ -29,6 +29,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(padding, forKey: "padding") }
     }
 
+    @Published var magneticScrollingEnabled: Bool {
+        didSet { UserDefaults.standard.set(magneticScrollingEnabled, forKey: "magneticScrollingEnabled") }
+    }
+
     private init() {
         let spacing = UserDefaults.standard.double(forKey: "defaultParagraphSpacing")
         self.defaultParagraphSpacing = spacing == 0 ? AppSettings.unrelatedParagraphSpacing : spacing
@@ -38,5 +42,7 @@ class AppSettings: ObservableObject {
 
         let padding = UserDefaults.standard.double(forKey: "padding")
         self.padding = padding == 0 ? 20.0 : padding
+
+        self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? true
     }
 }

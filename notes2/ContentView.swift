@@ -198,6 +198,10 @@ struct ContentView: View {
                                     historyVisible = newValue
                                 }
                             ))
+                            Toggle("Magnetic scrolling", isOn: Binding(
+                                get: { AppSettings.shared.magneticScrollingEnabled },
+                                set: { AppSettings.shared.magneticScrollingEnabled = $0 }
+                            ))
                         } label: {
                             Image(systemName: "gear")
                         }
