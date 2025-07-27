@@ -178,6 +178,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var lastParagraphCount: Int = 0
         var activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:]
         private var pinchedParagraphIndices: [Int] = []
+        private var isPinching: Bool = false
 
         // Drag-to-reorder state
         private var draggingParagraphIndex: Int?
@@ -341,11 +342,14 @@ struct RichTextEditor: UIViewRepresentable {
             let maxOffset = max(0, contentHeight - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
 
-            self.parent.canScroll = canScroll
-            self.parent.isAtBottom = isAtBottom
+
+            if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll {
+                self.parent.canScroll = canScroll
+                self.parent.isAtBottom = isAtBottom
+            }
 
             // Check for magnetic zone transitions during scrolling, but only when user is dragging
-            if parent.settings.magneticScrollingEnabled {
+            if !self.isPinching && parent.settings.magneticScrollingEnabled {
                 checkMagneticZoneTransition()
             }
         }
@@ -663,7 +667,9 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
+            self.isPinching = true
             textView.endEditing(true)
+
             let location1 = gesture.location(ofTouch: 0, in: textView)
             let location2 = gesture.location(ofTouch: 1, in: textView)
 
@@ -876,6 +882,7 @@ struct RichTextEditor: UIViewRepresentable {
                         self.affectedParagraphRange = nil
                         self.currentDetent = nil
                         self.lastClosestDetent = nil
+                        self.isPinching = false
                     }
                 } else {
                     let progress = CGFloat(elapsed / duration)
