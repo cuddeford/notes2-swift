@@ -360,7 +360,7 @@ struct RichTextEditor: UIViewRepresentable {
             guard let textView = textView, paragraphs.count > 1 else { return nil }
 
             let screenTopY = textView.contentOffset.y + textView.textContainerInset.top
-            let activationWindow: CGFloat = 100.0 // ±40pt from screen top
+            let activationWindow: CGFloat = 100.0 // ±50pt from screen top
 
             // Find the paragraph whose top edge is closest to screen top, excluding first and last paragraphs
             var closestParagraph: Paragraph?
@@ -382,17 +382,40 @@ struct RichTextEditor: UIViewRepresentable {
 
             return closestParagraph
         }
+
+        private func findCenteredParagraph() -> Paragraph? {
+            guard let textView = textView, paragraphs.count > 1 else { return nil }
+
+            let screenTopY = textView.contentOffset.y + textView.textContainerInset.top
+            let centerThreshold: CGFloat = 2.0 // ±2pt tolerance for center detection
+
+            // Find the paragraph whose top edge is exactly at screen top, excluding first and last paragraphs
+            for (index, paragraph) in paragraphs.enumerated() {
+                // Skip the first and last paragraphs
+                guard index > 0 && index < paragraphs.count - 1 else { continue }
+                
+                let paragraphTop = paragraph.screenPosition.y
+                let distance = abs(paragraphTop - screenTopY)
+
+                // Only return paragraph if it's perfectly centered
+                if distance <= centerThreshold {
+                    return paragraph
+                }
+            }
+
+            return nil
+        }
         
         private func checkMagneticZoneTransition() {
-            let paragraphInZone = findParagraphToSnap()
+            let centeredParagraph = findCenteredParagraph()
             
-            // Check if paragraph entered or exited the activation zone
-            if paragraphInZone?.id != currentMagneticParagraph?.id {
-                // Only trigger selection haptic on transition if user is actively dragging
-                if isUserDragging {
-                    selectionHapticGenerator.selectionChanged()
-                }
-                currentMagneticParagraph = paragraphInZone
+            // Only trigger haptic when paragraph is perfectly centered
+            if let centered = centeredParagraph, centered.id != currentMagneticParagraph?.id {
+                selectionHapticGenerator.selectionChanged()
+                currentMagneticParagraph = centered
+            } else if centeredParagraph == nil {
+                // Clear current paragraph when no longer centered
+                currentMagneticParagraph = nil
             }
         }
 
