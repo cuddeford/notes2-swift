@@ -38,50 +38,14 @@ struct EditorToolbar: View {
         HStack {
             if isExpanded {
                 HStack {
-                    HStack {
-                        Button(action: { buttonAction(action: onBold) }) {
-                            Image(systemName: "bold")
-                                .padding(16)
-                                .background(
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                )
-                        }
-
-                        Button(action: { buttonAction(action: onItalic) }) {
-                            Image(systemName: "italic")
-                                .padding(16)
-                                .background(
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                )
-                        }
-
-                        Button(action: { buttonAction(action: onUnderline) }) {
-                            Image(systemName: "underline")
-                                .padding(16)
-                                .background(
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                )
-                        }
-                    }
-
                     Spacer()
 
                     HStack {
                         Button(action: { buttonAction(action: onTitle1) }) {
-                            Text("h1")
+                            Text("size")
+                                .padding(.vertical, -10)
                                 .bold()
                                 .padding(16)
-                                .background(
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                )
-                        }
-                        Button(action: { buttonAction(action: onBody) }) {
-                            Text("body")
-                                .padding(10)
                                 .background(
                                     Rectangle()
                                         .fill(.ultraThinMaterial)
