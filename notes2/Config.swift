@@ -47,7 +47,7 @@ class AppSettings: ObservableObject {
         let padding = UserDefaults.standard.double(forKey: "padding")
         self.padding = padding == 0 ? 20.0 : padding
 
-        self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? true
+        self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? false
         self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false
     }
 }
