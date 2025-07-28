@@ -6,7 +6,7 @@ class RuledView: UIView {
     private var paragraphOverlays: [CAShapeLayer] = []
     private var targetIndicatorLayers: [CAShapeLayer] = []
     private var dragState: DragState = .none
-    
+
     enum DragState {
         case none
         case dragging(sourceIndex: Int, targetIndex: Int?)
@@ -105,7 +105,7 @@ class RuledView: UIView {
 
     func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
         let inset = textView.textContainerInset
-        let cornerRadius = 10.0
+        let cornerRadius = 20.0
 
         // Remove excess layers
         if paragraphOverlays.count > paragraphs.count {
@@ -241,32 +241,32 @@ class RuledView: UIView {
     }
 
     // MARK: - Drag-to-Reorder Visual Support
-    
+
     func updateParagraphOverlayOpacity(index: Int, opacity: Float) {
         guard index < paragraphOverlays.count else { return }
         paragraphOverlays[index].opacity = opacity
     }
-    
+
     func updateTargetIndicators(targetIndex: Int?) {
         // Clear existing target indicators
         for layer in targetIndicatorLayers {
             layer.removeFromSuperlayer()
         }
         targetIndicatorLayers.removeAll()
-        
-        guard let textView = textView, 
+
+        guard let textView = textView,
               let coordinator = textView.delegate as? RichTextEditor.Coordinator,
               let targetIndex = targetIndex else { return }
-        
+
         let paragraphs = coordinator.paragraphs
         let inset = textView.textContainerInset
         let indicatorHeight: CGFloat = 4
         let indicatorWidth: CGFloat = textView.textContainer.size.width
         let cornerRadius: CGFloat = 2
-        
+
         // Calculate position for target indicator
         var yPosition: CGFloat
-        
+
         if targetIndex == 0 {
             // Before first paragraph
             if paragraphs.count > 0 {
@@ -291,22 +291,22 @@ class RuledView: UIView {
             let prevRect = textView.layoutManager.boundingRect(forGlyphRange: prevParagraph.range, in: textView.textContainer)
             yPosition = prevRect.origin.y + prevRect.height + inset.top + (prevParagraph.paragraphStyle.paragraphSpacing / 2)
         }
-        
+
         let indicatorRect = CGRect(
             x: inset.left,
             y: yPosition - indicatorHeight / 2,
             width: indicatorWidth,
             height: indicatorHeight
         )
-        
+
         let indicatorLayer = CAShapeLayer()
         indicatorLayer.path = UIBezierPath(roundedRect: indicatorRect, cornerRadius: cornerRadius).cgPath
         indicatorLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
         indicatorLayer.opacity = 0
-        
+
         layer.addSublayer(indicatorLayer)
         targetIndicatorLayers.append(indicatorLayer)
-        
+
         // Animate appearance
         let animation = CABasicAnimation(keyPath: "opacity")
         animation.fromValue = 0
@@ -315,7 +315,7 @@ class RuledView: UIView {
         indicatorLayer.add(animation, forKey: "fadeIn")
         indicatorLayer.opacity = 1
     }
-    
+
     func clearTargetIndicators() {
         for layer in targetIndicatorLayers {
             let animation = CABasicAnimation(keyPath: "opacity")
@@ -323,7 +323,7 @@ class RuledView: UIView {
             animation.toValue = 0
             animation.duration = 0.2
             layer.add(animation, forKey: "fadeOut")
-            
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 layer.removeFromSuperlayer()
             }
