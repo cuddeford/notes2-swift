@@ -33,6 +33,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(magneticScrollingEnabled, forKey: "magneticScrollingEnabled") }
     }
 
+    @Published var dragToReorderParagraphEnabled: Bool {
+        didSet { UserDefaults.standard.set(dragToReorderParagraphEnabled, forKey: "dragToReorderParagraphEnabled") }
+    }
+
     private init() {
         let spacing = UserDefaults.standard.double(forKey: "defaultParagraphSpacing")
         self.defaultParagraphSpacing = spacing == 0 ? AppSettings.unrelatedParagraphSpacing : spacing
@@ -44,5 +48,6 @@ class AppSettings: ObservableObject {
         self.padding = padding == 0 ? 20.0 : padding
 
         self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? true
+        self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false
     }
 }

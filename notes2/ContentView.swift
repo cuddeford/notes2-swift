@@ -206,6 +206,10 @@ struct ContentView: View {
                                 set: { AppSettings.shared.magneticScrollingEnabled = $0 }
                             ))
                             Toggle("New notes start with big font", isOn: $newNoteWithBigFont)
+                            Toggle("Drag to reorder paragraph (WIP)", isOn: Binding(
+                                get: { AppSettings.shared.dragToReorderParagraphEnabled },
+                                set: { AppSettings.shared.dragToReorderParagraphEnabled = $0 }
+                            ))
                         } label: {
                             Image(systemName: "gear")
                         }

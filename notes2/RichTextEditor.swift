@@ -995,6 +995,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         @objc func handleLongPressGesture(_ gesture: UILongPressGestureRecognizer) {
             guard let textView = textView else { return }
+            guard AppSettings.shared.dragToReorderParagraphEnabled else { return }
 
             let location = gesture.location(in: textView)
 
