@@ -171,8 +171,8 @@ struct NoteView: View {
                     dragLocation = .zero
                 }
         )
-        .ignoresSafeArea()
         .toolbar(UIDevice.current.userInterfaceIdiom == .phone ? .hidden : .visible, for: .navigationBar)
+        .ignoresSafeArea()
         .overlay(
             EditorToolbarOverlay(
                 keyboard: keyboard,
