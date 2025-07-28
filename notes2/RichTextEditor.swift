@@ -63,9 +63,12 @@ struct RichTextEditor: UIViewRepresentable {
         paragraphStyle.maximumLineHeight = textView.font!.lineHeight
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
-        // Apply default title style if the text view is empty
+        // Apply default style based on user preference if the text view is empty
         if textView.attributedText.length == 0 {
-            let defaultFont = UIFont.noteStyle(.title1, traits: .traitBold)
+            let useBigFont = UserDefaults.standard.bool(forKey: "newNoteWithBigFont")
+            let style: NoteTextStyle = useBigFont ? .title1 : .body
+            let traits: UIFontDescriptor.SymbolicTraits = useBigFont ? .traitBold : []
+            let defaultFont = UIFont.noteStyle(style, traits: traits)
             let defaultParagraphStyle = NSMutableParagraphStyle()
             defaultParagraphStyle.paragraphSpacing = settings.defaultParagraphSpacing
             defaultParagraphStyle.minimumLineHeight = defaultFont.lineHeight

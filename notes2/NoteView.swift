@@ -77,8 +77,11 @@ struct NoteView: View {
             mutableAttr.endEditing()
             loadedText = mutableAttr
         } else {
-            // If loading fails or note is empty, create a new note with default title style
-            let newFont = UIFont.noteStyle(.title1, traits: .traitBold)
+            // If loading fails or note is empty, create a new note with style based on user preference
+            let useBigFont = UserDefaults.standard.bool(forKey: "newNoteWithBigFont")
+            let style: NoteTextStyle = useBigFont ? .title1 : .body
+            let traits: UIFontDescriptor.SymbolicTraits = useBigFont ? .traitBold : []
+            let newFont = UIFont.noteStyle(style, traits: traits)
             let newParagraphStyle = NSMutableParagraphStyle()
             newParagraphStyle.paragraphSpacing = AppSettings.shared.defaultParagraphSpacing
             newParagraphStyle.minimumLineHeight = newFont.lineHeight

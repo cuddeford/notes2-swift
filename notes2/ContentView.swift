@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @AppStorage("collapseSidebarInLandscape") private var collapseSidebarInLandscape = false
     @AppStorage("collapseSidebarInPortrait") private var collapseSidebarInPortrait = true
+    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
 
     @State private var listDragOffset: CGSize = .zero
     @State private var listDragLocation: CGPoint = .zero
@@ -204,6 +205,7 @@ struct ContentView: View {
                                 get: { AppSettings.shared.magneticScrollingEnabled },
                                 set: { AppSettings.shared.magneticScrollingEnabled = $0 }
                             ))
+                            Toggle("New notes start with big font", isOn: $newNoteWithBigFont)
                         } label: {
                             Image(systemName: "gear")
                         }
