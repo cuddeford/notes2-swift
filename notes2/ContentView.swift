@@ -199,6 +199,7 @@ struct ContentView: View {
                                     historyVisible = newValue
                                 }
                             ))
+                            Divider()
                             Toggle("Magnetic scrolling", isOn: Binding(
                                 get: { AppSettings.shared.magneticScrollingEnabled },
                                 set: { AppSettings.shared.magneticScrollingEnabled = $0 }
