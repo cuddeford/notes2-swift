@@ -179,6 +179,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var hasTriggeredLightHaptic: Bool = false
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
         private var lastParagraphCount: Int = 0
+        private var initialPinchDistance: CGFloat?
         var activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:]
         private var pinchedParagraphIndices: [Int] = []
         var isPinching: Bool = false
@@ -672,8 +673,17 @@ struct RichTextEditor: UIViewRepresentable {
         private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
             self.isPinching = true
 
+            guard gesture.numberOfTouches >= 2 else {
+                gesture.state = .cancelled
+                return
+            }
+
             let location1 = gesture.location(ofTouch: 0, in: textView)
             let location2 = gesture.location(ofTouch: 1, in: textView)
+
+            let dx = location2.x - location1.x
+            let dy = location2.y - location1.y
+            self.initialPinchDistance = sqrt(dx*dx + dy*dy)
 
             if let position1 = textView.closestPosition(to: location1), let position2 = textView.closestPosition(to: location2) {
                 let range1 = paragraphRange(for: textView.attributedText, at: textView.offset(from: textView.beginningOfDocument, to: position1))
@@ -738,7 +748,7 @@ struct RichTextEditor: UIViewRepresentable {
                     textView: textView,
                     activePinchedPairs: activePinchedPairs,
                     currentGestureDetent: self.currentDetent,
-                    currentGestureRange: topRange,
+                    currentGestureRange: topRange
                 )
             }
             gesture.scale = 1.0
@@ -746,12 +756,19 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handlePinchChanged(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
-            guard let initialSpacing = initialSpacing, let range = affectedParagraphRange else { return }
+            guard let initialSpacing = initialSpacing, let range = affectedParagraphRange, let initialPinchDistance = initialPinchDistance else { return }
 
-            // Symmetrical scaling logic
-            let gestureRange = AppSettings.unrelatedParagraphSpacing - AppSettings.relatedParagraphSpacing
-            let gestureProgress = (gesture.scale - 1.0) * gestureRange
-            var targetSpacing = initialSpacing + gestureProgress
+            guard gesture.numberOfTouches >= 2 else { return }
+
+            let location1 = gesture.location(ofTouch: 0, in: textView)
+            let location2 = gesture.location(ofTouch: 1, in: textView)
+
+            let dx = location2.x - location1.x
+            let dy = location2.y - location1.y
+            let currentDistance = sqrt(dx*dx + dy*dy)
+
+            let delta = currentDistance - initialPinchDistance
+            var targetSpacing = initialSpacing + delta
 
             // Clamp the spacing to the defined detents
             targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
@@ -780,7 +797,7 @@ struct RichTextEditor: UIViewRepresentable {
                     shouldTriggerLight = true
                 } else if startedAtLimit && initialLimitValue == targetSpacing {
                     // Started at this limit - check direction and if already triggered
-                    let direction = gesture.scale - 1.0
+                    let direction = currentDistance - initialPinchDistance
                     let isMovingTowardLimit = (initialLimitValue == AppSettings.relatedParagraphSpacing && direction < 0) ||
                                             (initialLimitValue == AppSettings.unrelatedParagraphSpacing && direction > 0)
 
