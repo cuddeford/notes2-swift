@@ -12,6 +12,7 @@ struct LastNoteIndicatorView: View {
     var translation: CGSize
     var location: CGPoint
     var noteFirstLine: String
+    var isUntitled: Bool
 
     @State private var lastWillCreateNote: Bool = false
 
@@ -27,6 +28,8 @@ struct LastNoteIndicatorView: View {
 
         Text(noteFirstLine)
             .font(.headline)
+            .italic(isUntitled)
+            .opacity(isUntitled ? 0.5 : 1)
             .padding()
             .background(backgroundColor)
             .foregroundColor(.white)

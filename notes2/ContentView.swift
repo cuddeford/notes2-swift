@@ -247,7 +247,8 @@ struct ContentView: View {
                 }
                 .overlay {
                     if isListDragging {
-                        LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: recentNotes.first?.firstLine ?? "untitled")
+                        let isUntitled = recentNotes.first?.firstLine.isEmpty ?? true
+                        LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: isUntitled ? "untitled" : recentNotes.first!.firstLine, isUntitled: isUntitled)
                     }
                 }
                 .gesture(
@@ -271,6 +272,7 @@ struct ContentView: View {
                             if isListDragging, value.translation.width < -100 { // Swipe left
                                 if let lastEdited = recentNotes.first {
                                     selectedNoteID = lastEdited.id
+                                    selectedCompositeID = "recents-\(lastEdited.id)"
                                 }
                             }
                             // Reset drag state
