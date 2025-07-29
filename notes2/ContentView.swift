@@ -2,21 +2,23 @@
 //  ContentView.swift
 //  notes2
 //
-//  Created by Lucio Cuddeford on 22/06/2025.
+//  Simplified ContentView with essential functionality
 //
 
 import SwiftUI
 import SwiftData
 import Foundation
-import UIKit
-import Combine
-
 
 struct ContentView: View {
     @Query(sort: \Note.createdAt, order: .reverse) var notes: [Note]
     @Environment(\.modelContext) private var context
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    @State private var hasRestoredLastOpenedNote = false
+    @State private var selectedNoteID: UUID?
+    @State private var selectedCompositeID: String?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var searchText = ""
     @AppStorage("recentsVisible") private var recentsVisible = true
     @AppStorage("historyVisible") private var historyVisible = true
     @AppStorage("pinnedVisible") private var pinnedVisible = true
@@ -24,33 +26,20 @@ struct ContentView: View {
     @AppStorage("historyExpanded") private var historyExpanded = true
     @AppStorage("pinnedExpanded") private var pinnedExpanded = true
     @State private var historicalExpanded: [String: Bool] = [:]
-    @State private var hasRestoredLastOpenedNote = false
-    @State private var selectedNoteID: UUID?
-    @State private var selectedCompositeID: String?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
-    @AppStorage("collapseSidebarInLandscape") private var collapseSidebarInLandscape = false
-    @AppStorage("collapseSidebarInPortrait") private var collapseSidebarInPortrait = true
-    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
-
-    @State private var listDragOffset: CGSize = .zero
-    @State private var listDragLocation: CGPoint = .zero
-    @State private var isListDragging = false
-    @State private var searchText = ""
-
+    
     private func binding(for day: Date) -> Binding<Bool> {
         let key = ISO8601DateFormatter().string(from: day)
-        return .init(
+        return Binding(
             get: { self.historicalExpanded[key, default: true] },
-            set: { self.historicalExpanded[key] = $0 }
+            set: { 
+                self.historicalExpanded[key] = $0
+                DispatchQueue.main.async {
+                    if let encoded = try? JSONEncoder().encode(self.historicalExpanded) {
+                        UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
+                    }
+                }
+            }
         )
-    }
-
-    private var isPortrait: Bool {
-        UIDevice.current.orientation.isPortrait ||
-        UIDevice.current.orientation == .unknown ||
-        (UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.interfaceOrientation.isPortrait ?? true)
     }
 
     var body: some View {
@@ -69,219 +58,92 @@ struct ContentView: View {
         let pinnedNotes = filteredNotes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
 
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            ZStack {
-                List(selection: $selectedCompositeID) {
-                    if !searchText.isEmpty {
-                        if filteredNotes.isEmpty {
-                            Section {
-                                Text("No notes found matching \"​\(searchText)\"")
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 20)
-                            }
-                        } else {
-                            Section(header: Text("Search Results")) {
-                                ForEach(filteredNotes) { note in
-                                    NoteRow(note: note)
-                                        .tag("search-\(note.id)")
-                                }
-                            }
+            List(selection: $selectedCompositeID) {
+                if !searchText.isEmpty {
+                    // Search results
+                    Section(header: Text("Search Results")) {
+                        ForEach(filteredNotes) { note in
+                            NoteRow(note: note)
+                                .tag("search-\(note.id)")
                         }
-                    } else {
-                        if pinnedVisible && !pinnedNotes.isEmpty {
-                            Section(isExpanded: $pinnedExpanded) {
-                                ForEach(pinnedNotes) { note in
-                                    NoteRow(note: note)
-                                        .tag("pinned-\(note.id)")
-                                }
-                            } header: {
-                                Label("Pinned", systemImage: "pin.fill")
+                    }
+                } else {
+                    // Pinned notes
+                    if pinnedVisible && !pinnedNotes.isEmpty {
+                        Section(isExpanded: $pinnedExpanded) {
+                            ForEach(pinnedNotes) { note in
+                                NoteRow(note: note)
+                                    .tag("pinned-\(note.id)")
                             }
+                        } header: {
+                            Label("Pinned", systemImage: "pin.fill")
                         }
+                    }
 
-                        if recentsVisible && !recentNotes.isEmpty {
-                            Section(isExpanded: $recentsExpanded) {
-                                ForEach(recentNotes) { note in
-                                    NoteRow(note: note)
-                                        .tag("recents-\(note.id)")
-                                }
-                            } header: {
-                                Label("Recents", systemImage: "clock.fill")
+                    // Recent notes
+                    if recentsVisible && !recentNotes.isEmpty {
+                        Section(isExpanded: $recentsExpanded) {
+                            ForEach(recentNotes) { note in
+                                NoteRow(note: note)
+                                    .tag("recents-\(note.id)")
                             }
+                        } header: {
+                            Label("Recents", systemImage: "clock.fill")
                         }
+                    }
 
-                        if historyVisible {
-                            Section(isExpanded: $historyExpanded) {
-                                ForEach(sortedDays, id: \.self) { day in
-                                    Section(isExpanded: binding(for: day)) {
-                                        ForEach(groupedNotes[day] ?? []) { note in
-                                            NoteRow(note: note)
+                    // History
+                    if historyVisible {
+                        Section(isExpanded: $historyExpanded) {
+                            ForEach(sortedDays, id: \.self) { day in
+                                Section(isExpanded: binding(for: day)) {
+                                    ForEach(groupedNotes[day] ?? []) { note in
+                                        NoteRow(note: note)
                                             .tag("history-\(note.id)")
-                                        }
-                                    } header: {
-                                        HStack {
-                                            Text(day.formattedDate())
-                                            Spacer()
-                                            Text(day.relativeDate())
-                                                .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
-                                                .foregroundStyle(.secondary)
-                                        }
                                     }
-                                }
-                            } header: {
-                                Label("History", systemImage: "calendar")
-                            }
-                        }
-                    }
-                }
-                .animation(.default, value: pinnedExpanded)
-                .animation(.default, value: recentsExpanded)
-                .animation(.default, value: historyExpanded)
-                .animation(.default, value: historicalExpanded)
-                .animation(.default, value: pinnedVisible)
-                .animation(.default, value: recentsVisible)
-                .animation(.default, value: historyVisible)
-                .navigationTitle("Notes2")
-                .searchable(text: $searchText, placement: .automatic, prompt: "Search notes...")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            let newNote = Note()
-                            context.insert(newNote)
-                            selectedNoteID = newNote.id
-                            selectedCompositeID = "recents-\(newNote.id)"
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus")
-                                Text("New note")
-                            }
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Menu {
-                            if UIDevice.current.userInterfaceIdiom == .pad {
-                                Toggle("Collapse sidebar in landscape", isOn: $collapseSidebarInLandscape)
-                                Toggle("Collapse sidebar in portrait", isOn: $collapseSidebarInPortrait)
-                                Divider()
-                            }
-                            Toggle("Show pinned section", isOn: Binding(
-                                get: { pinnedVisible },
-                                set: { newValue in
-                                    if !newValue {
-                                        let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
-                                        if visibleCount <= 1 {
-                                            return // Don't allow hiding the last visible section
-                                        }
-                                    }
-                                    pinnedVisible = newValue
-                                }
-                            ))
-                            Toggle("Show recents section", isOn: Binding(
-                                get: { recentsVisible },
-                                set: { newValue in
-                                    if !newValue {
-                                        let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
-                                        if visibleCount <= 1 {
-                                            return // Don't allow hiding the last visible section
-                                        }
-                                    }
-                                    recentsVisible = newValue
-                                }
-                            ))
-                            Toggle("Show history section", isOn: Binding(
-                                get: { historyVisible },
-                                set: { newValue in
-                                    if !newValue {
-                                        let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
-                                        if visibleCount <= 1 {
-                                            return // Don't allow hiding the last visible section
-                                        }
-                                    }
-                                    historyVisible = newValue
-                                }
-                            ))
-                            Divider()
-                            Toggle("Magnetic scrolling", isOn: Binding(
-                                get: { AppSettings.shared.magneticScrollingEnabled },
-                                set: { AppSettings.shared.magneticScrollingEnabled = $0 }
-                            ))
-                            Toggle("New notes start with big font", isOn: $newNoteWithBigFont)
-                            Toggle("Drag to reorder paragraph (WIP)", isOn: Binding(
-                                get: { AppSettings.shared.dragToReorderParagraphEnabled },
-                                set: { AppSettings.shared.dragToReorderParagraphEnabled = $0 }
-                            ))
-                        } label: {
-                            Image(systemName: "gear")
-                        }
-                    }
-                }
-                .onChange(of: historicalExpanded) { oldValue, newValue in
-                    if let encoded = try? JSONEncoder().encode(newValue) {
-                        UserDefaults.standard.set(encoded, forKey: "historicalExpanded")
-                    }
-                }
-                .onAppear {
-                    guard !hasRestoredLastOpenedNote else { return }
-                    hasRestoredLastOpenedNote = true
-
-                    if let idString = UserDefaults.standard.string(forKey: "lastOpenedNoteID"),
-                       let uuid = UUID(uuidString: idString),
-                       let note = notes.first(where: { $0.id == uuid }) {
-                        selectedNoteID = note.id
-
-                        // Set the composite selection ID based on which section the note is in
-                        if pinnedNotes.contains(where: { $0.id == uuid }) {
-                            selectedCompositeID = "pinned-\(uuid)"
-                        } else if recentNotes.contains(where: { $0.id == uuid }) {
-                            selectedCompositeID = "recents-\(uuid)"
-                        } else {
-                            selectedCompositeID = "history-\(uuid)"
-                        }
-                    }
-
-                    if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
-                        if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
-                            self.historicalExpanded = decoded
-                        }
-                    }
-                }
-                .overlay {
-                    if isListDragging {
-                        LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: recentNotes.first?.firstLine ?? "untitled")
-                    }
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 25, coordinateSpace: .global)
-                        .onChanged { value in
-                            // Only activate if the drag starts from the right edge of the screen
-                            if value.startLocation.x > UIScreen.main.bounds.width - 50 {
-                                // Set the location first
-                                listDragOffset = value.translation
-                                listDragLocation = value.location
-
-                                // Then animate the appearance if it's not already visible
-                                if !isListDragging {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        isListDragging = true
+                                } header: {
+                                    HStack {
+                                        Text(day.formattedDate())
+                                        Spacer()
+                                        Text(day.relativeDate())
+                                            .fontWeight(day.relativeDate() == "Today" ? .bold : .regular)
+                                            .foregroundStyle(.secondary)
                                     }
                                 }
                             }
+                        } header: {
+                            Label("History", systemImage: "calendar")
                         }
-                        .onEnded { value in
-                            if isListDragging, value.translation.width < -100 { // Swipe left
-                                if let lastEdited = recentNotes.first {
-                                    selectedNoteID = lastEdited.id
-                                }
-                            }
-                            // Reset drag state
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isListDragging = false
-                            }
-                            listDragOffset = .zero
-                            listDragLocation = .zero
-                        }
-                )
+                    }
+                }
             }
+            .navigationTitle("Notes")
+            .searchable(text: $searchText, placement: .automatic, prompt: "Search notes...")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        createNewNote()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    settingsButton()
+                }
+            }
+            .onAppear {
+                handleAppLaunch()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                UserDefaults.standard.set(Date(), forKey: "lastForegroundDate")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                UserDefaults.standard.set(Date(), forKey: "lastForegroundDate")
+            }
+            .animation(.default, value: searchText)
+            .animation(.default, value: pinnedVisible)
+            .animation(.default, value: recentsVisible)
+            .animation(.default, value: historyVisible)
         } detail: {
             if let selectedNoteID {
                 if let note = notes.first(where: { $0.id == selectedNoteID }) {
@@ -289,7 +151,7 @@ struct ContentView: View {
                         .id(selectedNoteID)
                         .environment(\.modelContext, context)
                 } else {
-                    Text("Loading note...")
+                    Text("Note not found")
                         .foregroundStyle(.secondary)
                 }
             } else {
@@ -297,65 +159,213 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .onChange(of: selectedCompositeID) { oldValue, newValue in
+            handleCompositeSelection(newValue)
+        }
         .onChange(of: selectedNoteID) { oldValue, newValue in
             if newValue != nil && horizontalSizeClass == .compact {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    columnVisibility = .detailOnly
-                }
+                columnVisibility = .detailOnly
             }
         }
-        .onChange(of: selectedCompositeID) { oldValue, newValue in
-            // Extract the actual note ID from composite identifier
-            if let compositeID = newValue {
-                let parts = compositeID.split(separator: "-", maxSplits: 1)
-                if parts.count > 1, let noteID = UUID(uuidString: String(parts[1])) {
-                    selectedNoteID = noteID
-                }
-            } else {
-                selectedNoteID = nil
-            }
-        }
-        .onChange(of: selectedNoteID) { oldValue, newValue in
-            if newValue != nil {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    if UIDevice.current.userInterfaceIdiom == .pad {
-                        if (isPortrait && collapseSidebarInPortrait) || (!isPortrait && collapseSidebarInLandscape) {
-                            columnVisibility = .detailOnly
-                        }
-                    }
-                }
-            } else {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    if UIDevice.current.userInterfaceIdiom == .pad {
-                        columnVisibility = .automatic
-                    }
-                }
-            }
+    }
+    
+    private func createNewNote() {
+        let newNote = Note()
+        context.insert(newNote)
+        selectedNoteID = newNote.id
+        selectedCompositeID = "recents-\(newNote.id)"
+    }
+    
+    private func handleAppLaunch() {
+        guard !hasRestoredLastOpenedNote else { return }
+        hasRestoredLastOpenedNote = true
 
-            // Trigger reflow when note selection changes
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(
-                    name: .sidebarStateChanged,
-                    object: nil,
-                    userInfo: ["trigger": "noteSelectionChanged"]
-                )
+        // Track app foregrounding
+        UserDefaults.standard.set(Date(), forKey: "lastForegroundDate")
+
+        let recentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
+        let decision = determineFreshNoteCreation(notes: notes, recentNotes: Array(recentNotes))
+        
+        if decision.createNew {
+            let note = decision.reuseExisting ? decision.existingNote! : Note()
+            if !decision.reuseExisting {
+                context.insert(note)
+            } else {
+                note.updatedAt = Date()
+            }
+            selectedNoteID = note.id
+            selectedCompositeID = "recents-\(note.id)"
+        } else if let idString = UserDefaults.standard.string(forKey: "lastOpenedNoteID"),
+                  let uuid = UUID(uuidString: idString),
+                  let note = notes.first(where: { $0.id == uuid }) {
+            selectedNoteID = note.id
+            let allPinnedNotes = notes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
+            let allRecentNotes = notes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
+            
+            if allPinnedNotes.contains(where: { $0.id == uuid }) {
+                selectedCompositeID = "pinned-\(uuid)"
+            } else if allRecentNotes.contains(where: { $0.id == uuid }) {
+                selectedCompositeID = "recents-\(uuid)"
+            } else {
+                selectedCompositeID = "history-\(uuid)"
             }
         }
-        .onChange(of: columnVisibility) { oldValue, newValue in
-            // Broadcast sidebar state change for text reflow
-            NotificationCenter.default.post(
-                name: .sidebarStateChanged,
-                object: nil,
-                userInfo: ["visibility": newValue, "oldValue": oldValue]
-            )
+
+        if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
+            if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
+                self.historicalExpanded = decoded
+            }
+        }
+    }
+    
+    private func handleCompositeSelection(_ compositeID: String?) {
+        guard let compositeID = compositeID else {
+            selectedNoteID = nil
+            return
+        }
+        
+        let parts = compositeID.split(separator: "-", maxSplits: 1)
+        if parts.count > 1, let noteID = UUID(uuidString: String(parts[1])) {
+            selectedNoteID = noteID
+        }
+    }
+    
+    // MARK: - Fresh Note System
+    
+    private struct FreshNoteDecision {
+        let createNew: Bool
+        let reuseExisting: Bool
+        let existingNote: Note?
+    }
+    
+    private func determineFreshNoteCreation(notes: [Note], recentNotes: [Note]) -> FreshNoteDecision {
+        // Check if always create new is enabled
+        if UserDefaults.standard.bool(forKey: "alwaysCreateNewNote") {
+            return FreshNoteDecision(createNew: true, reuseExisting: false, existingNote: nil)
+        }
+        
+        // Check time boundary
+        guard let lastForegroundDate = UserDefaults.standard.object(forKey: "lastForegroundDate") as? Date else {
+            return FreshNoteDecision(createNew: false, reuseExisting: false, existingNote: nil)
+        }
+        
+        let thresholdHours = UserDefaults.standard.double(forKey: "freshNoteThresholdHours")
+        let boundaryDate = Calendar.current.date(byAdding: .hour, value: -Int(thresholdHours), to: Date()) ?? Date()
+        
+        if lastForegroundDate > boundaryDate {
+            return FreshNoteDecision(createNew: false, reuseExisting: false, existingNote: nil)
+        }
+        
+        // Check if we should reuse an empty note
+        if let mostRecent = recentNotes.first, isNoteEmpty(mostRecent) {
+            return FreshNoteDecision(createNew: true, reuseExisting: true, existingNote: mostRecent)
+        }
+        
+        return FreshNoteDecision(createNew: true, reuseExisting: false, existingNote: nil)
+    }
+    
+    private func isNoteEmpty(_ note: Note) -> Bool {
+        let content = note.plain.trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.isEmpty
+    }
+    
+    // MARK: - Settings
+    
+    private func settingsButton() -> some View {
+        NavigationLink {
+            SettingsView()
+        } label: {
+            Image(systemName: "gear")
         }
     }
 }
 
-#Preview {
-    ContentView()
+// MARK: - Settings View
+
+struct SettingsView: View {
+    @AppStorage("alwaysCreateNewNote") private var alwaysCreateNewNote = false
+    @AppStorage("freshNoteThresholdHours") private var freshNoteThresholdHours = 4.0
+    @AppStorage("magneticScrollingEnabled") private var magneticScrollingEnabled = true
+    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
+    @AppStorage("dragToReorderParagraphEnabled") private var dragToReorderParagraphEnabled = false
+    @AppStorage("recentsVisible") private var recentsVisible = true
+    @AppStorage("historyVisible") private var historyVisible = true
+    @AppStorage("pinnedVisible") private var pinnedVisible = true
+    @AppStorage("collapseSidebarInLandscape") private var collapseSidebarInLandscape = false
+    @AppStorage("collapseSidebarInPortrait") private var collapseSidebarInPortrait = true
+    
+    var body: some View {
+        Form {
+            Section(header: Text("Fresh Note Creation")) {
+                Toggle("Always create new note", isOn: $alwaysCreateNewNote)
+                
+                if !alwaysCreateNewNote {
+                    Stepper("Create new note after: \(Int(freshNoteThresholdHours)) hours", 
+                           value: $freshNoteThresholdHours, in: 1...24, step: 1.0)
+                }
+            }
+            
+            Section(header: Text("Sections")) {
+                Toggle("Show pinned section", isOn: Binding(
+                    get: { pinnedVisible },
+                    set: { newValue in
+                        if !newValue {
+                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                            if visibleCount <= 1 {
+                                return
+                            }
+                        }
+                        pinnedVisible = newValue
+                    }
+                ))
+                Toggle("Show recents section", isOn: Binding(
+                    get: { recentsVisible },
+                    set: { newValue in
+                        if !newValue {
+                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                            if visibleCount <= 1 {
+                                return
+                            }
+                        }
+                        recentsVisible = newValue
+                    }
+                ))
+                Toggle("Show history section", isOn: Binding(
+                    get: { historyVisible },
+                    set: { newValue in
+                        if !newValue {
+                            let visibleCount = [pinnedVisible, recentsVisible, historyVisible].map { $0 ? 1 : 0 }.reduce(0, +)
+                            if visibleCount <= 1 {
+                                return
+                            }
+                        }
+                        historyVisible = newValue
+                    }
+                ))
+            }
+            
+            Section(header: Text("Editor")) {
+                Toggle("Magnetic scrolling", isOn: $magneticScrollingEnabled)
+                Toggle("New notes start with big font", isOn: $newNoteWithBigFont)
+                Toggle("Drag to reorder paragraph (WIP)", isOn: $dragToReorderParagraphEnabled)
+            }
+            
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                Section(header: Text("Sidebar")) {
+                    Toggle("Collapse sidebar in landscape", isOn: $collapseSidebarInLandscape)
+                    Toggle("Collapse sidebar in portrait", isOn: $collapseSidebarInPortrait)
+                }
+            }
+        }
+        .navigationTitle("Settings")
+    }
 }
+
 
 extension Notification.Name {
     static let sidebarStateChanged = Notification.Name("SidebarStateChangedNotification")
+}
+
+#Preview {
+    ContentView()
 }

@@ -37,6 +37,14 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(dragToReorderParagraphEnabled, forKey: "dragToReorderParagraphEnabled") }
     }
 
+    @Published var freshNoteThresholdHours: Int {
+        didSet { UserDefaults.standard.set(freshNoteThresholdHours, forKey: "freshNoteThresholdHours") }
+    }
+
+    @Published var alwaysCreateNewNote: Bool {
+        didSet { UserDefaults.standard.set(alwaysCreateNewNote, forKey: "alwaysCreateNewNote") }
+    }
+
     private init() {
         let spacing = UserDefaults.standard.double(forKey: "defaultParagraphSpacing")
         self.defaultParagraphSpacing = spacing == 0 ? AppSettings.unrelatedParagraphSpacing : spacing
@@ -49,5 +57,10 @@ class AppSettings: ObservableObject {
 
         self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? false
         self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false
+        
+        let threshold = UserDefaults.standard.integer(forKey: "freshNoteThresholdHours")
+        self.freshNoteThresholdHours = threshold == 0 ? 6 : threshold
+        
+        self.alwaysCreateNewNote = UserDefaults.standard.bool(forKey: "alwaysCreateNewNote")
     }
 }
