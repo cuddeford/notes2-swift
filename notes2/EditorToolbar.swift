@@ -42,7 +42,7 @@ struct EditorToolbar: View {
 
                     HStack {
                         Button(action: { buttonAction(action: onTitle1) }) {
-                            Text("size")
+                            Text("Size")
                                 .padding(.vertical, -10)
                                 .bold()
                                 .padding(16)
