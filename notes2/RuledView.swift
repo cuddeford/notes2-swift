@@ -438,7 +438,11 @@ class RuledView: UIView {
     private func colors(for detent: CGFloat? = nil, isPinched: Bool = false) -> (fill: UIColor, stroke: UIColor) {
         guard isPinched else {
             // Default color for all non-pinched paragraphs
-            return (UIColor.label.withAlphaComponent(0.05), UIColor.clear)
+            let userInterfaceStyle = traitCollection.userInterfaceStyle
+            if userInterfaceStyle == .dark {
+                return (UIColor.label.withAlphaComponent(0.12), UIColor.clear)
+            }
+            return (UIColor.label.withAlphaComponent(0.07), UIColor.clear)
         }
 
         // Dynamic colors for pinched paragraphs based on their relationship
