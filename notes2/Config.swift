@@ -14,6 +14,7 @@ class AppSettings: ObservableObject {
     // The two detents for paragraph spacing
     static let relatedParagraphSpacing: CGFloat = 32
     static let unrelatedParagraphSpacing: CGFloat = 250
+    static let titleFontSizeModifier: CGFloat = 0
 
     static let showRuledLines = false
 

@@ -20,7 +20,8 @@ extension UIFont {
         case .body:
             baseFont = UIFont.preferredFont(forTextStyle: .body)
         case .title1:
-            baseFont = UIFont.preferredFont(forTextStyle: .title1)
+            let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .title1)
+            baseFont = UIFont(descriptor: baseDescriptor, size: baseDescriptor.pointSize + AppSettings.titleFontSizeModifier)
         case .title2:
             baseFont = UIFont.preferredFont(forTextStyle: .title2)
         }
