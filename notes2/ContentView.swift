@@ -66,7 +66,7 @@ struct ContentView: View {
         let sortedDays = groupedNotes.keys.sorted(by: >)
 
         let recentNotes = filteredNotes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
-        let pinnedNotes = filteredNotes.filter { $0.isPinned }.sorted(by: { $0.updatedAt > $1.updatedAt })
+        let pinnedNotes = filteredNotes.filter { $0.isPinned }.sorted(by: { $0.pinnedAt ?? Date.distantPast > $1.pinnedAt ?? Date.distantPast })
 
         NavigationSplitView(columnVisibility: $columnVisibility) {
             ZStack {

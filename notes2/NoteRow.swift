@@ -17,6 +17,11 @@ struct NoteRow: View {
         .swipeActions(edge: .leading) {
             Button {
                 note.isPinned.toggle()
+                if note.isPinned {
+                    note.pinnedAt = Date()
+                } else {
+                    note.pinnedAt = nil
+                }
                 let impactMed = UIImpactFeedbackGenerator(style: .heavy)
                 impactMed.impactOccurred()
             } label: {

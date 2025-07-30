@@ -18,14 +18,16 @@ class Note: Identifiable, Hashable {
     var updatedAt: Date = Date()
     var cursorLocation: Int = 0
     var isPinned: Bool = false
+    var pinnedAt: Date?
 
-    init(id: UUID = UUID(), content: Data = Data(), createdAt: Date = Date(), updatedAt: Date = Date(), cursorLocation: Int = 0, isPinned: Bool = false) {
+    init(id: UUID = UUID(), content: Data = Data(), createdAt: Date = Date(), updatedAt: Date = Date(), cursorLocation: Int = 0, isPinned: Bool = false, pinnedAt: Date? = nil) {
         self.id = id
         self.content = content
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.cursorLocation = cursorLocation
         self.isPinned = isPinned
+        self.pinnedAt = pinnedAt
     }
 
     static func == (lhs: Note, rhs: Note) -> Bool { lhs.id == rhs.id }
