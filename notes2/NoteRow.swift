@@ -10,9 +10,16 @@ struct NoteRow: View {
                 .font(.headline)
                 .italic(note.firstLine.isEmpty)
                 .opacity(note.firstLine.isEmpty ? 0.5 : 1)
-            Text("\(note.createdAt.relativeDate()) at \(note.createdAt, style: .time)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 5) {
+                if note.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+                Text("\(note.createdAt.relativeDate()) at \(note.createdAt, style: .time)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .swipeActions(edge: .leading) {
             Button {

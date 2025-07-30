@@ -1,0 +1,52 @@
+I can see the issue. You're using .toolbar(.hidden, for: .navigationBar) on line 175, but this can
+cause layout issues during the swipe-back gesture. The problem is that hiding the navigation bar
+changes the safe area insets, which can cause the underlying list view to recalculate its layout
+incorrectly.
+
+Here's a better approach using UINavigationController appearance APIs to properly hide the
+navigation bar without affecting the layout:
+
+Solution 1: Use toolbar visibility with safe area preservation
+
+Replace your current .toolbar(...) line (line 175) with:
+
+.navigationBarHidden(UIDevice.current.userInterfaceIdiom == .phone)
+.navigationBarBackButtonHidden(UIDevice.current.userInterfaceIdiom == .phone)
+
+Solution 2: Use a more sophisticated approach with navigation bar appearance
+
+If the above doesn't work perfectly, use this more sophisticated approach by adding these modifiers
+to your NoteView:
+
+.onAppear {
+    if UIDevice.current.userInterfaceIdiom == .phone {
+        // Hide navigation bar with animation
+        withAnimation(.easeInOut(duration: 0.2)) {
+            UINavigationBar.appearance().isHidden = true
+        }
+    }
+}
+.onDisappear {
+    if UIDevice.current.userInterfaceIdiom == .phone {
+        // Restore navigation bar
+        withAnimation(.easeInOut(duration: 0.2)) {
+            UINavigationBar.appearance().isHidden = false
+        }
+    }
+}
+
+And remove the .toolbar(...) line entirely.
+
+Solution 3: Use safe area ignoring with manual offset (most reliable)
+
+This approach keeps the navigation bar hidden but preserves the safe area:
+
+.ignoresSafeArea(.container, edges: .top)
+.navigationBarHidden(UIDevice.current.userInterfaceIdiom == .phone)
+
+The key insight is that .toolbar(.hidden, for: .navigationBar) is too aggressive and removes the
+navigation bar from the view hierarchy entirely, which causes layout recalculation issues. Using
+.navigationBarHidden(true) keeps the navigation bar in the hierarchy but just hides it visually,
+preventing the layout issues you're experiencing.
+
+Try Solution 1 first as it's the cleanest SwiftUI-native approach.
