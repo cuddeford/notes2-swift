@@ -116,7 +116,7 @@ struct ContentView: View {
                                     Section(isExpanded: binding(for: day)) {
                                         ForEach(groupedNotes[day] ?? []) { note in
                                             NoteRow(note: note)
-                                            .tag("history-\(note.id)")
+                                                .tag("history-\(note.id)")
                                         }
                                     } header: {
                                         HStack {
