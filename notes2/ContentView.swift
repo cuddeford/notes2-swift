@@ -211,7 +211,10 @@ struct ContentView: View {
                                 set: { AppSettings.shared.dragToReorderParagraphEnabled = $0 }
                             ))
                         } label: {
-                            Image(systemName: "gear")
+                            HStack {
+                                Image(systemName: "gear")
+                                Text("Settings")
+                            }
                         }
                     }
                 }
