@@ -294,7 +294,7 @@ struct ContentView: View {
                         .id(selectedNoteID)
                         .environment(\.modelContext, context)
                 } else {
-                    Text("Loading note...")
+                    Text("Select a note")
                         .foregroundStyle(.secondary)
                 }
             } else {
