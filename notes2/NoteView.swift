@@ -172,7 +172,6 @@ struct NoteView: View {
                 }
         )
         .toolbar(UIDevice.current.userInterfaceIdiom == .phone ? .hidden : .visible, for: .navigationBar)
-        .navigationBarTitle("")
         .ignoresSafeArea()
         .overlay(
             EditorToolbarOverlay(
