@@ -37,26 +37,25 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationView {
-            let filteredNotes = searchText.isEmpty ? notes : notes.filter { note in
-                let searchLower = searchText.lowercased()
-                return note.firstLine.lowercased().localizedCaseInsensitiveContains(searchLower) ||
-                       note.plain.lowercased().localizedCaseInsensitiveContains(searchLower)
-            }
+        let filteredNotes = searchText.isEmpty ? notes : notes.filter { note in
+            let searchLower = searchText.lowercased()
+            return note.firstLine.lowercased().localizedCaseInsensitiveContains(searchLower) ||
+                   note.plain.lowercased().localizedCaseInsensitiveContains(searchLower)
+        }
+        let recentNotes = filteredNotes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
 
+        return NavigationView {
             let groupedNotes = Dictionary(grouping: filteredNotes) { note in
                 Calendar.current.startOfDay(for: note.createdAt)
             }
             let sortedDays = groupedNotes.keys.sorted(by: >)
-
-            let recentNotes = filteredNotes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
             let pinnedNotes = filteredNotes.filter { $0.isPinned }.sorted(by: { $0.pinnedAt ?? Date.distantPast > $1.pinnedAt ?? Date.distantPast })
 
             List {
                 if !searchText.isEmpty {
                     if filteredNotes.isEmpty {
                         Section {
-                            Text("No notes found matching \"\u{200b}\(searchText)\"")
+                            Text("No notes found matching \u{200b}\(searchText)")
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 20)
@@ -195,6 +194,43 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay {
+            if isListDragging {
+                let isUntitled = recentNotes.first?.firstLine.isEmpty ?? true
+                LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: isUntitled ? "untitled" : recentNotes.first!.firstLine, isUntitled: isUntitled)
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 25, coordinateSpace: .global)
+                .onChanged { value in
+                    // Only activate if the drag starts from the right edge of the screen
+                    if value.startLocation.x > UIScreen.main.bounds.width - 50 {
+                        // Set the location first
+                        listDragOffset = value.translation
+                        listDragLocation = value.location
+
+                        // Then animate the appearance if it's not already visible
+                        if !isListDragging {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isListDragging = true
+                            }
+                        }
+                    }
+                }
+                .onEnded { value in
+                    if isListDragging, value.translation.width < -100 { // Swipe left
+                        if let lastEdited = recentNotes.first {
+                            selectedNoteID = lastEdited.id
+                        }
+                    }
+                    // Reset drag state
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isListDragging = false
+                    }
+                    listDragOffset = .zero
+                    listDragLocation = .zero
+                }
+        )
     }
 }
 
