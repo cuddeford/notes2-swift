@@ -150,6 +150,37 @@ struct NoteView: View {
                 Spacer()
             }
         }
+        .gesture(
+            DragGesture(minimumDistance: 25, coordinateSpace: .global)
+                .onChanged { value in
+                    // Only activate if the drag starts from the right edge of the screen
+                    if value.startLocation.x > UIScreen.main.bounds.width - 50 {
+                        // Set the location first
+                        dragOffset = value.translation
+                        dragLocation = value.location
+
+                        // Then animate the appearance if it's not already visible
+                        if !isDragging {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isDragging = true
+                            }
+                        }
+                    }
+                }
+                .onEnded { value in
+                    if isDragging, value.translation.width < -100 { // Swipe left
+                        let newNote = Note()
+                        context.insert(newNote)
+                        selectedNoteID = newNote.id
+                    }
+                    // Reset drag state
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isDragging = false
+                    }
+                    dragOffset = .zero
+                    dragLocation = .zero
+                }
+        )
         .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea()
         .overlay(
