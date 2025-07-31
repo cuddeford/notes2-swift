@@ -21,6 +21,9 @@ struct NoteRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .swipeActions(edge: .leading) {
             Button {
                 note.isPinned.toggle()
