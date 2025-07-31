@@ -13,6 +13,7 @@ struct NoteView: View {
     @Bindable var note: Note
     @Binding var selectedNoteID: UUID?
     @Environment(\.modelContext) private var context: ModelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var noteText: NSAttributedString
     @State private var selectedRange = NSRange(location: 0, length: 0)
@@ -25,6 +26,7 @@ struct NoteView: View {
     @State private var isDragging = false
     @State private var isAtBottom = true
     @State private var canScroll = false
+    @State private var isStatusBarHidden = false
 
     static private func noteTextStyle(for aFont: UIFont) -> NoteTextStyle {
         let title1Size = UIFont.preferredFont(forTextStyle: .title1).pointSize
@@ -136,6 +138,21 @@ struct NoteView: View {
             if isDragging {
                 NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
             }
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.gray)
+                            .padding()
+                            .opacity(0.5)
+                    }
+                    .padding(.trailing, 15)
+                }
+                Spacer()
+            }
         }
         .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea()
@@ -155,10 +172,13 @@ struct NoteView: View {
             )
         )
         .onAppear {
+            isStatusBarHidden = true
             UserDefaults.standard.set(note.id.uuidString, forKey: "lastOpenedNoteID")
         }
         .onDisappear {
+            isStatusBarHidden = false
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
         }
+        .statusBar(hidden: isStatusBarHidden)
     }
 }

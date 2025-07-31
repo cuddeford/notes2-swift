@@ -169,7 +169,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .sheet(item: $selectedNoteID) { noteID in
+            .fullScreenCover(item: $selectedNoteID) { noteID in
                 if let note = notes.first(where: { $0.id == noteID }) {
                     NoteView(note: note, selectedNoteID: $selectedNoteID)
                 }
