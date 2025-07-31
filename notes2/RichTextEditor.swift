@@ -51,7 +51,7 @@ struct RichTextEditor: UIViewRepresentable {
         textView.allowsEditingTextAttributes = true
 
         // Use a hosting controller to bridge SwiftUI modifiers to the UIKit view
-        let hostingController = UIHostingController(rootView: 
+        let hostingController = UIHostingController(rootView:
             Color.clear
             .onFirstAppear {
                 context.coordinator.parseAttributedText(textView.attributedText)
@@ -948,9 +948,7 @@ struct RichTextEditor: UIViewRepresentable {
             let maxOffset = max(0, contentHeight - textView.bounds.height + textView.adjustedContentInset.bottom)
             let bottomOffset = CGPoint(x: 0, y: maxOffset)
 
-            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
-                textView.setContentOffset(bottomOffset, animated: false)
-            }, completion: nil)
+            textView.setContentOffset(bottomOffset, animated: true)
         }
 
         private func animateNewParagraphSpacing(cursorLocation: Int) {

@@ -17,7 +17,7 @@ struct NoteView: View {
 
     @State private var noteText: NSAttributedString
     @State private var selectedRange = NSRange(location: 0, length: 0)
-    @State private var editorCoordinator: RichTextEditor.Coordinator?
+    @StateObject private var coordinatorHolder = CoordinatorHolder()
     @StateObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
 
@@ -109,7 +109,7 @@ struct NoteView: View {
                 note: note,
                 keyboard: keyboard,
                 onCoordinatorReady: { coordinator in
-                    self.editorCoordinator = coordinator
+                    coordinatorHolder.coordinator = coordinator
                 },
                 isAtBottom: $isAtBottom,
                 canScroll: $canScroll
@@ -123,9 +123,9 @@ struct NoteView: View {
                     note.updatedAt = Date()
                 }
                 // Re-parse and update spatial properties when noteText changes
-                editorCoordinator?.parseAttributedText(newValue)
+                coordinatorHolder.coordinator?.parseAttributedText(newValue)
             }
-            .onChange(of: editorCoordinator?.paragraphs) { oldParagraphs, newParagraphs in
+            .onChange(of: coordinatorHolder.coordinator?.paragraphs) { oldParagraphs, newParagraphs in
                 // Handle changes in paragraphs, e.g., update UI based on spatial properties
                 // print("Paragraphs changed: \(newParagraphs?.count ?? 0) paragraphs")
                 // You can now access newParagraphs[i].height, newParagraphs[i].screenPosition, etc.
@@ -187,13 +187,15 @@ struct NoteView: View {
             EditorToolbarOverlay(
                 keyboard: keyboard,
                 settings: settings,
-                onBold: { editorCoordinator?.toggleAttribute(.bold) },
-                onItalic: { editorCoordinator?.toggleAttribute(.italic) },
-                onUnderline: { editorCoordinator?.toggleAttribute(.underline) },
-                onTitle1: { editorCoordinator?.toggleAttribute(.title1) },
-                onTitle2: { editorCoordinator?.toggleAttribute(.title2) },
-                onBody: { editorCoordinator?.toggleAttribute(.body) },
-                onScrollToBottom: { editorCoordinator?.scrollToBottom() },
+                onBold: { coordinatorHolder.coordinator?.toggleAttribute(.bold) },
+                onItalic: { coordinatorHolder.coordinator?.toggleAttribute(.italic) },
+                onUnderline: { coordinatorHolder.coordinator?.toggleAttribute(.underline) },
+                onTitle1: { coordinatorHolder.coordinator?.toggleAttribute(.title1) },
+                onTitle2: { coordinatorHolder.coordinator?.toggleAttribute(.title2) },
+                onBody: { coordinatorHolder.coordinator?.toggleAttribute(.body) },
+                onScrollToBottom: {
+                    coordinatorHolder.coordinator?.scrollToBottom()
+                },
                 isAtBottom: isAtBottom,
                 canScroll: canScroll
             )
