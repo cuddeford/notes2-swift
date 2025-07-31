@@ -50,6 +50,19 @@ struct RichTextEditor: UIViewRepresentable {
         textView.coordinator = context.coordinator
         textView.allowsEditingTextAttributes = true
 
+        // Use a hosting controller to bridge SwiftUI modifiers to the UIKit view
+        let hostingController = UIHostingController(rootView: 
+            Color.clear
+            .onFirstAppear {
+                context.coordinator.parseAttributedText(textView.attributedText)
+            }
+        )
+        hostingController.view.frame = textView.bounds
+        hostingController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        hostingController.view.backgroundColor = .clear
+        hostingController.view.isUserInteractionEnabled = false // Allow touches to pass through
+        textView.addSubview(hostingController.view)
+
         let ruledView = RuledView(frame: .zero)
         ruledView.textView = textView
         textView.backgroundColor = .clear

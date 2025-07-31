@@ -114,10 +114,6 @@ struct NoteView: View {
                 isAtBottom: $isAtBottom,
                 canScroll: $canScroll
             )
-            .onAppear {
-                // Initial parsing and spatial property update when the view appears
-                editorCoordinator?.parseAttributedText(noteText)
-            }
             .onChange(of: noteText) { oldValue, newValue in
                 if let data = try? newValue.data(
                     from: NSRange(location: 0, length: newValue.length),
