@@ -180,6 +180,14 @@ struct ContentView: View {
                 }
             }
             .onAppear {
+                if !hasRestoredLastOpenedNote {
+                    hasRestoredLastOpenedNote = true
+                    if let idString = UserDefaults.standard.string(forKey: "lastOpenedNoteID"),
+                       let uuid = UUID(uuidString: idString) {
+                        self.selectedNoteID = uuid
+                    }
+                }
+
                 if let data = UserDefaults.standard.data(forKey: "historicalExpanded") {
                     if let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
                         self.historicalExpanded = decoded
