@@ -135,9 +135,12 @@ class RuledView: UIView {
             if index == paragraphs.count - 1 {
                 let lastIsEmpty = paragraph.content.string.isEmpty
                 // force paragraph blocks when single lines, rather than inline
-                var width = textView.textContainer.size.width + overlayPaddingHorizontal
+                var width = textView.textContainer.size.width + overlayPaddingHorizontal + 5.0
                 if paragraphs.indices.contains(index - 1) {
-                    width = textView.layoutManager.boundingRect(forGlyphRange: paragraphs[index - 1].range, in: textView.textContainer).offsetBy(dx: inset.left, dy: inset.top).insetBy(dx: -overlayPaddingHorizontal, dy: -overlayPaddingVertical).width - (lastIsEmpty ? 5.0 : 0)
+                    width = textView.layoutManager
+                        .boundingRect(forGlyphRange: paragraphs[index - 1].range, in: textView.textContainer)
+                        .offsetBy(dx: inset.left, dy: inset.top)
+                        .insetBy(dx: -overlayPaddingHorizontal, dy: -overlayPaddingVertical).width - (lastIsEmpty ? 5.0 : 0)
                 }
 
                 let blockRect = CGRect(
