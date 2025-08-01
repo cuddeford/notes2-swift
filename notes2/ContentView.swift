@@ -11,12 +11,12 @@ struct ContentView: View {
     @Environment(\ .modelContext) private var context
     @Environment(\ .horizontalSizeClass) private var horizontalSizeClass
 
-    @AppStorage("recentsVisible") private var recentsVisible = true
-    @AppStorage("historyVisible") private var historyVisible = true
-    @AppStorage("pinnedVisible") private var pinnedVisible = true
-    @AppStorage("recentsExpanded") private var recentsExpanded = true
-    @AppStorage("historyExpanded") private var historyExpanded = true
-    @AppStorage("pinnedExpanded") private var pinnedExpanded = true
+    @AppStorage("recentsVisible") private var recentsVisible: Bool
+    @AppStorage("historyVisible") private var historyVisible: Bool
+    @AppStorage("pinnedVisible") private var pinnedVisible: Bool
+    @AppStorage("recentsExpanded") private var recentsExpanded: Bool
+    @AppStorage("historyExpanded") private var historyExpanded: Bool
+    @AppStorage("pinnedExpanded") private var pinnedExpanded: Bool
     @State private var historicalExpanded: [String: Bool] = [: ]
     @State private var hasRestoredLastOpenedNote = false
     @State private var selectedNoteID: UUID?

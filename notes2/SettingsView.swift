@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("recentsVisible") private var recentsVisible = true
-    @AppStorage("historyVisible") private var historyVisible = true
-    @AppStorage("pinnedVisible") private var pinnedVisible = true
-    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
+    @AppStorage("recentsVisible") private var recentsVisible: Bool
+    @AppStorage("historyVisible") private var historyVisible: Bool
+    @AppStorage("pinnedVisible") private var pinnedVisible: Bool
+    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont: Bool
 
     var body: some View {
         Form {
