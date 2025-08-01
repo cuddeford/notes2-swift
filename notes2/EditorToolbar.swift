@@ -16,6 +16,7 @@ struct EditorToolbar: View {
     var onBody: () -> Void
     var onDismiss: () -> Void
     var onNewNote: () -> Void
+    var isAtTop: Bool
     @ObservedObject var settings: AppSettings
     @AppStorage("editorToolbarExpanded") private var isExpanded: Bool = true
     @State private var hideTimer: Timer?
@@ -47,7 +48,8 @@ struct EditorToolbar: View {
                     .font(.largeTitle)
                     .foregroundColor(.gray)
                     .padding()
-                    .opacity(0.5)
+                    .opacity(isAtTop ? 0 : 0.5)
+                    .animation(.easeInOut, value: isAtTop)
             }
 
             if isExpanded {

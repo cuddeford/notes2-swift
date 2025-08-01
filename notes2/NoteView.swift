@@ -214,6 +214,7 @@ struct NoteView: View {
                 },
                 isAtBottom: isAtBottom,
                 canScroll: canScroll,
+                isAtTop: isAtTop,
                 onDismiss: {
                     dismiss()
                 },

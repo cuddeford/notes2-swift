@@ -19,6 +19,7 @@ struct EditorToolbarOverlay: View {
     var onScrollToBottom: () -> Void
     var isAtBottom: Bool
     var canScroll: Bool
+    var isAtTop: Bool
     var onDismiss: () -> Void
     var onNewNote: () -> Void
 
@@ -44,7 +45,6 @@ struct EditorToolbarOverlay: View {
     }
 
     var body: some View {
-
         VStack {
             Spacer()
             VStack() {
@@ -65,6 +65,7 @@ struct EditorToolbarOverlay: View {
                         onBody: onBody,
                         onDismiss: onDismiss,
                         onNewNote: onNewNote,
+                        isAtTop: isAtTop,
                         settings: settings,
                     )
                     .transition(.opacity)
