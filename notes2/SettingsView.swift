@@ -19,11 +19,13 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("New Notes Start with Big Font", isOn: $newNoteWithBigFont)
+                Toggle(isOn: $newNoteWithBigFont) {
+                    Text("Text size defaults to: ") + Text(newNoteWithBigFont ? "Big" : "Normal").fontWeight(.bold)
+                }
             } header: {
                Text("Editor")
             } footer: {
-                Text("When enabled, new notes will begin with a larger default font size.")
+                Text("When enabled, new notes will begin with a larger default font size. This can help to make your thoughts feel more immediate.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -33,7 +35,7 @@ struct SettingsView: View {
                     Text("Paragraphs default to: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)
                 }
             } footer: {
-                Text("Controls the default spacing between paragraphs when you create a new note.")
+                Text("Controls the default spacing between paragraphs when you create a new note. Pinch two paragraphs to mark them as related or unrelated.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -41,7 +43,7 @@ struct SettingsView: View {
             Section {
                 Toggle("Enable paragraph overlays", isOn: $settings.paragraphOverlaysEnabled)
             } footer: {
-                Text("Shows visual boundaries around paragraphs. Overlays are always visible during gestures.")
+                Text("Shows visual boundaries around paragraphs, like thought bubbles.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -57,7 +59,7 @@ struct SettingsView: View {
             Section {
                 Toggle("Drag to Reorder Paragraphs", isOn: $settings.dragToReorderParagraphEnabled)
             } footer: {
-                Text("Allows you to reorder paragraphs by long-pressing and dragging them. (Work in Progress)")
+                Text("Reorder paragraphs by long-pressing and dragging them. (Work in Progress)")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
