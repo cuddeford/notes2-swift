@@ -29,6 +29,7 @@ struct SettingsView: View {
                 Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
                 Toggle("New Notes Start with Big Font", isOn: $newNoteWithBigFont)
                 Toggle("Drag to Reorder Paragraphs (WIP)", isOn: $settings.dragToReorderParagraphEnabled)
+                Toggle("Enable paragraph overlays", isOn: $settings.paragraphOverlaysEnabled)
             }
 
             Section(header: Text("Show Sections")) {

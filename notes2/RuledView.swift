@@ -440,6 +440,10 @@ class RuledView: UIView {
 
     private func colors(for detent: CGFloat? = nil, isPinched: Bool = false) -> (fill: UIColor, stroke: UIColor) {
         guard isPinched else {
+            if !AppSettings.shared.paragraphOverlaysEnabled {
+                return (UIColor.clear, UIColor.clear)
+            }
+
             // Default color for all non-pinched paragraphs
             let userInterfaceStyle = traitCollection.userInterfaceStyle
             if userInterfaceStyle == .dark {

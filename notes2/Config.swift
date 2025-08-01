@@ -38,6 +38,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(dragToReorderParagraphEnabled, forKey: "dragToReorderParagraphEnabled") }
     }
 
+    @Published var paragraphOverlaysEnabled: Bool {
+        didSet { UserDefaults.standard.set(paragraphOverlaysEnabled, forKey: "paragraphOverlaysEnabled") }
+    }
+
     static func registerDefaults() {
         let defaults: [String: Any] = [
             "recentsVisible": true,
@@ -46,6 +50,7 @@ class AppSettings: ObservableObject {
             "newNoteWithBigFont": true,
             "magneticScrollingEnabled": true,
             "dragToReorderParagraphEnabled": false,
+            "paragraphOverlaysEnabled": true,
             "defaultParagraphSpacing": unrelatedParagraphSpacing,
             "fontSize": 18.0,
             "padding": 20.0
@@ -65,5 +70,6 @@ class AppSettings: ObservableObject {
 
         self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? false
         self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false
+        self.paragraphOverlaysEnabled = UserDefaults.standard.object(forKey: "paragraphOverlaysEnabled") as? Bool ?? false
     }
 }
