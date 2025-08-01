@@ -18,26 +18,45 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("Editor")) {
+            Section {
                 Toggle(isOn: isDefaultSpacingRelated) {
                     Text("Paragraphs default to: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)
                 }
+            } header: {
+               Text("Editor")
+            } footer: {
                 Text("This controls the default spacing between paragraphs when you create a new note or reset spacing.")
                     .font(.caption)
                     .foregroundColor(.gray)
+            }
+
+            Section {
                 Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
+            } footer: {
                 Text("Enables a feature that snaps the current line to the center of the screen while typing.")
                     .font(.caption)
                     .foregroundColor(.gray)
+            }
+
+            Section {
                 Toggle("New Notes Start with Big Font", isOn: $newNoteWithBigFont)
+            } footer: {
                 Text("When enabled, new notes will begin with a larger default font size.")
                     .font(.caption)
                     .foregroundColor(.gray)
+            }
+
+            Section {
                 Toggle("Drag to Reorder Paragraphs (WIP)", isOn: $settings.dragToReorderParagraphEnabled)
+            } footer: {
                 Text("Allows you to reorder paragraphs by long-pressing and dragging them. (Work in Progress)")
                     .font(.caption)
                     .foregroundColor(.gray)
+            }
+
+            Section {
                 Toggle("Enable paragraph overlays", isOn: $settings.paragraphOverlaysEnabled)
+            } footer: {
                 Text("Shows visual boundaries around paragraphs. Overlays are always visible during gestures.")
                     .font(.caption)
                     .foregroundColor(.gray)
