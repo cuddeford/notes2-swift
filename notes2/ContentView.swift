@@ -21,7 +21,7 @@ struct ContentView: View {
     @State private var hasRestoredLastOpenedNote = false
     @State private var selectedNoteID: UUID?
     @State private var selectedCompositeID: String?
-    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
+    @State private var isShowingSettings = false
 
     @State private var listDragOffset: CGSize = .zero
     @State private var listDragLocation: CGPoint = .zero
@@ -152,27 +152,15 @@ struct ContentView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Menu {
-                        Toggle("Show pinned section", isOn: $pinnedVisible)
-                        Toggle("Show recents section", isOn: $recentsVisible)
-                        Toggle("Show history section", isOn: $historyVisible)
-                        Divider()
-                        Toggle("Magnetic scrolling", isOn: Binding(
-                            get: { AppSettings.shared.magneticScrollingEnabled },
-                            set: { AppSettings.shared.magneticScrollingEnabled = $0 }
-                        ))
-                        Toggle("New notes start with big font", isOn: $newNoteWithBigFont)
-                        Toggle("Drag to reorder paragraph (WIP)", isOn: Binding(
-                            get: { AppSettings.shared.dragToReorderParagraphEnabled },
-                            set: { AppSettings.shared.dragToReorderParagraphEnabled = $0 }
-                        ))
+                    Button {
+                        isShowingSettings = true
                     } label: {
-                        HStack {
-                            Image(systemName: "gear")
-                            Text("Settings")
-                        }
+                        Image(systemName: "gear")
                     }
                 }
+            }
+            .sheet(isPresented: $isShowingSettings) {
+                SettingsView()
             }
             .fullScreenCover(item: $selectedNoteID) { noteID in
                 if let note = notes.first(where: { $0.id == noteID }) {
