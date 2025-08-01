@@ -1,10 +1,20 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("recentsVisible") private var recentsVisible: Bool
-    @AppStorage("historyVisible") private var historyVisible: Bool
-    @AppStorage("pinnedVisible") private var pinnedVisible: Bool
-    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont: Bool
+    @ObservedObject var settings = AppSettings.shared
+    @AppStorage("recentsVisible") private var recentsVisible = true
+    @AppStorage("historyVisible") private var historyVisible = true
+    @AppStorage("pinnedVisible") private var pinnedVisible = true
+    @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
+
+    private var isDefaultSpacingRelated: Binding<Bool> {
+        Binding<Bool>(
+            get: { settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing },
+            set: { isRelated in
+                settings.defaultParagraphSpacing = isRelated ? AppSettings.relatedParagraphSpacing : AppSettings.unrelatedParagraphSpacing
+            }
+        )
+    }
 
     var body: some View {
         Form {
@@ -15,15 +25,16 @@ struct SettingsView: View {
             }
 
             Section(header: Text("Editor")) {
-                Toggle("Magnetic Scrolling", isOn: Binding(
-                    get: { AppSettings.shared.magneticScrollingEnabled },
-                    set: { AppSettings.shared.magneticScrollingEnabled = $0 }
-                ))
+                Toggle(isOn: isDefaultSpacingRelated) {
+                    if settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing {
+                        Text("Paragraphs default to: ") + Text("Related").fontWeight(.bold)
+                    } else {
+                        Text("Paragraphs default to: ") + Text("Unrelated").fontWeight(.bold)
+                    }
+                }
+                Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
                 Toggle("New Notes Start with Big Font", isOn: $newNoteWithBigFont)
-                Toggle("Drag to Reorder Paragraphs (WIP)", isOn: Binding(
-                    get: { AppSettings.shared.dragToReorderParagraphEnabled },
-                    set: { AppSettings.shared.dragToReorderParagraphEnabled = $0 }
-                ))
+                Toggle("Drag to Reorder Paragraphs (WIP)", isOn: $settings.dragToReorderParagraphEnabled)
             }
         }
         .navigationTitle("Settings")
