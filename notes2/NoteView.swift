@@ -212,6 +212,11 @@ struct NoteView: View {
                 onDismiss: {
                     dismiss()
                 },
+                onNewNote: {
+                    let newNote = Note()
+                    context.insert(newNote)
+                    selectedNoteID = newNote.id
+                }
             )
         )
         .onAppear {

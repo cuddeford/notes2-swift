@@ -15,6 +15,7 @@ struct EditorToolbar: View {
     var onTitle2: () -> Void
     var onBody: () -> Void
     var onDismiss: () -> Void
+    var onNewNote: () -> Void
     @ObservedObject var settings: AppSettings
     @AppStorage("editorToolbarExpanded") private var isExpanded: Bool = true
     @State private var hideTimer: Timer?
@@ -93,6 +94,16 @@ struct EditorToolbar: View {
                     .padding()
                     .opacity(isExpanded ? 1 : 0.5)
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
+            }
+
+            Button(action: {
+                onNewNote()
+            }) {
+                Image(systemName: "plus")
+                    .font(.largeTitle)
+                    .foregroundColor(.gray)
+                    .padding()
+                    .opacity(0.5)
             }
         }
         .padding(.horizontal)

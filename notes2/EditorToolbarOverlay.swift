@@ -20,6 +20,7 @@ struct EditorToolbarOverlay: View {
     var isAtBottom: Bool
     var canScroll: Bool
     var onDismiss: () -> Void
+    var onNewNote: () -> Void
 
     private var isLandscape: Bool {
         UIDevice.current.orientation.isLandscape ||
@@ -63,6 +64,7 @@ struct EditorToolbarOverlay: View {
                         onTitle2: onTitle2,
                         onBody: onBody,
                         onDismiss: onDismiss,
+                        onNewNote: onNewNote,
                         settings: settings,
                     )
                     .transition(.opacity)

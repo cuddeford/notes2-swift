@@ -16,12 +16,11 @@ struct ScrollToBottomButton: View {
             generator.impactOccurred()
             action()
         }) {
-            Image(systemName: "chevron.right")
+            Image(systemName: "chevron.down")
                 .font(.largeTitle)
                 .foregroundColor(.gray)
                 .padding()
                 .opacity(0.5)
-                .rotationEffect(.degrees(90))
         }
     }
 }
