@@ -65,6 +65,8 @@ struct ContentView: View {
                             ForEach(filteredNotes) { note in
                                 NoteRow(note: note)
                                     .onTapGesture {
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
                                         self.selectedNoteID = note.id
                                     }
                             }
@@ -76,6 +78,8 @@ struct ContentView: View {
                             ForEach(pinnedNotes) { note in
                                 NoteRow(note: note)
                                     .onTapGesture {
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
                                         self.selectedNoteID = note.id
                                     }
                             }
@@ -89,6 +93,8 @@ struct ContentView: View {
                             ForEach(recentNotes) { note in
                                 NoteRow(note: note)
                                     .onTapGesture {
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
                                         self.selectedNoteID = note.id
                                     }
                             }
