@@ -153,7 +153,7 @@ struct NoteView: View {
                             .font(.largeTitle)
                             .foregroundColor(.gray)
                             .padding()
-                            .opacity(keyboard.isKeyboardVisible ? 0.1 : 0.5)
+                            .opacity(keyboard.isKeyboardVisible ? 0 : 0.5)
                     }
                     .padding(16)
                     .animation(.easeInOut, value: keyboard.isKeyboardVisible)
