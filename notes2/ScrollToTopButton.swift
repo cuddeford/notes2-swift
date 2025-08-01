@@ -9,6 +9,8 @@ import SwiftUI
 
 struct ScrollToTopButton: View {
     let action: () -> Void
+    let isAtTop: Bool
+    let canScroll: Bool
 
     var body: some View {
         Button(action: {
@@ -20,8 +22,10 @@ struct ScrollToTopButton: View {
                 .font(.largeTitle)
                 .foregroundColor(.gray)
                 .padding()
-                .opacity(0.5)
+                .opacity((isAtTop || !canScroll) ? 0 : 0.5)
                 .rotationEffect(.degrees(-90))
+                .animation(.easeInOut, value: isAtTop)
+                .animation(.easeInOut, value: canScroll)
         }
     }
 }

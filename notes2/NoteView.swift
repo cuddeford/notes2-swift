@@ -139,12 +139,12 @@ struct NoteView: View {
 
             VStack {
                 HStack {
-                    ScrollToTopButton(action: {
-                        coordinatorHolder.coordinator?.scrollToTop()
-                    })
+                    ScrollToTopButton(
+                        action: { coordinatorHolder.coordinator?.scrollToTop() },
+                        isAtTop: isAtTop,
+                        canScroll: canScroll,
+                    )
                     .padding(16)
-                    .animation(.easeInOut, value: keyboard.isKeyboardVisible)
-                    .opacity((isAtTop || !canScroll) ? 0 : 1)
 
                     Spacer()
 
@@ -157,10 +157,11 @@ struct NoteView: View {
                             .font(.largeTitle)
                             .foregroundColor(.gray)
                             .padding()
-                            .opacity(keyboard.isKeyboardVisible ? 0 : 0.5)
+                            .opacity(keyboard.isKeyboardVisible ? isAtTop ? 0.5 : 0 : 0.5)
                     }
                     .padding(16)
                     .animation(.easeInOut, value: keyboard.isKeyboardVisible)
+                    .animation(.easeInOut, value: isAtTop)
                 }
                 Spacer()
             }
