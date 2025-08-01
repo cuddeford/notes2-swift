@@ -26,6 +26,7 @@ struct NoteView: View {
     @State private var isDragging = false
     @State private var isAtBottom = true
     @State private var canScroll = false
+    @State private var isAtTop = true
     @State private var isStatusBarHidden = false
 
     static private func noteTextStyle(for aFont: UIFont) -> NoteTextStyle {
@@ -112,7 +113,8 @@ struct NoteView: View {
                     coordinatorHolder.coordinator = coordinator
                 },
                 isAtBottom: $isAtBottom,
-                canScroll: $canScroll
+                canScroll: $canScroll,
+                isAtTop: $isAtTop
             )
             .onChange(of: noteText) { oldValue, newValue in
                 if let data = try? newValue.data(
@@ -137,7 +139,15 @@ struct NoteView: View {
 
             VStack {
                 HStack {
+                    ScrollToTopButton(action: {
+                        coordinatorHolder.coordinator?.scrollToTop()
+                    })
+                    .padding(16)
+                    .animation(.easeInOut, value: keyboard.isKeyboardVisible)
+                    .opacity((isAtTop || !canScroll) ? 0 : 1)
+
                     Spacer()
+
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark")
                             .font(.largeTitle)

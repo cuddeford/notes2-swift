@@ -32,6 +32,7 @@ struct RichTextEditor: UIViewRepresentable {
 
     @Binding var isAtBottom: Bool
     @Binding var canScroll: Bool
+    @Binding var isAtTop: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
         let textView = CustomTextView()
@@ -358,11 +359,13 @@ struct RichTextEditor: UIViewRepresentable {
             let canScroll = contentHeight > boundsHeight
             let maxOffset = max(0, contentHeight - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
+            let isAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 60.0
 
 
-            if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll {
+            if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
                 self.parent.canScroll = canScroll
                 self.parent.isAtBottom = isAtBottom
+                self.parent.isAtTop = isAtTop
             }
 
             // Check for magnetic zone transitions during scrolling, but only when user is dragging
@@ -949,6 +952,12 @@ struct RichTextEditor: UIViewRepresentable {
             let bottomOffset = CGPoint(x: 0, y: maxOffset)
 
             textView.setContentOffset(bottomOffset, animated: true)
+        }
+
+        func scrollToTop() {
+            guard let textView = self.textView else { return }
+            let topOffset = CGPoint(x: 0, y: -textView.adjustedContentInset.top)
+            textView.setContentOffset(topOffset, animated: true)
         }
 
         private func animateNewParagraphSpacing(cursorLocation: Int) {
