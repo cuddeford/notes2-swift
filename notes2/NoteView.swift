@@ -148,7 +148,11 @@ struct NoteView: View {
 
                     Spacer()
 
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                        dismiss()
+                    }) {
                         Image(systemName: "xmark")
                             .font(.largeTitle)
                             .foregroundColor(.gray)

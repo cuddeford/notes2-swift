@@ -38,7 +38,11 @@ struct EditorToolbar: View {
 
     var body: some View {
         HStack {
-            Button(action: { onDismiss() }) {
+            Button(action: {
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+                onDismiss()
+            }) {
                 Image(systemName: "xmark")
                     .font(.largeTitle)
                     .foregroundColor(.gray)
@@ -97,6 +101,8 @@ struct EditorToolbar: View {
             }
 
             Button(action: {
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
                 onNewNote()
             }) {
                 Image(systemName: "plus")
