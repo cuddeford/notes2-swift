@@ -145,6 +145,7 @@ struct NoteView: View {
                             .padding()
                             .opacity(keyboard.isKeyboardVisible ? 0.1 : 0.5)
                     }
+                    .padding(16)
                     .animation(.easeInOut, value: keyboard.isKeyboardVisible)
                 }
                 Spacer()
