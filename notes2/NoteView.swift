@@ -28,6 +28,7 @@ struct NoteView: View {
     @State private var canScroll = false
     @State private var isAtTop = true
     @State private var isStatusBarHidden = false
+    @State private var noteReady = false
 
     static private func noteTextStyle(for aFont: UIFont) -> NoteTextStyle {
         let title1Size = UIFont.preferredFont(forTextStyle: .title1).pointSize
@@ -228,11 +229,15 @@ struct NoteView: View {
         .onAppear {
             isStatusBarHidden = true
             UserDefaults.standard.set(note.id.uuidString, forKey: "lastOpenedNoteID")
+            noteReady = true
         }
         .onDisappear {
             isStatusBarHidden = false
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
+            noteReady = false
         }
         .statusBar(hidden: isStatusBarHidden)
+        .opacity(noteReady ? 1 : 0)
+        .animation(.easeInOut(duration: 0.75).delay(0.1), value: noteReady)
     }
 }
