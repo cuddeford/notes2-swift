@@ -18,12 +18,6 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("Show Sections")) {
-                Toggle("Pinned", isOn: $pinnedVisible)
-                Toggle("Recents", isOn: $recentsVisible)
-                Toggle("History", isOn: $historyVisible)
-            }
-
             Section(header: Text("Editor")) {
                 Toggle(isOn: isDefaultSpacingRelated) {
                     if settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing {
@@ -35,6 +29,12 @@ struct SettingsView: View {
                 Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
                 Toggle("New Notes Start with Big Font", isOn: $newNoteWithBigFont)
                 Toggle("Drag to Reorder Paragraphs (WIP)", isOn: $settings.dragToReorderParagraphEnabled)
+            }
+
+            Section(header: Text("Show Sections")) {
+                Toggle("Pinned", isOn: $pinnedVisible)
+                Toggle("Recents", isOn: $recentsVisible)
+                Toggle("History", isOn: $historyVisible)
             }
         }
         .navigationTitle("Settings")
