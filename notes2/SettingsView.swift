@@ -20,16 +20,27 @@ struct SettingsView: View {
         Form {
             Section(header: Text("Editor")) {
                 Toggle(isOn: isDefaultSpacingRelated) {
-                    if settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing {
-                        Text("Paragraphs default to: ") + Text("Related").fontWeight(.bold)
-                    } else {
-                        Text("Paragraphs default to: ") + Text("Unrelated").fontWeight(.bold)
-                    }
+                    Text("Paragraphs default to: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)
                 }
+                Text("This controls the default spacing between paragraphs when you create a new note or reset spacing.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
                 Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
+                Text("Enables a feature that snaps the current line to the center of the screen while typing.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
                 Toggle("New Notes Start with Big Font", isOn: $newNoteWithBigFont)
+                Text("When enabled, new notes will begin with a larger default font size.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
                 Toggle("Drag to Reorder Paragraphs (WIP)", isOn: $settings.dragToReorderParagraphEnabled)
+                Text("Allows you to reorder paragraphs by long-pressing and dragging them. (Work in Progress)")
+                    .font(.caption)
+                    .foregroundColor(.gray)
                 Toggle("Enable paragraph overlays", isOn: $settings.paragraphOverlaysEnabled)
+                Text("Shows visual boundaries around paragraphs. Overlays are always visible during gestures.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
             }
 
             Section(header: Text("Show Sections")) {
