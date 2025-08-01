@@ -14,6 +14,7 @@ struct EditorToolbar: View {
     var onTitle1: () -> Void
     var onTitle2: () -> Void
     var onBody: () -> Void
+    var onDismiss: () -> Void
     @ObservedObject var settings: AppSettings
     @AppStorage("editorToolbarExpanded") private var isExpanded: Bool = true
     @State private var hideTimer: Timer?
@@ -36,6 +37,14 @@ struct EditorToolbar: View {
 
     var body: some View {
         HStack {
+            Button(action: { onDismiss() }) {
+                Image(systemName: "xmark")
+                    .font(.largeTitle)
+                    .foregroundColor(.gray)
+                    .padding()
+                    .opacity(0.5)
+            }
+
             if isExpanded {
                 HStack {
                     Spacer()
@@ -78,10 +87,10 @@ struct EditorToolbar: View {
                     hideTimer?.invalidate()
                 }
             }) {
-                Image(systemName: "chevron.right.circle.fill")
-                    .font(.system(size: 24, weight: .medium))
-                    .padding(16)
-                    .foregroundColor(.accentColor)
+                Image(systemName: "chevron.right")
+                    .font(.largeTitle)
+                    .foregroundColor(.gray)
+                    .padding()
                     .opacity(isExpanded ? 1 : 0.5)
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
             }

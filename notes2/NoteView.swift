@@ -143,9 +143,9 @@ struct NoteView: View {
                             .font(.largeTitle)
                             .foregroundColor(.gray)
                             .padding()
-                            .opacity(0.5)
+                            .opacity(keyboard.isKeyboardVisible ? 0.1 : 0.5)
                     }
-                    .padding(.trailing, 15)
+                    .animation(.easeInOut, value: keyboard.isKeyboardVisible)
                 }
                 Spacer()
             }
@@ -197,7 +197,10 @@ struct NoteView: View {
                     coordinatorHolder.coordinator?.scrollToBottom()
                 },
                 isAtBottom: isAtBottom,
-                canScroll: canScroll
+                canScroll: canScroll,
+                onDismiss: {
+                    dismiss()
+                },
             )
         )
         .onAppear {
