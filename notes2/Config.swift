@@ -48,7 +48,7 @@ class AppSettings: ObservableObject {
             "historyVisible": true,
             "pinnedVisible": true,
             "newNoteWithBigFont": true,
-            "magneticScrollingEnabled": true,
+            "magneticScrollingEnabled": false,
             "dragToReorderParagraphEnabled": false,
             "paragraphOverlaysEnabled": true,
             "defaultParagraphSpacing": unrelatedParagraphSpacing,
