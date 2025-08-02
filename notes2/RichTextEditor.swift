@@ -1043,6 +1043,12 @@ struct RichTextEditor: UIViewRepresentable {
                 return
             }
 
+            // Prepare haptics
+            dragSelectionGenerator.prepare()
+            dragHapticGenerator.prepare()
+
+            dragSelectionGenerator.selectionChanged()
+
             draggingParagraphIndex = index
             draggedParagraphID = paragraphs[index].id
             dragInitialLocation = location
@@ -1055,10 +1061,6 @@ struct RichTextEditor: UIViewRepresentable {
             // Highlight the source paragraph
             setDraggingSource(index)
             isDragging = true
-
-            // Prepare haptics
-            dragSelectionGenerator.prepare()
-            dragHapticGenerator.prepare()
         }
 
         private func handleDragChanged(location: CGPoint, textView: UITextView) {
