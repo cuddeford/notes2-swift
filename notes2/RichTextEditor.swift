@@ -1129,10 +1129,21 @@ struct RichTextEditor: UIViewRepresentable {
             )
 
             for (index, paragraph) in paragraphs.enumerated() {
-                let rect = textView.layoutManager.boundingRect(
+                var rect = textView.layoutManager.boundingRect(
                     forGlyphRange: paragraph.range,
                     in: textView.textContainer
                 )
+                
+                if index == paragraphs.count - 1 {
+                    // Ultimate paragraph - use full width for consistent touch area
+                    rect = CGRect(
+                        x: 0,
+                        y: rect.minY,
+                        width: textView.textContainer.size.width,
+                        height: max(rect.height, textView.font?.lineHeight ?? 20)
+                    )
+                }
+                
                 if rect.contains(adjustedLocation) {
                     return index
                 }
@@ -1195,10 +1206,20 @@ struct RichTextEditor: UIViewRepresentable {
             // Calculate target based on vertical position between paragraphs
             var targetIndex = 0
             for (index, paragraph) in paragraphs.enumerated() {
-                let rect = textView.layoutManager.boundingRect(
+                var rect = textView.layoutManager.boundingRect(
                     forGlyphRange: paragraph.range,
                     in: textView.textContainer
                 )
+                
+                if index == paragraphs.count - 1 {
+                    // Ultimate paragraph - use full width for consistent touch area
+                    rect = CGRect(
+                        x: 0,
+                        y: rect.minY,
+                        width: textView.textContainer.size.width,
+                        height: max(rect.height, textView.font?.lineHeight ?? 20)
+                    )
+                }
 
                 if adjustedLocation.y < rect.midY {
                     targetIndex = index
