@@ -1069,8 +1069,8 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Move paragraph immediately when target changes
             if newTargetIndex != dragTargetIndex {
-                // Find current index of the dragged paragraph
-                let currentDragIndex = paragraphs.firstIndex { $0.id == draggedID } ?? 0
+                // Use stored dragging index instead of UUID lookup to avoid identity loss
+                let currentDragIndex = draggingParagraphIndex ?? 0
 
                 reorderParagraph(from: currentDragIndex, to: newTargetIndex, textView: textView, isLiveDrag: true)
 
@@ -1086,7 +1086,7 @@ struct RichTextEditor: UIViewRepresentable {
             }
 
             // Update ghost position based on current paragraph position if ghost is enabled
-            if showGhostOverlay, let ghostView = dragGhostView, let currentIndex = paragraphs.firstIndex(where: { $0.id == draggedID }) {
+            if showGhostOverlay, let ghostView = dragGhostView, let currentIndex = draggingParagraphIndex {
                 let currentParagraph = paragraphs[currentIndex]
                 let paragraphFrame = textView.layoutManager.boundingRect(
                     forGlyphRange: currentParagraph.range,
