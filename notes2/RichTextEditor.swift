@@ -1654,8 +1654,9 @@ struct RichTextEditor: UIViewRepresentable {
             textView.attributedText = mutableText
             parent.text = mutableText
             
-            // Set cursor position at the start of the new paragraph
-            let cursorPosition = insertLocation + 1 // After the newline
+            // Handle cursor positioning for edge case of last paragraph
+            let isLastParagraph = paragraphIndex == paragraphs.count - 1
+            let cursorPosition = isLastParagraph ? insertLocation + 1 : insertLocation
             textView.selectedRange = NSRange(location: cursorPosition, length: 0)
             parent.selectedRange = textView.selectedRange
             
