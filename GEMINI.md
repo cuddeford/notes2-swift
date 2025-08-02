@@ -12,7 +12,7 @@ The source folder is notes2/ so e.g. notes2/RichTextEditor.swift
 
 When building the project to test compilation use this command. It's important to keep the -quiet flag to save on input tokens:
 ```
-xcodebuild -quiet -project notes2.xcodeproj -scheme notes2 -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build)
+xcodebuild -quiet -project notes2.xcodeproj -scheme notes2 -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build
 ```
 Whenever I tell you to build, run, or compile the project I expect you to use this exact command ^
 
