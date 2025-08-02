@@ -1117,17 +1117,23 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Configure the shadow on the container
             ghostContainerView.layer.shadowColor = UIColor.label.cgColor
-            ghostContainerView.layer.shadowOpacity = 0.1
+            ghostContainerView.layer.shadowOpacity = 0.3
             ghostContainerView.layer.shadowOffset = CGSize(width: 0, height: 5)
             ghostContainerView.layer.shadowRadius = 10.0
             ghostContainerView.layer.shadowPath = UIBezierPath(roundedRect: ghostContainerView.bounds, cornerRadius: ruledView?.overlayCornerRadius ?? 20.0).cgPath
 
-            // Configure the snapshot view itself
-            snapshotView.frame = ghostContainerView.bounds
-            snapshotView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
-            snapshotView.layer.masksToBounds = true
+            // This view will have the opaque background and clip its subviews.
+            let clippingView = UIView(frame: ghostContainerView.bounds)
+            clippingView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
+            clippingView.layer.masksToBounds = true
+            clippingView.backgroundColor = .systemBackground.withAlphaComponent(0.8) // Semi-opaque background
+            ghostContainerView.addSubview(clippingView)
 
-            ghostContainerView.addSubview(snapshotView)
+            // The snapshot view is placed inside the clipping view.
+            // Its semi-transparent content will blend with the clippingView's opaque background.
+            snapshotView.frame = clippingView.bounds
+            clippingView.addSubview(snapshotView)
+
             ghostContainerView.alpha = 0
 
             textView.addSubview(ghostContainerView)
