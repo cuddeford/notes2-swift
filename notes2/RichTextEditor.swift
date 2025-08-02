@@ -707,7 +707,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
-            guard let textView = textView else { return }
+            guard let textView = textView, !isDragging else { return }
 
             if gesture.state == .began && gesture.numberOfTouches >= 2 {
                 handlePinchBegan(gesture, textView: textView)
@@ -1506,7 +1506,7 @@ struct RichTextEditor: UIViewRepresentable {
         // MARK: - Reply Gesture Handling
         
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
-            guard let textView = textView, !isDragging else { return }
+            guard let textView = textView, !isDragging, !isPinching else { return }
             let location = gesture.location(in: textView)
             
             switch gesture.state {
