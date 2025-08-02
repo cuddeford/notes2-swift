@@ -18,8 +18,8 @@ struct ScrollToTopButton: View {
             generator.impactOccurred()
             action()
         }) {
-            Image(systemName: "chevron.right")
-                .font(.largeTitle)
+            Image(systemName: "arrow.right.to.line.compact")
+                .font(.title)
                 .foregroundColor(.gray)
                 .padding()
                 .opacity((isAtTop || !canScroll) ? 0 : 0.5)

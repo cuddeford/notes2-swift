@@ -155,7 +155,7 @@ struct NoteView: View {
                         dismiss()
                     }) {
                         Image(systemName: "xmark")
-                            .font(.largeTitle)
+                            .font(.title)
                             .foregroundColor(.gray)
                             .padding()
                             .opacity(0.5)

@@ -45,8 +45,8 @@ struct EditorToolbar: View {
                 generator.impactOccurred()
                 hideKeyboard()
             }) {
-                Image(systemName: "xmark")
-                    .font(.largeTitle)
+                Image(systemName: "keyboard.chevron.compact.down")
+                    .font(.title)
                     .foregroundColor(.gray)
                     .padding()
                     .opacity(0.5)
@@ -58,15 +58,21 @@ struct EditorToolbar: View {
 
                     HStack {
                         Button(action: { buttonAction(action: onTitle1) }) {
-                            Text("Size")
-                                .padding(.vertical, -10)
-                                .bold()
-                                .padding(16)
-                                .background(
-                                    Rectangle()
-                                        .fill(.ultraThinMaterial)
-                                        .cornerRadius(25)
-                                )
+                            Image(systemName: "textformat.size")
+                                .font(.title)
+                                .foregroundColor(.gray)
+                                .padding()
+                        }
+
+                        Button(action: {
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                            onNewNote()
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.title)
+                                .foregroundColor(.gray)
+                                .padding()
                         }
                     }
                 }
@@ -95,24 +101,13 @@ struct EditorToolbar: View {
                 }
             }) {
                 Image(systemName: "chevron.right")
-                    .font(.largeTitle)
+                    .font(.title)
                     .foregroundColor(.gray)
                     .padding()
                     .opacity(isExpanded ? 1 : 0.5)
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
             }
-
-            Button(action: {
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
-                onNewNote()
-            }) {
-                Image(systemName: "plus")
-                    .font(.largeTitle)
-                    .foregroundColor(.gray)
-                    .padding()
-                    .opacity(0.5)
-            }
+            .padding(.trailing, 4)
         }
         .padding(.horizontal)
         .animation(.easeInOut, value: isExpanded)

@@ -16,8 +16,8 @@ struct ScrollToBottomButton: View {
             generator.impactOccurred()
             action()
         }) {
-            Image(systemName: "chevron.down")
-                .font(.largeTitle)
+            Image(systemName: "arrow.down.to.line.compact")
+                .font(.title)
                 .foregroundColor(.gray)
                 .padding()
                 .opacity(0.5)
