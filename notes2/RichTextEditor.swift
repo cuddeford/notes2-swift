@@ -218,6 +218,7 @@ struct RichTextEditor: UIViewRepresentable {
         private let replyGestureThreshold: CGFloat = 100.0
         private let replyGestureHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var hasTriggeredReplyHaptic = false
+        private var isHorizontalSwipe = false
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -1535,6 +1536,30 @@ struct RichTextEditor: UIViewRepresentable {
             guard let ghostView = replyGhostView else { return }
             
             let translation = gesture.translation(in: textView)
+            
+            // Check if this is a horizontal swipe on the first movement
+            if !isHorizontalSwipe {
+                let horizontalMovement = abs(translation.x)
+                let verticalMovement = abs(translation.y)
+                
+                // Cancel if vertical movement is dominant
+                if verticalMovement > horizontalMovement && verticalMovement > 10 {
+                    cleanupReplyGesture()
+                    return
+                }
+                
+                // Mark as horizontal swipe if horizontal is dominant
+                if horizontalMovement > verticalMovement {
+                    isHorizontalSwipe = true
+                }
+            }
+            
+            // Only proceed if it's a horizontal swipe
+            guard isHorizontalSwipe else {
+                cleanupReplyGesture()
+                return
+            }
+            
             let horizontalTranslation = min(max(0, translation.x), replyGestureThreshold) // Limit to threshold
             
             // Apply 1:1 translation to ghost view (capped at threshold)
@@ -1558,8 +1583,8 @@ struct RichTextEditor: UIViewRepresentable {
             let translation = gesture.translation(in: textView)
             let horizontalTranslation = max(0, translation.x)
             
-            if horizontalTranslation >= replyGestureThreshold {
-                // Trigger reply action
+            // Only trigger if it's a confirmed horizontal swipe
+            if isHorizontalSwipe && horizontalTranslation >= replyGestureThreshold {
                 triggerReplyAction()
             }
             
@@ -1684,6 +1709,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.replyGestureParagraphIndex = nil
                 self.replyGestureInitialLocation = nil
                 self.hasTriggeredReplyHaptic = false
+                self.isHorizontalSwipe = false
                 return
             }
             
@@ -1706,6 +1732,7 @@ struct RichTextEditor: UIViewRepresentable {
                     self.replyGestureParagraphIndex = nil
                     self.replyGestureInitialLocation = nil
                     self.hasTriggeredReplyHaptic = false
+                    self.isHorizontalSwipe = false
                 }
             )
         }
