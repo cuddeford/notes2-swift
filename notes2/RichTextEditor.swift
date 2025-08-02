@@ -1617,7 +1617,12 @@ struct RichTextEditor: UIViewRepresentable {
             newParagraphStyle.paragraphSpacing = AppSettings.relatedParagraphSpacing // Always related spacing between paragraphs
             
             // Use the same font as the original paragraph or fallback to typing attributes
-            let originalAttributes = originalParagraph.content.attributes(at: 0, effectiveRange: nil)
+            let originalAttributes: [NSAttributedString.Key: Any]
+            if originalParagraph.content.length > 0 {
+                originalAttributes = originalParagraph.content.attributes(at: 0, effectiveRange: nil)
+            } else {
+                originalAttributes = textView.typingAttributes
+            }
             let font = originalAttributes[.font] as? UIFont ?? textView.typingAttributes[.font] as? UIFont ?? UIFont.preferredFont(forTextStyle: .body)
             
             let newAttributes: [NSAttributedString.Key: Any] = [
