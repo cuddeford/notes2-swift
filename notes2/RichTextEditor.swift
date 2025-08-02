@@ -1038,11 +1038,6 @@ struct RichTextEditor: UIViewRepresentable {
             // Find which paragraph contains the press location
             guard let index = paragraphIndex(at: location, textView: textView) else { return }
 
-            // Don't allow dragging the last empty paragraph
-            if index == paragraphs.count - 1 && paragraphs[index].content.string.isEmpty {
-                return
-            }
-
             // Prepare haptics
             dragSelectionGenerator.prepare()
             dragHapticGenerator.prepare()
@@ -1064,7 +1059,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleDragChanged(location: CGPoint, textView: UITextView) {
-            guard let draggedID = draggedParagraphID else { return }
+            guard draggedParagraphID != nil else { return }
 
             // Find target insertion index
             let newTargetIndex = calculateTargetIndex(for: location, textView: textView)
@@ -1130,6 +1125,20 @@ struct RichTextEditor: UIViewRepresentable {
                 y: location.y - textView.textContainerInset.top
             )
 
+            // Use the overlay frames from RuledView for consistent positioning
+            if let ruledView = ruledView {
+                for index in 0..<paragraphs.count {
+                    if let overlayFrame = ruledView.getOverlayFrame(forParagraphAtIndex: index) {
+                        // The overlay frame already includes textContainerInset, so we need to adjust it back
+                        let adjustedFrame = overlayFrame.offsetBy(dx: -textView.textContainerInset.left, dy: -textView.textContainerInset.top)
+                        if adjustedFrame.contains(adjustedLocation) {
+                            return index
+                        }
+                    }
+                }
+            }
+
+            // Fallback to layout-based detection if overlays aren't available
             for (index, paragraph) in paragraphs.enumerated() {
                 var rect = textView.layoutManager.boundingRect(
                     forGlyphRange: paragraph.range,
@@ -1206,28 +1215,41 @@ struct RichTextEditor: UIViewRepresentable {
             )
 
             // Calculate target based on vertical position between paragraphs
-            var targetIndex = 0
-            for (index, paragraph) in paragraphs.enumerated() {
-                var rect = textView.layoutManager.boundingRect(
-                    forGlyphRange: paragraph.range,
-                    in: textView.textContainer
-                )
+            var paragraphRects: [CGRect] = []
 
-                if index == paragraphs.count - 1 {
-                    // Ultimate paragraph - use full width for consistent touch area
-                    rect = CGRect(
-                        x: 0,
-                        y: rect.minY,
-                        width: textView.textContainer.size.width,
-                        height: max(rect.height, textView.font?.lineHeight ?? 20)
-                    )
+            // Use overlay frames if available, otherwise fallback to layout
+            if let ruledView = ruledView {
+                for index in 0..<paragraphs.count {
+                    if let overlayFrame = ruledView.getOverlayFrame(forParagraphAtIndex: index) {
+                        let adjustedFrame = overlayFrame.offsetBy(dx: -textView.textContainerInset.left, dy: -textView.textContainerInset.top)
+                        paragraphRects.append(adjustedFrame)
+                    } else {
+                        // Fallback to layout-based detection
+                        var rect = textView.layoutManager.boundingRect(
+                            forGlyphRange: paragraphs[index].range,
+                            in: textView.textContainer
+                        )
+                        paragraphRects.append(rect)
+                    }
                 }
+            } else {
+                // Fallback to layout-based detection
+                for (index, paragraph) in paragraphs.enumerated() {
+                    var rect = textView.layoutManager.boundingRect(
+                        forGlyphRange: paragraph.range,
+                        in: textView.textContainer
+                    )
+                    paragraphRects.append(rect)
+                }
+            }
 
+            var targetIndex = 0
+            for (index, rect) in paragraphRects.enumerated() {
                 if adjustedLocation.y < rect.midY {
                     targetIndex = index
                     break
-                } else if index == paragraphs.count - 1 {
-                    targetIndex = paragraphs.count
+                } else if index == paragraphRects.count - 1 {
+                    targetIndex = paragraphRects.count
                 }
             }
 
