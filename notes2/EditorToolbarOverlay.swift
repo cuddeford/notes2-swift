@@ -22,6 +22,7 @@ struct EditorToolbarOverlay: View {
     var isAtTop: Bool
     var onDismiss: () -> Void
     var onNewNote: () -> Void
+    var hideKeyboard: () -> Void
 
     private var isLandscape: Bool {
         UIDevice.current.orientation.isLandscape ||
@@ -66,6 +67,7 @@ struct EditorToolbarOverlay: View {
                         onDismiss: onDismiss,
                         onNewNote: onNewNote,
                         isAtTop: isAtTop,
+                        hideKeyboard: hideKeyboard,
                         settings: settings,
                     )
                     .transition(.opacity)

@@ -158,11 +158,9 @@ struct NoteView: View {
                             .font(.largeTitle)
                             .foregroundColor(.gray)
                             .padding()
-                            .opacity(keyboard.isKeyboardVisible ? isAtTop ? 0.5 : 0 : 0.5)
+                            .opacity(0.5)
                     }
                     .padding(16)
-                    .animation(.easeInOut, value: keyboard.isKeyboardVisible)
-                    .animation(.easeInOut, value: isAtTop)
                 }
                 Spacer()
             }
@@ -223,6 +221,9 @@ struct NoteView: View {
                     let newNote = Note()
                     context.insert(newNote)
                     selectedNoteID = newNote.id
+                },
+                hideKeyboard: {
+                    coordinatorHolder.coordinator?.hideKeyboard()
                 }
             )
         )

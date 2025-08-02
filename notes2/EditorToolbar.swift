@@ -17,6 +17,7 @@ struct EditorToolbar: View {
     var onDismiss: () -> Void
     var onNewNote: () -> Void
     var isAtTop: Bool
+    var hideKeyboard: () -> Void
     @ObservedObject var settings: AppSettings
     @AppStorage("editorToolbarExpanded") private var isExpanded: Bool = true
     @State private var hideTimer: Timer?
@@ -42,14 +43,13 @@ struct EditorToolbar: View {
             Button(action: {
                 let generator = UIImpactFeedbackGenerator(style: .light)
                 generator.impactOccurred()
-                onDismiss()
+                hideKeyboard()
             }) {
                 Image(systemName: "xmark")
                     .font(.largeTitle)
                     .foregroundColor(.gray)
                     .padding()
-                    .opacity(isAtTop ? 0 : 0.5)
-                    .animation(.easeInOut, value: isAtTop)
+                    .opacity(0.5)
             }
 
             if isExpanded {

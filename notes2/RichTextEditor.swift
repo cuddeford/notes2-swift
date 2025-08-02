@@ -217,6 +217,11 @@ struct RichTextEditor: UIViewRepresentable {
             super.init()
         }
 
+        func hideKeyboard() {
+            guard let textView = textView else { return }
+            textView.endEditing(true)
+        }
+
         func parseAttributedText(_ attributedText: NSAttributedString) {
             var newParagraphs: [Paragraph] = []
             let string = attributedText.string
