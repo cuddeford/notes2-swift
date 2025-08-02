@@ -89,7 +89,7 @@ struct RichTextEditor: UIViewRepresentable {
         textView.addGestureRecognizer(pinchGesture)
 
         let longPressGesture = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPressGesture(_:)))
-        longPressGesture.minimumPressDuration = 0.5
+        longPressGesture.minimumPressDuration = 0.25
         longPressGesture.allowableMovement = 20
         textView.addGestureRecognizer(longPressGesture)
 
