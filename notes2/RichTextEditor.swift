@@ -1102,35 +1102,41 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func createDragGhost(for paragraph: Paragraph, textView: UITextView) {
-
-            let paragraphRect = textView.layoutManager.boundingRect(
+            let textRect = textView.layoutManager.boundingRect(
                 forGlyphRange: paragraph.range,
                 in: textView.textContainer
-            ).offsetBy(dx: textView.textContainerInset.left, dy: textView.textContainerInset.top)
+            )
 
-            // Create ghost view with paragraph content
-            let ghostView = UIView(frame: paragraphRect)
-            ghostView.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
-            ghostView.layer.cornerRadius = 8
-            ghostView.layer.shadowColor = UIColor.label.cgColor
-            ghostView.layer.shadowOpacity = 0.3
-            ghostView.layer.shadowOffset = CGSize(width: 0, height: 2)
-            ghostView.layer.shadowRadius = 4
-            ghostView.alpha = 0
+            // This padding MUST match RuledView's overlay padding to capture the full visual
+            let overlayPaddingHorizontal = 15.0
+            let overlayPaddingVertical = overlayPaddingHorizontal / 2.0
 
-            // Add paragraph content
-            let label = UILabel(frame: ghostView.bounds.insetBy(dx: 8, dy: 4))
-            label.attributedText = paragraph.content
-            label.numberOfLines = 0
-            label.font = textView.font
-            ghostView.addSubview(label)
+            let snapshotRect = textRect
+                .offsetBy(dx: textView.textContainerInset.left, dy: textView.textContainerInset.top)
+                .insetBy(dx: -overlayPaddingHorizontal, dy: -overlayPaddingVertical)
 
-            textView.addSubview(ghostView)
-            dragGhostView = ghostView
+            // Create a snapshot of the paragraph area, including the RuledView overlay
+            guard let snapshotView = textView.resizableSnapshotView(from: snapshotRect, afterScreenUpdates: true, withCapInsets: .zero) else {
+                return // Or handle error appropriately
+            }
+
+            snapshotView.frame = snapshotRect
+            
+            // Apply styling to the snapshot's layer
+            snapshotView.layer.cornerRadius = 8
+            snapshotView.layer.masksToBounds = false // Allow shadow to be visible
+            snapshotView.layer.shadowColor = UIColor.label.cgColor
+            snapshotView.layer.shadowOpacity = 0.3
+            snapshotView.layer.shadowOffset = CGSize(width: 0, height: 2)
+            snapshotView.layer.shadowRadius = 4
+            snapshotView.alpha = 0
+
+            textView.addSubview(snapshotView)
+            dragGhostView = snapshotView
 
             // Animate appearance
             UIView.animate(withDuration: 0.2) {
-                ghostView.alpha = 1
+                snapshotView.alpha = 1.0
             }
         }
 
