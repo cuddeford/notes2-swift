@@ -195,6 +195,17 @@ struct RichTextEditor: UIViewRepresentable {
         private let dragHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private let dragSelectionGenerator = UISelectionFeedbackGenerator()
 
+        // Auto-scrolling state for drag-to-reorder
+        private var scrollDisplayLink: CADisplayLink?
+        private var isAutoScrolling: Bool = false
+        private let scrollEdgeThreshold: CGFloat = 80.0
+        private let maxScrollSpeed: CGFloat = 1200.0
+        private let minScrollSpeed: CGFloat = 200.0
+
+        // Multitouch support for drag + manual scroll
+        private var initialTouchCount: Int = 1
+        private var isMultitouchDrag: Bool = false
+
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
         @Published var contentOffset: CGPoint = .zero
@@ -1024,17 +1035,17 @@ struct RichTextEditor: UIViewRepresentable {
 
             switch gesture.state {
             case .began:
-                handleDragBegan(location: location, textView: textView)
+                handleDragBegan(location: location, textView: textView, gesture: gesture)
             case .changed:
-                handleDragChanged(location: location, textView: textView)
+                handleDragChanged(location: location, textView: textView, gesture: gesture)
             case .ended, .cancelled:
-                handleDragEnded(location: location, textView: textView)
+                handleDragEnded(location: location, textView: textView, gesture: gesture)
             default:
                 break
             }
         }
 
-        private func handleDragBegan(location: CGPoint, textView: UITextView) {
+        private func handleDragBegan(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
             // Find which paragraph contains the press location
             guard let index = paragraphIndex(at: location, textView: textView) else { return }
 
@@ -1048,6 +1059,10 @@ struct RichTextEditor: UIViewRepresentable {
             draggedParagraphID = paragraphs[index].id
             dragInitialLocation = location
 
+            // Track initial touch count for multitouch detection
+            initialTouchCount = gesture.numberOfTouches
+            isMultitouchDrag = false
+
             // Create ghost view if enabled
             if showGhostOverlay {
                 createDragGhost(for: paragraphs[index], at: index, textView: textView)
@@ -1058,8 +1073,23 @@ struct RichTextEditor: UIViewRepresentable {
             isDragging = true
         }
 
-        private func handleDragChanged(location: CGPoint, textView: UITextView) {
+        private func handleDragChanged(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
             guard draggedParagraphID != nil else { return }
+
+            // Check for multitouch transition
+            let currentTouchCount = gesture.numberOfTouches
+            if currentTouchCount > initialTouchCount {
+                isMultitouchDrag = true
+                stopAutoScroll() // Stop auto-scroll when second finger is added
+            }
+
+            // Update drag location for auto-scrolling
+            dragInitialLocation = location
+
+            // Check for auto-scrolling (only if not multitouch scrolling)
+            if !isMultitouchDrag {
+                checkAutoScroll(location: location, textView: textView)
+            }
 
             // Find target insertion index
             let newTargetIndex = calculateTargetIndex(for: location, textView: textView)
@@ -1104,10 +1134,11 @@ struct RichTextEditor: UIViewRepresentable {
             }
         }
 
-        private func handleDragEnded(location: CGPoint, textView: UITextView) {
+        private func handleDragEnded(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
             // Paragraph has already been moved during drag, just clean up
             cleanupDrag()
             isDragging = false
+            isMultitouchDrag = false
 
             // Re-parse attributed text to ensure paragraph ranges are up-to-date
             self.parseAttributedText(textView.attributedText)
@@ -1339,6 +1370,9 @@ struct RichTextEditor: UIViewRepresentable {
                 dragGhostView = nil
             }
 
+            // Stop auto-scrolling
+            stopAutoScroll()
+
             // Restore original paragraph appearance
             setDraggingSource(nil)
 
@@ -1347,6 +1381,108 @@ struct RichTextEditor: UIViewRepresentable {
             dragInitialLocation = nil
             dragTargetIndex = nil
             draggedParagraphID = nil
+            initialTouchCount = 1
+            isMultitouchDrag = false
+        }
+
+        // MARK: - Auto-Scrolling for Drag-to-Reorder
+        private func startAutoScroll() {
+            guard !isAutoScrolling, let textView = textView else { return }
+
+            isAutoScrolling = true
+            scrollDisplayLink = CADisplayLink(target: self, selector: #selector(updateAutoScroll))
+            scrollDisplayLink?.add(to: .main, forMode: .common)
+
+            // Haptic feedback for scroll start
+            let scrollStartHaptic = UIImpactFeedbackGenerator(style: .light)
+            scrollStartHaptic.impactOccurred()
+        }
+
+        private func stopAutoScroll() {
+            isAutoScrolling = false
+            scrollDisplayLink?.invalidate()
+            scrollDisplayLink = nil
+        }
+
+        @objc private func updateAutoScroll() {
+            guard let textView = textView, let location = dragInitialLocation else {
+                stopAutoScroll()
+                return
+            }
+
+            let scrollBounds = textView.bounds
+            let contentOffset = textView.contentOffset
+            let yPosition = location.y - contentOffset.y
+
+            // Calculate scroll direction and speed
+            var scrollDelta: CGFloat = 0
+
+            // Top edge scrolling
+            if yPosition < scrollEdgeThreshold {
+                let distanceFromEdge = max(0, yPosition)
+                let speedFactor = 1.0 - (distanceFromEdge / scrollEdgeThreshold)
+                scrollDelta = -minScrollSpeed - (maxScrollSpeed - minScrollSpeed) * speedFactor
+            }
+            // Bottom edge scrolling
+            else if yPosition > scrollBounds.height - scrollEdgeThreshold {
+                let distanceFromEdge = max(0, scrollBounds.height - yPosition)
+                let speedFactor = 1.0 - (distanceFromEdge / scrollEdgeThreshold)
+                scrollDelta = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor
+            }
+
+            if abs(scrollDelta) > 1 {
+                let newOffset = CGPoint(
+                    x: textView.contentOffset.x,
+                    y: textView.contentOffset.y + scrollDelta / 60.0 // 60fps
+                )
+
+                // Clamp to valid range
+                let maxOffset = max(0, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
+                let clampedOffset = CGPoint(
+                    x: newOffset.x,
+                    y: max(-textView.adjustedContentInset.top, min(newOffset.y, maxOffset))
+                )
+
+                textView.setContentOffset(clampedOffset, animated: false)
+
+                // Update drag location and check for new target
+                let updatedLocation = CGPoint(x: location.x, y: location.y + scrollDelta / 60.0)
+                dragInitialLocation = updatedLocation
+
+                // Update target index based on new scroll position
+                let newTargetIndex = calculateTargetIndex(for: updatedLocation, textView: textView)
+                if newTargetIndex != dragTargetIndex {
+                    let currentDragIndex = draggingParagraphIndex ?? 0
+                    reorderParagraph(from: currentDragIndex, to: newTargetIndex, textView: textView, isLiveDrag: true)
+                    draggingParagraphIndex = newTargetIndex
+                    dragTargetIndex = newTargetIndex
+                    setDraggingSource(newTargetIndex)
+                    dragSelectionGenerator.selectionChanged()
+                }
+            } else {
+                stopAutoScroll()
+            }
+        }
+
+        private func checkAutoScroll(location: CGPoint, textView: UITextView) {
+            let scrollBounds = textView.bounds
+            let contentOffset = textView.contentOffset
+
+            // Calculate location relative to visible bounds
+            let visibleLocation = CGPoint(
+                x: location.x,
+                y: location.y - contentOffset.y
+            )
+
+            let shouldScrollTop = visibleLocation.y < scrollEdgeThreshold
+            let shouldScrollBottom = visibleLocation.y > scrollBounds.height - scrollEdgeThreshold
+            let shouldScroll = shouldScrollTop || shouldScrollBottom
+
+            if shouldScroll && !isAutoScrolling {
+                startAutoScroll()
+            } else if !shouldScroll && isAutoScrolling {
+                stopAutoScroll()
+            }
         }
     }
 }
