@@ -1604,10 +1604,8 @@ struct RichTextEditor: UIViewRepresentable {
         }
         
         private func cleanupReplyGesture() {
-            UIView.animate(withDuration: 0.2, animations: {
-                self.replyGhostView?.alpha = 0
-                self.replyOverlayView?.alpha = 0
-            }, completion: { _ in
+            guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
+                // Fallback to immediate cleanup if views don't exist
                 self.replyGhostView?.removeFromSuperview()
                 self.replyOverlayView?.removeFromSuperview()
                 self.replyGhostView = nil
@@ -1615,7 +1613,30 @@ struct RichTextEditor: UIViewRepresentable {
                 self.replyGestureParagraphIndex = nil
                 self.replyGestureInitialLocation = nil
                 self.hasTriggeredReplyHaptic = false
-            })
+                return
+            }
+            
+            // Spring animation for ghost return to original position
+            UIView.animate(
+                withDuration: 0.3,
+                delay: 0,
+                usingSpringWithDamping: 0.8,
+                initialSpringVelocity: 0.5,
+                options: [.curveEaseOut, .allowUserInteraction],
+                animations: {
+                    ghostView.transform = CGAffineTransform.identity
+                    overlayView.alpha = 0
+                },
+                completion: { _ in
+                    self.replyGhostView?.removeFromSuperview()
+                    self.replyOverlayView?.removeFromSuperview()
+                    self.replyGhostView = nil
+                    self.replyOverlayView = nil
+                    self.replyGestureParagraphIndex = nil
+                    self.replyGestureInitialLocation = nil
+                    self.hasTriggeredReplyHaptic = false
+                }
+            )
         }
     }
 }
