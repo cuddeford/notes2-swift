@@ -160,7 +160,9 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $isShowingSettings) {
-                SettingsView()
+                NavigationView {
+                    SettingsView()
+                }
             }
             .fullScreenCover(item: $selectedNoteID) { noteID in
                 if let note = notes.first(where: { $0.id == noteID }) {
