@@ -1112,23 +1112,30 @@ struct RichTextEditor: UIViewRepresentable {
                 return // Or handle error appropriately
             }
 
-            snapshotView.frame = snapshotRect
-            
-            // Apply styling to the snapshot's layer
-            snapshotView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
-            snapshotView.layer.masksToBounds = false // Allow shadow to be visible
-            snapshotView.layer.shadowColor = UIColor.label.cgColor
-            snapshotView.layer.shadowOpacity = 0.3
-            snapshotView.layer.shadowOffset = CGSize(width: 0, height: 2)
-            snapshotView.layer.shadowRadius = 4
-            snapshotView.alpha = 0
+            // Create a container to hold the snapshot and apply the shadow to it
+            let ghostContainerView = UIView(frame: snapshotRect)
 
-            textView.addSubview(snapshotView)
-            dragGhostView = snapshotView
+            // Configure the shadow on the container
+            ghostContainerView.layer.shadowColor = UIColor.label.cgColor
+            ghostContainerView.layer.shadowOpacity = 0.1
+            ghostContainerView.layer.shadowOffset = CGSize(width: 0, height: 5)
+            ghostContainerView.layer.shadowRadius = 10.0
+            ghostContainerView.layer.shadowPath = UIBezierPath(roundedRect: ghostContainerView.bounds, cornerRadius: ruledView?.overlayCornerRadius ?? 20.0).cgPath
+
+            // Configure the snapshot view itself
+            snapshotView.frame = ghostContainerView.bounds
+            snapshotView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
+            snapshotView.layer.masksToBounds = true
+
+            ghostContainerView.addSubview(snapshotView)
+            ghostContainerView.alpha = 0
+
+            textView.addSubview(ghostContainerView)
+            dragGhostView = ghostContainerView
 
             // Animate appearance
             UIView.animate(withDuration: 0.2) {
-                snapshotView.alpha = 1.0
+                ghostContainerView.alpha = 1.0
             }
         }
 
