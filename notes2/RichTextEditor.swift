@@ -1256,7 +1256,7 @@ struct RichTextEditor: UIViewRepresentable {
                         paragraphRects.append(adjustedFrame)
                     } else {
                         // Fallback to layout-based detection
-                        var rect = textView.layoutManager.boundingRect(
+                        let rect = textView.layoutManager.boundingRect(
                             forGlyphRange: paragraphs[index].range,
                             in: textView.textContainer
                         )
@@ -1265,8 +1265,8 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             } else {
                 // Fallback to layout-based detection
-                for (index, paragraph) in paragraphs.enumerated() {
-                    var rect = textView.layoutManager.boundingRect(
+                for (_, paragraph) in paragraphs.enumerated() {
+                    let rect = textView.layoutManager.boundingRect(
                         forGlyphRange: paragraph.range,
                         in: textView.textContainer
                     )
@@ -1387,7 +1387,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         // MARK: - Auto-Scrolling for Drag-to-Reorder
         private func startAutoScroll() {
-            guard !isAutoScrolling, let textView = textView else { return }
+            guard !isAutoScrolling, let _ = textView else { return }
 
             isAutoScrolling = true
             scrollDisplayLink = CADisplayLink(target: self, selector: #selector(updateAutoScroll))
