@@ -1029,7 +1029,7 @@ struct RichTextEditor: UIViewRepresentable {
             dragInitialLocation = location
 
             // Create ghost view
-            createDragGhost(for: paragraphs[index], textView: textView)
+            createDragGhost(for: paragraphs[index], at: index, textView: textView)
 
             // Fade original paragraph
             updateOriginalParagraphOpacity(index: index, opacity: 0.3)
@@ -1101,19 +1101,11 @@ struct RichTextEditor: UIViewRepresentable {
             return nil
         }
 
-        private func createDragGhost(for paragraph: Paragraph, textView: UITextView) {
-            let textRect = textView.layoutManager.boundingRect(
-                forGlyphRange: paragraph.range,
-                in: textView.textContainer
-            )
-
-            // This padding MUST match RuledView's overlay padding to capture the full visual
-            let overlayPaddingHorizontal = 15.0
-            let overlayPaddingVertical = overlayPaddingHorizontal / 2.0
-
-            let snapshotRect = textRect
-                .offsetBy(dx: textView.textContainerInset.left, dy: textView.textContainerInset.top)
-                .insetBy(dx: -overlayPaddingHorizontal, dy: -overlayPaddingVertical)
+        private func createDragGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) {
+            // Use the RuledView to get the exact frame of the overlay
+            guard let snapshotRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else {
+                return
+            }
 
             // Create a snapshot of the paragraph area, including the RuledView overlay
             guard let snapshotView = textView.resizableSnapshotView(from: snapshotRect, afterScreenUpdates: true, withCapInsets: .zero) else {
@@ -1123,7 +1115,7 @@ struct RichTextEditor: UIViewRepresentable {
             snapshotView.frame = snapshotRect
             
             // Apply styling to the snapshot's layer
-            snapshotView.layer.cornerRadius = 8
+            snapshotView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
             snapshotView.layer.masksToBounds = false // Allow shadow to be visible
             snapshotView.layer.shadowColor = UIColor.label.cgColor
             snapshotView.layer.shadowOpacity = 0.3

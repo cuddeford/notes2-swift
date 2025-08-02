@@ -6,6 +6,7 @@ class RuledView: UIView {
     private var paragraphOverlays: [CAShapeLayer] = []
     private var targetIndicatorLayers: [CAShapeLayer] = []
     private var dragState: DragState = .none
+    public let overlayCornerRadius: CGFloat = 20.0
 
     enum DragState {
         case none
@@ -105,7 +106,6 @@ class RuledView: UIView {
 
     func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
         let inset = textView.textContainerInset
-        let cornerRadius = 20.0
 
         // Remove excess layers
         if paragraphOverlays.count > paragraphs.count {
@@ -130,7 +130,7 @@ class RuledView: UIView {
                 }
             }
 
-            var path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
+            var path = UIBezierPath(roundedRect: drawingRect, cornerRadius: overlayCornerRadius).cgPath
 
             if index == paragraphs.count - 1 {
                 let lastIsEmpty = paragraph.content.string.isEmpty
@@ -150,7 +150,7 @@ class RuledView: UIView {
                     height: drawingRect.height,
                 )
 
-                path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
+                path = UIBezierPath(roundedRect: blockRect, cornerRadius: overlayCornerRadius).cgPath
             }
 
             // weird little hack for height spacing on the penultimate paragraph
@@ -166,7 +166,7 @@ class RuledView: UIView {
                             height: drawingRect.height - 0.5,
                         )
 
-                        path = UIBezierPath(roundedRect: heightFixRect, cornerRadius: cornerRadius).cgPath
+                        path = UIBezierPath(roundedRect: heightFixRect, cornerRadius: overlayCornerRadius).cgPath
                     }
                 }
             }
@@ -242,6 +242,13 @@ class RuledView: UIView {
         for layer in paragraphOverlays {
             layer.opacity = 0
         }
+    }
+
+    func getOverlayFrame(forParagraphAtIndex index: Int) -> CGRect? {
+        guard index < paragraphOverlays.count, let path = paragraphOverlays[index].path else {
+            return nil
+        }
+        return path.boundingBox
     }
 
     // MARK: - Drag-to-Reorder Visual Support
