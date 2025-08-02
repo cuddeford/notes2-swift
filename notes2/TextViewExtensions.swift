@@ -55,9 +55,9 @@ class CustomTextView: UITextView {
         return adjustedRects
     }
 
-    // Prevent scrolling during pinch gesture
+    // Prevent scrolling during pinch gesture and paragraph drag
     override func scrollRectToVisible(_ rect: CGRect, animated: Bool) {
-        if coordinator?.isPinching == true {
+        if coordinator?.isPinching == true || coordinator?.isDragging == true {
             return
         }
 

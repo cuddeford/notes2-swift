@@ -4,8 +4,8 @@ class RuledView: UIView {
     weak var textView: UITextView?
 
     private var paragraphOverlays: [CAShapeLayer] = []
-    private var targetIndicatorLayers: [CAShapeLayer] = []
-    private var dragState: DragState = .none
+    private var draggingSourceIndex: Int?
+    public let overlayCornerRadius: CGFloat = 20.0
 
     enum DragState {
         case none
@@ -105,7 +105,6 @@ class RuledView: UIView {
 
     func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
         let inset = textView.textContainerInset
-        let cornerRadius = 20.0
 
         // Remove excess layers
         if paragraphOverlays.count > paragraphs.count {
@@ -130,7 +129,7 @@ class RuledView: UIView {
                 }
             }
 
-            var path = UIBezierPath(roundedRect: drawingRect, cornerRadius: cornerRadius).cgPath
+            var path = UIBezierPath(roundedRect: drawingRect, cornerRadius: overlayCornerRadius).cgPath
 
             if index == paragraphs.count - 1 {
                 let lastIsEmpty = paragraph.content.string.isEmpty
@@ -150,7 +149,7 @@ class RuledView: UIView {
                     height: drawingRect.height,
                 )
 
-                path = UIBezierPath(roundedRect: blockRect, cornerRadius: cornerRadius).cgPath
+                path = UIBezierPath(roundedRect: blockRect, cornerRadius: overlayCornerRadius).cgPath
             }
 
             // weird little hack for height spacing on the penultimate paragraph
@@ -166,7 +165,7 @@ class RuledView: UIView {
                             height: drawingRect.height - 0.5,
                         )
 
-                        path = UIBezierPath(roundedRect: heightFixRect, cornerRadius: cornerRadius).cgPath
+                        path = UIBezierPath(roundedRect: heightFixRect, cornerRadius: overlayCornerRadius).cgPath
                     }
                 }
             }
@@ -213,16 +212,22 @@ class RuledView: UIView {
                 detent = paragraph.paragraphStyle.paragraphSpacing
             }
 
-            let (fill, stroke) = colors(for: detent, isPinched: isPinched)
+            let (fill, stroke) = colors(for: detent, isPinched: isPinched, isDraggingSource: index == draggingSourceIndex)
             let borderWidth = self.borderWidth(for: paragraphs[index].range)
 
             if index < paragraphOverlays.count {
                 // Update existing layer
-                paragraphOverlays[index].path = path
-                paragraphOverlays[index].fillColor = fill.cgColor
-                paragraphOverlays[index].strokeColor = stroke.cgColor
-                paragraphOverlays[index].opacity = 1
-                paragraphOverlays[index].lineWidth = borderWidth
+                let layer = paragraphOverlays[index]
+                layer.path = path
+                layer.fillColor = fill.cgColor
+                layer.strokeColor = stroke.cgColor
+                layer.opacity = 1
+                layer.lineWidth = borderWidth
+                if index == draggingSourceIndex {
+                    layer.lineDashPattern = [10, 5] // Dashed pattern
+                } else {
+                    layer.lineDashPattern = nil // Solid line
+                }
             } else {
                 // Create new layer
                 let newLayer = CAShapeLayer()
@@ -232,6 +237,11 @@ class RuledView: UIView {
                 newLayer.fillColor = fill.cgColor
                 newLayer.strokeColor = stroke.cgColor
                 newLayer.opacity = 1
+                if index == draggingSourceIndex {
+                    newLayer.lineDashPattern = [10, 5] // Dashed pattern
+                } else {
+                    newLayer.lineDashPattern = nil // Solid line
+                }
                 layer.addSublayer(newLayer)
                 paragraphOverlays.append(newLayer)
             }
@@ -244,6 +254,13 @@ class RuledView: UIView {
         }
     }
 
+    func getOverlayFrame(forParagraphAtIndex index: Int) -> CGRect? {
+        guard index < paragraphOverlays.count, let path = paragraphOverlays[index].path else {
+            return nil
+        }
+        return path.boundingBox
+    }
+
     // MARK: - Drag-to-Reorder Visual Support
 
     func updateParagraphOverlayOpacity(index: Int, opacity: Float) {
@@ -251,89 +268,18 @@ class RuledView: UIView {
         paragraphOverlays[index].opacity = opacity
     }
 
-    func updateTargetIndicators(targetIndex: Int?) {
-        // Clear existing target indicators
-        for layer in targetIndicatorLayers {
-            layer.removeFromSuperlayer()
+    func setDraggingSourceIndex(_ index: Int?) {
+        draggingSourceIndex = index
+        // We need to redraw the overlays to reflect the change
+        if let coordinator = textView?.delegate as? RichTextEditor.Coordinator, let textView = textView {
+            updateAllParagraphOverlays(
+                paragraphs: coordinator.paragraphs,
+                textView: textView,
+                activePinchedPairs: coordinator.activePinchedPairs
+            )
         }
-        targetIndicatorLayers.removeAll()
-
-        guard let textView = textView,
-              let coordinator = textView.delegate as? RichTextEditor.Coordinator,
-              let targetIndex = targetIndex else { return }
-
-        let paragraphs = coordinator.paragraphs
-        let inset = textView.textContainerInset
-        let indicatorHeight: CGFloat = 4
-        let indicatorWidth: CGFloat = textView.textContainer.size.width
-        let cornerRadius: CGFloat = 2
-
-        // Calculate position for target indicator
-        var yPosition: CGFloat
-
-        if targetIndex == 0 {
-            // Before first paragraph
-            if paragraphs.count > 0 {
-                let firstParagraph = paragraphs[0]
-                let rect = textView.layoutManager.boundingRect(forGlyphRange: firstParagraph.range, in: textView.textContainer)
-                yPosition = rect.origin.y + inset.top - 10
-            } else {
-                yPosition = inset.top
-            }
-        } else if targetIndex == paragraphs.count {
-            // After last paragraph
-            if paragraphs.count > 0 {
-                let lastParagraph = paragraphs[paragraphs.count - 1]
-                let rect = textView.layoutManager.boundingRect(forGlyphRange: lastParagraph.range, in: textView.textContainer)
-                yPosition = rect.origin.y + rect.height + inset.top + 10
-            } else {
-                yPosition = inset.top
-            }
-        } else {
-            // Between paragraphs
-            let prevParagraph = paragraphs[targetIndex - 1]
-            let prevRect = textView.layoutManager.boundingRect(forGlyphRange: prevParagraph.range, in: textView.textContainer)
-            yPosition = prevRect.origin.y + prevRect.height + inset.top + (prevParagraph.paragraphStyle.paragraphSpacing / 2)
-        }
-
-        let indicatorRect = CGRect(
-            x: inset.left,
-            y: yPosition - indicatorHeight / 2,
-            width: indicatorWidth,
-            height: indicatorHeight
-        )
-
-        let indicatorLayer = CAShapeLayer()
-        indicatorLayer.path = UIBezierPath(roundedRect: indicatorRect, cornerRadius: cornerRadius).cgPath
-        indicatorLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
-        indicatorLayer.opacity = 0
-
-        layer.addSublayer(indicatorLayer)
-        targetIndicatorLayers.append(indicatorLayer)
-
-        // Animate appearance
-        let animation = CABasicAnimation(keyPath: "opacity")
-        animation.fromValue = 0
-        animation.toValue = 1
-        animation.duration = 0.2
-        indicatorLayer.add(animation, forKey: "fadeIn")
-        indicatorLayer.opacity = 1
     }
 
-    func clearTargetIndicators() {
-        for layer in targetIndicatorLayers {
-            let animation = CABasicAnimation(keyPath: "opacity")
-            animation.fromValue = 1
-            animation.toValue = 0
-            animation.duration = 0.2
-            layer.add(animation, forKey: "fadeOut")
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                layer.removeFromSuperlayer()
-            }
-        }
-        targetIndicatorLayers.removeAll()
-    }
 
     func triggerHapticFeedback(for range: NSRange, type: HapticType) {
         // Apply haptic state to this paragraph
@@ -438,7 +384,11 @@ class RuledView: UIView {
         return baseBorderWidth + additionalWidth
     }
 
-    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false) -> (fill: UIColor, stroke: UIColor) {
+    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false, isDraggingSource: Bool = false) -> (fill: UIColor, stroke: UIColor) {
+        if isDraggingSource {
+            return (UIColor.systemBlue.withAlphaComponent(0.3), .systemBlue)
+        }
+
         guard isPinched else {
             if !AppSettings.shared.paragraphOverlaysEnabled {
                 return (UIColor.clear, UIColor.clear)

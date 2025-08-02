@@ -11,13 +11,10 @@ import SwiftUI
 
 struct Paragraph: Identifiable, Equatable {
     static func == (lhs: Paragraph, rhs: Paragraph) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.content == rhs.content &&
-               lhs.range == rhs.range &&
-               lhs.paragraphStyle == rhs.paragraphStyle
+        return lhs.id == rhs.id
     }
 
-    let id = UUID()
+    var id = UUID()
     var content: NSAttributedString
     var range: NSRange
     var paragraphStyle: NSParagraphStyle = NSParagraphStyle.default

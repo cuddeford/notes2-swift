@@ -89,7 +89,7 @@ struct RichTextEditor: UIViewRepresentable {
         textView.addGestureRecognizer(pinchGesture)
 
         let longPressGesture = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPressGesture(_:)))
-        longPressGesture.minimumPressDuration = 0.5
+        longPressGesture.minimumPressDuration = 0.25
         longPressGesture.allowableMovement = 20
         textView.addGestureRecognizer(longPressGesture)
 
@@ -189,8 +189,22 @@ struct RichTextEditor: UIViewRepresentable {
         private var dragGhostView: UIView?
         private var dragInitialLocation: CGPoint?
         private var dragTargetIndex: Int?
+        private var draggedParagraphID: UUID?
+        var isDragging: Bool = false
+        private let showGhostOverlay = false
         private let dragHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private let dragSelectionGenerator = UISelectionFeedbackGenerator()
+
+        // Auto-scrolling state for drag-to-reorder
+        private var scrollDisplayLink: CADisplayLink?
+        private var isAutoScrolling: Bool = false
+        private let scrollEdgeThreshold: CGFloat = 80.0
+        private let maxScrollSpeed: CGFloat = 1200.0
+        private let minScrollSpeed: CGFloat = 200.0
+
+        // Multitouch support for drag + manual scroll
+        private var initialTouchCount: Int = 1
+        private var isMultitouchDrag: Bool = false
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -236,8 +250,25 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
 
-            self.paragraphs = newParagraphs
-            self.lastParagraphCount = newParagraphs.count
+            // Preserve existing UUIDs for paragraphs that haven't changed
+            let oldParagraphs = self.paragraphs
+            var finalParagraphs: [Paragraph] = []
+            var consumedOldIndices = Set<Int>() // Track indices of old paragraphs that have been matched
+
+            for var newP in newParagraphs { // Use 'var' to allow modification
+                for (oldIndex, oldP) in oldParagraphs.enumerated() {
+                    if !consumedOldIndices.contains(oldIndex) && oldP.content.isEqual(to: newP.content) && oldP.paragraphStyle == newP.paragraphStyle {
+                        // If content and paragraph style match, reuse the old paragraph's UUID
+                        newP.id = oldP.id
+                        consumedOldIndices.insert(oldIndex) // Mark as consumed
+
+                        break // Found a match for this new paragraph, move to next newP
+                    }
+                }
+                finalParagraphs.append(newP)
+            }
+            self.paragraphs = finalParagraphs
+            self.lastParagraphCount = finalParagraphs.count
             updateParagraphSpatialProperties()
             if let tv = textView {
                 ruledView?.updateAllParagraphOverlays(
@@ -252,17 +283,13 @@ struct RichTextEditor: UIViewRepresentable {
 
         func updateParagraphSpatialProperties() {
             guard let textView = textView else { return }
-            var updatedParagraphs = [Paragraph]()
-
-            for var paragraph in paragraphs {
+            for i in 0..<paragraphs.count {
+                let paragraph = paragraphs[i]
                 let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
-                paragraph.height = rect.height
-                paragraph.numberOfLines = Int((rect.height / textView.font!.lineHeight).rounded(.toNearestOrAwayFromZero))
-                paragraph.screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y)
-
-                updatedParagraphs.append(paragraph)
+                paragraphs[i].height = rect.height
+                paragraphs[i].numberOfLines = Int((rect.height / textView.font!.lineHeight).rounded(.toNearestOrAwayFromZero))
+                paragraphs[i].screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y)
             }
-            self.paragraphs = updatedParagraphs
         }
 
         func updateRuledViewFrame() {
@@ -478,15 +505,17 @@ struct RichTextEditor: UIViewRepresentable {
                 let cursorLocation = textView.selectedRange.location
 
                 self.parent.text = textView.attributedText
-                let oldParagraphs = self.paragraphs
-                self.parseAttributedText(textView.attributedText)
-                let newParagraphs = self.paragraphs
+                if !self.isDragging {
+                    let oldParagraphs = self.paragraphs
+                    self.parseAttributedText(textView.attributedText)
+                    let newParagraphs = self.paragraphs
 
-                // Check if new paragraphs were added by comparing counts
-                if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
-                    self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
+                    // Check if new paragraphs were added by comparing counts
+                    if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
+                        self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
+                    }
+                    self.lastParagraphCount = newParagraphs.count
                 }
-                self.lastParagraphCount = newParagraphs.count
 
                 self.centerCursorInTextView()
                 self.updateRuledViewFrame()
@@ -1006,77 +1035,119 @@ struct RichTextEditor: UIViewRepresentable {
 
             switch gesture.state {
             case .began:
-                handleDragBegan(location: location, textView: textView)
+                handleDragBegan(location: location, textView: textView, gesture: gesture)
             case .changed:
-                handleDragChanged(location: location, textView: textView)
+                handleDragChanged(location: location, textView: textView, gesture: gesture)
             case .ended, .cancelled:
-                handleDragEnded(location: location, textView: textView)
+                handleDragEnded(location: location, textView: textView, gesture: gesture)
             default:
                 break
             }
         }
 
-        private func handleDragBegan(location: CGPoint, textView: UITextView) {
+        private func handleDragBegan(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
             // Find which paragraph contains the press location
             guard let index = paragraphIndex(at: location, textView: textView) else { return }
-
-            // Don't allow dragging the last empty paragraph
-            if index == paragraphs.count - 1 && paragraphs[index].content.string.isEmpty {
-                return
-            }
-
-            draggingParagraphIndex = index
-            dragInitialLocation = location
-
-            // Create ghost view
-            createDragGhost(for: paragraphs[index], textView: textView)
-
-            // Fade original paragraph
-            updateOriginalParagraphOpacity(index: index, opacity: 0.3)
 
             // Prepare haptics
             dragSelectionGenerator.prepare()
             dragHapticGenerator.prepare()
+
+            dragSelectionGenerator.selectionChanged()
+
+            draggingParagraphIndex = index
+            draggedParagraphID = paragraphs[index].id
+            dragInitialLocation = location
+
+            // Track initial touch count for multitouch detection
+            initialTouchCount = gesture.numberOfTouches
+            isMultitouchDrag = false
+
+            // Create ghost view if enabled
+            if showGhostOverlay {
+                createDragGhost(for: paragraphs[index], at: index, textView: textView)
+            }
+
+            // Highlight the source paragraph
+            setDraggingSource(index)
+            isDragging = true
         }
 
-        private func handleDragChanged(location: CGPoint, textView: UITextView) {
-            guard let ghostView = dragGhostView, let dragIndex = draggingParagraphIndex else { return }
+        private func handleDragChanged(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
+            guard draggedParagraphID != nil else { return }
 
-            // Update ghost position
-            let offset = CGPoint(
-                x: location.x - (dragInitialLocation?.x ?? 0),
-                y: location.y - (dragInitialLocation?.y ?? 0)
-            )
-            ghostView.center = CGPoint(
-                x: textView.bounds.midX + offset.x,
-                y: textView.convert(paragraphs[dragIndex].screenPosition, to: textView).y + offset.y
-            )
+            // Check for multitouch transition
+            let currentTouchCount = gesture.numberOfTouches
+            if currentTouchCount > initialTouchCount {
+                isMultitouchDrag = true
+                stopAutoScroll() // Stop auto-scroll when second finger is added
+            }
+
+            // Update drag location for auto-scrolling
+            dragInitialLocation = location
+
+            // Check for auto-scrolling (only if not multitouch scrolling)
+            if !isMultitouchDrag {
+                checkAutoScroll(location: location, textView: textView)
+            }
 
             // Find target insertion index
             let newTargetIndex = calculateTargetIndex(for: location, textView: textView)
 
-            // Update target indicators
+            // Move paragraph immediately when target changes
             if newTargetIndex != dragTargetIndex {
+                // Use stored dragging index instead of UUID lookup to avoid identity loss
+                let currentDragIndex = draggingParagraphIndex ?? 0
+
+                reorderParagraph(from: currentDragIndex, to: newTargetIndex, textView: textView, isLiveDrag: true)
+
+                // Update drag index to reflect new position
+                draggingParagraphIndex = newTargetIndex
                 dragTargetIndex = newTargetIndex
-                updateTargetIndicators()
+
+                // Update the blue styling to the new position
+                setDraggingSource(newTargetIndex)
+
+                // Haptic feedback for movement
                 dragSelectionGenerator.selectionChanged()
+            }
+
+            // Update ghost position based on current paragraph position if ghost is enabled
+            if showGhostOverlay, let ghostView = dragGhostView, let currentIndex = draggingParagraphIndex {
+                let currentParagraph = paragraphs[currentIndex]
+                let paragraphFrame = textView.layoutManager.boundingRect(
+                    forGlyphRange: currentParagraph.range,
+                    in: textView.textContainer
+                ).offsetBy(dx: textView.textContainerInset.left, dy: textView.textContainerInset.top)
+
+                // Calculate offset from initial touch to maintain drag continuity
+                let touchOffset = CGPoint(
+                    x: location.x - (dragInitialLocation?.x ?? 0),
+                    y: location.y - (dragInitialLocation?.y ?? 0)
+                )
+
+                // Position ghost relative to current paragraph position
+                ghostView.center = CGPoint(
+                    x: ghostView.center.x,
+                    y: paragraphFrame.midY + touchOffset.y
+                )
             }
         }
 
-        private func handleDragEnded(location: CGPoint, textView: UITextView) {
-            guard let dragIndex = draggingParagraphIndex, let targetIndex = dragTargetIndex else {
-                cancelDrag()
-                return
-            }
-
-            // Perform paragraph reordering
-            reorderParagraph(from: dragIndex, to: targetIndex, textView: textView)
-
-            // Clean up drag state
+        private func handleDragEnded(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
+            // Paragraph has already been moved during drag, just clean up
             cleanupDrag()
+            isDragging = false
+            isMultitouchDrag = false
 
-            // Haptic feedback
+            // Re-parse attributed text to ensure paragraph ranges are up-to-date
+            self.parseAttributedText(textView.attributedText)
+
+            // Final haptic feedback for drop completion
             dragHapticGenerator.impactOccurred()
+
+            // Ensure cursor is visible after final drop
+            centerCursorInTextView()
         }
 
         private func paragraphIndex(at location: CGPoint, textView: UITextView) -> Int? {
@@ -1085,11 +1156,36 @@ struct RichTextEditor: UIViewRepresentable {
                 y: location.y - textView.textContainerInset.top
             )
 
+            // Use the overlay frames from RuledView for consistent positioning
+            if let ruledView = ruledView {
+                for index in 0..<paragraphs.count {
+                    if let overlayFrame = ruledView.getOverlayFrame(forParagraphAtIndex: index) {
+                        // The overlay frame already includes textContainerInset, so we need to adjust it back
+                        let adjustedFrame = overlayFrame.offsetBy(dx: -textView.textContainerInset.left, dy: -textView.textContainerInset.top)
+                        if adjustedFrame.contains(adjustedLocation) {
+                            return index
+                        }
+                    }
+                }
+            }
+
+            // Fallback to layout-based detection if overlays aren't available
             for (index, paragraph) in paragraphs.enumerated() {
-                let rect = textView.layoutManager.boundingRect(
+                var rect = textView.layoutManager.boundingRect(
                     forGlyphRange: paragraph.range,
                     in: textView.textContainer
                 )
+
+                if index == paragraphs.count - 1 {
+                    // Last paragraph - use full width for consistent touch area
+                    rect = CGRect(
+                        x: 0,
+                        y: rect.minY,
+                        width: textView.textContainer.size.width,
+                        height: max(rect.height, textView.font?.lineHeight ?? 20)
+                    )
+                }
+
                 if rect.contains(adjustedLocation) {
                     return index
                 }
@@ -1097,36 +1193,47 @@ struct RichTextEditor: UIViewRepresentable {
             return nil
         }
 
-        private func createDragGhost(for paragraph: Paragraph, textView: UITextView) {
+        private func createDragGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) {
+            // Use the RuledView to get the exact frame of the overlay
+            guard let snapshotRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else {
+                return
+            }
 
-            let paragraphRect = textView.layoutManager.boundingRect(
-                forGlyphRange: paragraph.range,
-                in: textView.textContainer
-            ).offsetBy(dx: textView.textContainerInset.left, dy: textView.textContainerInset.top)
+            // Create a snapshot of the paragraph area, including the RuledView overlay
+            guard let snapshotView = textView.resizableSnapshotView(from: snapshotRect, afterScreenUpdates: true, withCapInsets: .zero) else {
+                return // Or handle error appropriately
+            }
 
-            // Create ghost view with paragraph content
-            let ghostView = UIView(frame: paragraphRect)
-            ghostView.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
-            ghostView.layer.cornerRadius = 8
-            ghostView.layer.shadowColor = UIColor.label.cgColor
-            ghostView.layer.shadowOpacity = 0.3
-            ghostView.layer.shadowOffset = CGSize(width: 0, height: 2)
-            ghostView.layer.shadowRadius = 4
-            ghostView.alpha = 0
+            // Create a container to hold the snapshot and apply the shadow to it
+            let ghostContainerView = UIView(frame: snapshotRect)
 
-            // Add paragraph content
-            let label = UILabel(frame: ghostView.bounds.insetBy(dx: 8, dy: 4))
-            label.attributedText = paragraph.content
-            label.numberOfLines = 0
-            label.font = textView.font
-            ghostView.addSubview(label)
+            // Configure the shadow on the container
+            ghostContainerView.layer.shadowColor = UIColor.label.cgColor
+            ghostContainerView.layer.shadowOpacity = 0.3
+            ghostContainerView.layer.shadowOffset = CGSize(width: 0, height: 5)
+            ghostContainerView.layer.shadowRadius = 10.0
+            ghostContainerView.layer.shadowPath = UIBezierPath(roundedRect: ghostContainerView.bounds, cornerRadius: ruledView?.overlayCornerRadius ?? 20.0).cgPath
 
-            textView.addSubview(ghostView)
-            dragGhostView = ghostView
+            // This view will have the opaque background and clip its subviews.
+            let clippingView = UIView(frame: ghostContainerView.bounds)
+            clippingView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
+            clippingView.layer.masksToBounds = true
+            clippingView.backgroundColor = .systemBackground.withAlphaComponent(0.8) // Semi-opaque background
+            ghostContainerView.addSubview(clippingView)
+
+            // The snapshot view is placed inside the clipping view.
+            // Its semi-transparent content will blend with the clippingView's opaque background.
+            snapshotView.frame = clippingView.bounds
+            clippingView.addSubview(snapshotView)
+
+            ghostContainerView.alpha = 0
+
+            textView.addSubview(ghostContainerView)
+            dragGhostView = ghostContainerView
 
             // Animate appearance
             UIView.animate(withDuration: 0.2) {
-                ghostView.alpha = 1
+                ghostContainerView.alpha = 1.0
             }
         }
 
@@ -1139,18 +1246,41 @@ struct RichTextEditor: UIViewRepresentable {
             )
 
             // Calculate target based on vertical position between paragraphs
-            var targetIndex = 0
-            for (index, paragraph) in paragraphs.enumerated() {
-                let rect = textView.layoutManager.boundingRect(
-                    forGlyphRange: paragraph.range,
-                    in: textView.textContainer
-                )
+            var paragraphRects: [CGRect] = []
 
+            // Use overlay frames if available, otherwise fallback to layout
+            if let ruledView = ruledView {
+                for index in 0..<paragraphs.count {
+                    if let overlayFrame = ruledView.getOverlayFrame(forParagraphAtIndex: index) {
+                        let adjustedFrame = overlayFrame.offsetBy(dx: -textView.textContainerInset.left, dy: -textView.textContainerInset.top)
+                        paragraphRects.append(adjustedFrame)
+                    } else {
+                        // Fallback to layout-based detection
+                        let rect = textView.layoutManager.boundingRect(
+                            forGlyphRange: paragraphs[index].range,
+                            in: textView.textContainer
+                        )
+                        paragraphRects.append(rect)
+                    }
+                }
+            } else {
+                // Fallback to layout-based detection
+                for (_, paragraph) in paragraphs.enumerated() {
+                    let rect = textView.layoutManager.boundingRect(
+                        forGlyphRange: paragraph.range,
+                        in: textView.textContainer
+                    )
+                    paragraphRects.append(rect)
+                }
+            }
+
+            var targetIndex = 0
+            for (index, rect) in paragraphRects.enumerated() {
                 if adjustedLocation.y < rect.midY {
                     targetIndex = index
                     break
-                } else if index == paragraphs.count - 1 {
-                    targetIndex = paragraphs.count
+                } else if index == paragraphRects.count - 1 {
+                    targetIndex = paragraphRects.count
                 }
             }
 
@@ -1162,7 +1292,7 @@ struct RichTextEditor: UIViewRepresentable {
             return max(0, min(targetIndex, paragraphs.count))
         }
 
-        private func reorderParagraph(from sourceIndex: Int, to targetIndex: Int, textView: UITextView) {
+        private func reorderParagraph(from sourceIndex: Int, to targetIndex: Int, textView: UITextView, isLiveDrag: Bool = false) {
             guard sourceIndex != targetIndex,
                   sourceIndex >= 0, sourceIndex < paragraphs.count,
                   targetIndex >= 0, targetIndex <= paragraphs.count else {
@@ -1183,24 +1313,50 @@ struct RichTextEditor: UIViewRepresentable {
             parent.text = newAttributedString
 
             // Update paragraphs and overlays
-            parseAttributedText(newAttributedString)
+            self.paragraphs = newParagraphs
+            updateParagraphSpatialProperties()
             updateRuledViewFrame()
+
+            // For live drag, don't reset the selection or cursor position
+            if !isLiveDrag {
+                // Ensure cursor is visible after final drop
+                centerCursorInTextView()
+            }
         }
 
         private func rebuildAttributedString(from paragraphs: [Paragraph]) -> NSAttributedString {
             let mutableAttributedString = NSMutableAttributedString()
-            for paragraph in paragraphs {
-                mutableAttributedString.append(paragraph.content)
+            for (index, paragraph) in paragraphs.enumerated() {
+                let isLast = index == paragraphs.count - 1
+                var content = paragraph.content
+
+                if isLast {
+                    // On the last paragraph, ensure it does not end with a newline.
+                    if content.string.hasSuffix("\n") {
+                        content = content.attributedSubstring(from: NSRange(location: 0, length: content.length - 1))
+                    }
+                } else {
+                    // On any other paragraph, ensure it ends with a newline.
+                    if !content.string.hasSuffix("\n") {
+                        let mutableContent = NSMutableAttributedString(attributedString: content)
+                        var attributes: [NSAttributedString.Key: Any] = [: ]
+                        if content.length > 0 {
+                            attributes = content.attributes(at: content.length - 1, effectiveRange: nil)
+                        } else if let textView = self.textView {
+                            attributes = textView.typingAttributes
+                        }
+                        attributes[.paragraphStyle] = paragraph.paragraphStyle
+                        mutableContent.append(NSAttributedString(string: "\n", attributes: attributes))
+                        content = mutableContent
+                    }
+                }
+                mutableAttributedString.append(content)
             }
             return mutableAttributedString
         }
 
-        private func updateOriginalParagraphOpacity(index: Int, opacity: Float) {
-            ruledView?.updateParagraphOverlayOpacity(index: index, opacity: opacity)
-        }
-
-        private func updateTargetIndicators() {
-            ruledView?.updateTargetIndicators(targetIndex: dragTargetIndex)
+        private func setDraggingSource(_ index: Int?) {
+            ruledView?.setDraggingSourceIndex(index)
         }
 
         private func cancelDrag() {
@@ -1208,22 +1364,125 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func cleanupDrag() {
-            // Remove ghost view
-            dragGhostView?.removeFromSuperview()
-            dragGhostView = nil
-
-            // Restore original paragraph opacity
-            if let index = draggingParagraphIndex {
-                updateOriginalParagraphOpacity(index: index, opacity: 1.0)
+            // Remove ghost view if it exists
+            if showGhostOverlay {
+                dragGhostView?.removeFromSuperview()
+                dragGhostView = nil
             }
+
+            // Stop auto-scrolling
+            stopAutoScroll()
+
+            // Restore original paragraph appearance
+            setDraggingSource(nil)
 
             // Clear drag state
             draggingParagraphIndex = nil
             dragInitialLocation = nil
             dragTargetIndex = nil
+            draggedParagraphID = nil
+            initialTouchCount = 1
+            isMultitouchDrag = false
+        }
 
-            // Clear target indicators
-            ruledView?.clearTargetIndicators()
+        // MARK: - Auto-Scrolling for Drag-to-Reorder
+        private func startAutoScroll() {
+            guard !isAutoScrolling, let _ = textView else { return }
+
+            isAutoScrolling = true
+            scrollDisplayLink = CADisplayLink(target: self, selector: #selector(updateAutoScroll))
+            scrollDisplayLink?.add(to: .main, forMode: .common)
+
+            // Haptic feedback for scroll start
+            let scrollStartHaptic = UIImpactFeedbackGenerator(style: .light)
+            scrollStartHaptic.impactOccurred()
+        }
+
+        private func stopAutoScroll() {
+            isAutoScrolling = false
+            scrollDisplayLink?.invalidate()
+            scrollDisplayLink = nil
+        }
+
+        @objc private func updateAutoScroll() {
+            guard let textView = textView, let location = dragInitialLocation else {
+                stopAutoScroll()
+                return
+            }
+
+            let scrollBounds = textView.bounds
+            let contentOffset = textView.contentOffset
+            let yPosition = location.y - contentOffset.y
+
+            // Calculate scroll direction and speed
+            var scrollDelta: CGFloat = 0
+
+            // Top edge scrolling
+            if yPosition < scrollEdgeThreshold {
+                let distanceFromEdge = max(0, yPosition)
+                let speedFactor = 1.0 - (distanceFromEdge / scrollEdgeThreshold)
+                scrollDelta = -minScrollSpeed - (maxScrollSpeed - minScrollSpeed) * speedFactor
+            }
+            // Bottom edge scrolling
+            else if yPosition > scrollBounds.height - scrollEdgeThreshold {
+                let distanceFromEdge = max(0, scrollBounds.height - yPosition)
+                let speedFactor = 1.0 - (distanceFromEdge / scrollEdgeThreshold)
+                scrollDelta = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor
+            }
+
+            if abs(scrollDelta) > 1 {
+                let newOffset = CGPoint(
+                    x: textView.contentOffset.x,
+                    y: textView.contentOffset.y + scrollDelta / 60.0 // 60fps
+                )
+
+                // Clamp to valid range
+                let maxOffset = max(0, textView.contentSize.height - textView.bounds.height + textView.adjustedContentInset.bottom)
+                let clampedOffset = CGPoint(
+                    x: newOffset.x,
+                    y: max(-textView.adjustedContentInset.top, min(newOffset.y, maxOffset))
+                )
+
+                textView.setContentOffset(clampedOffset, animated: false)
+
+                // Update drag location and check for new target
+                let updatedLocation = CGPoint(x: location.x, y: location.y + scrollDelta / 60.0)
+                dragInitialLocation = updatedLocation
+
+                // Update target index based on new scroll position
+                let newTargetIndex = calculateTargetIndex(for: updatedLocation, textView: textView)
+                if newTargetIndex != dragTargetIndex {
+                    let currentDragIndex = draggingParagraphIndex ?? 0
+                    reorderParagraph(from: currentDragIndex, to: newTargetIndex, textView: textView, isLiveDrag: true)
+                    draggingParagraphIndex = newTargetIndex
+                    dragTargetIndex = newTargetIndex
+                    setDraggingSource(newTargetIndex)
+                    dragSelectionGenerator.selectionChanged()
+                }
+            } else {
+                stopAutoScroll()
+            }
+        }
+
+        private func checkAutoScroll(location: CGPoint, textView: UITextView) {
+            let scrollBounds = textView.bounds
+            let contentOffset = textView.contentOffset
+
+            // Calculate location relative to visible bounds
+            let visibleLocation = CGPoint(
+                x: location.x,
+                y: location.y - contentOffset.y
+            )
+
+            let shouldScrollTop = visibleLocation.y < scrollEdgeThreshold
+            let shouldScrollBottom = visibleLocation.y > scrollBounds.height - scrollEdgeThreshold
+            let shouldScroll = shouldScrollTop || shouldScrollBottom
+
+            if shouldScroll && !isAutoScrolling {
+                startAutoScroll()
+            } else if !shouldScroll && isAutoScrolling {
+                stopAutoScroll()
+            }
         }
     }
 }
