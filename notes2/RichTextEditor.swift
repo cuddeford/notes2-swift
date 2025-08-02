@@ -189,7 +189,8 @@ struct RichTextEditor: UIViewRepresentable {
         private var dragGhostView: UIView?
         private var dragInitialLocation: CGPoint?
         private var dragTargetIndex: Int?
-        private var draggedParagraphContent: String?
+        private var draggedParagraphID: UUID?
+        private var isDragging: Bool = false
         private let showGhostOverlay = false
         private let dragHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private let dragSelectionGenerator = UISelectionFeedbackGenerator()
@@ -238,8 +239,25 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
 
-            self.paragraphs = newParagraphs
-            self.lastParagraphCount = newParagraphs.count
+            // Preserve existing UUIDs for paragraphs that haven't changed
+            let oldParagraphs = self.paragraphs
+            var finalParagraphs: [Paragraph] = []
+            var consumedOldIndices = Set<Int>() // Track indices of old paragraphs that have been matched
+
+            for var newP in newParagraphs { // Use 'var' to allow modification
+                for (oldIndex, oldP) in oldParagraphs.enumerated() {
+                    if !consumedOldIndices.contains(oldIndex) && oldP.content.isEqual(to: newP.content) && oldP.paragraphStyle == newP.paragraphStyle {
+                        // If content and paragraph style match, reuse the old paragraph's UUID
+                        newP.id = oldP.id
+                        consumedOldIndices.insert(oldIndex) // Mark as consumed
+
+                        break // Found a match for this new paragraph, move to next newP
+                    }
+                }
+                finalParagraphs.append(newP)
+            }
+            self.paragraphs = finalParagraphs
+            self.lastParagraphCount = finalParagraphs.count
             updateParagraphSpatialProperties()
             if let tv = textView {
                 ruledView?.updateAllParagraphOverlays(
@@ -254,17 +272,13 @@ struct RichTextEditor: UIViewRepresentable {
 
         func updateParagraphSpatialProperties() {
             guard let textView = textView else { return }
-            var updatedParagraphs = [Paragraph]()
-
-            for var paragraph in paragraphs {
+            for i in 0..<paragraphs.count {
+                let paragraph = paragraphs[i]
                 let rect = textView.layoutManager.boundingRect(forGlyphRange: paragraph.range, in: textView.textContainer)
-                paragraph.height = rect.height
-                paragraph.numberOfLines = Int((rect.height / textView.font!.lineHeight).rounded(.toNearestOrAwayFromZero))
-                paragraph.screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y)
-
-                updatedParagraphs.append(paragraph)
+                paragraphs[i].height = rect.height
+                paragraphs[i].numberOfLines = Int((rect.height / textView.font!.lineHeight).rounded(.toNearestOrAwayFromZero))
+                paragraphs[i].screenPosition = CGPoint(x: rect.origin.x, y: rect.origin.y)
             }
-            self.paragraphs = updatedParagraphs
         }
 
         func updateRuledViewFrame() {
@@ -480,15 +494,17 @@ struct RichTextEditor: UIViewRepresentable {
                 let cursorLocation = textView.selectedRange.location
 
                 self.parent.text = textView.attributedText
-                let oldParagraphs = self.paragraphs
-                self.parseAttributedText(textView.attributedText)
-                let newParagraphs = self.paragraphs
+                if !self.isDragging {
+                    let oldParagraphs = self.paragraphs
+                    self.parseAttributedText(textView.attributedText)
+                    let newParagraphs = self.paragraphs
 
-                // Check if new paragraphs were added by comparing counts
-                if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
-                    self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
+                    // Check if new paragraphs were added by comparing counts
+                    if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
+                        self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
+                    }
+                    self.lastParagraphCount = newParagraphs.count
                 }
-                self.lastParagraphCount = newParagraphs.count
 
                 self.centerCursorInTextView()
                 self.updateRuledViewFrame()
@@ -1028,7 +1044,7 @@ struct RichTextEditor: UIViewRepresentable {
             }
 
             draggingParagraphIndex = index
-            draggedParagraphContent = paragraphs[index].content.string
+            draggedParagraphID = paragraphs[index].id
             dragInitialLocation = location
 
             // Create ghost view if enabled
@@ -1038,6 +1054,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Highlight the source paragraph
             setDraggingSource(index)
+            isDragging = true
 
             // Prepare haptics
             dragSelectionGenerator.prepare()
@@ -1045,7 +1062,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleDragChanged(location: CGPoint, textView: UITextView) {
-            guard let draggedContent = draggedParagraphContent else { return }
+            guard let draggedID = draggedParagraphID else { return }
 
             // Find target insertion index
             let newTargetIndex = calculateTargetIndex(for: location, textView: textView)
@@ -1053,7 +1070,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Move paragraph immediately when target changes
             if newTargetIndex != dragTargetIndex {
                 // Find current index of the dragged paragraph
-                let currentDragIndex = paragraphs.firstIndex { $0.content.string == draggedContent } ?? 0
+                let currentDragIndex = paragraphs.firstIndex { $0.id == draggedID } ?? 0
 
                 reorderParagraph(from: currentDragIndex, to: newTargetIndex, textView: textView, isLiveDrag: true)
 
@@ -1069,7 +1086,7 @@ struct RichTextEditor: UIViewRepresentable {
             }
 
             // Update ghost position based on current paragraph position if ghost is enabled
-            if showGhostOverlay, let ghostView = dragGhostView, let currentIndex = paragraphs.firstIndex(where: { $0.content.string == draggedContent }) {
+            if showGhostOverlay, let ghostView = dragGhostView, let currentIndex = paragraphs.firstIndex(where: { $0.id == draggedID }) {
                 let currentParagraph = paragraphs[currentIndex]
                 let paragraphFrame = textView.layoutManager.boundingRect(
                     forGlyphRange: currentParagraph.range,
@@ -1093,6 +1110,10 @@ struct RichTextEditor: UIViewRepresentable {
         private func handleDragEnded(location: CGPoint, textView: UITextView) {
             // Paragraph has already been moved during drag, just clean up
             cleanupDrag()
+            isDragging = false
+
+            // Re-parse attributed text to ensure paragraph ranges are up-to-date
+            self.parseAttributedText(textView.attributedText)
 
             // Final haptic feedback for drop completion
             dragHapticGenerator.impactOccurred()
@@ -1216,7 +1237,8 @@ struct RichTextEditor: UIViewRepresentable {
             parent.text = newAttributedString
 
             // Update paragraphs and overlays
-            parseAttributedText(newAttributedString)
+            self.paragraphs = newParagraphs
+            updateParagraphSpatialProperties()
             updateRuledViewFrame()
 
             // For live drag, don't reset the selection or cursor position
@@ -1279,7 +1301,7 @@ struct RichTextEditor: UIViewRepresentable {
             draggingParagraphIndex = nil
             dragInitialLocation = nil
             dragTargetIndex = nil
-            draggedParagraphContent = nil
+            draggedParagraphID = nil
         }
     }
 }
