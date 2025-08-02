@@ -190,7 +190,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var dragInitialLocation: CGPoint?
         private var dragTargetIndex: Int?
         private var draggedParagraphID: UUID?
-        private var isDragging: Bool = false
+        var isDragging: Bool = false
         private let showGhostOverlay = false
         private let dragHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private let dragSelectionGenerator = UISelectionFeedbackGenerator()
