@@ -1598,9 +1598,74 @@ struct RichTextEditor: UIViewRepresentable {
         }
         
         private func triggerReplyAction() {
-            // Placeholder for reply action - can be customized later
+            guard let textView = textView,
+                  let paragraphIndex = replyGestureParagraphIndex,
+                  paragraphIndex < paragraphs.count else { return }
+            
             replyGestureHapticGenerator.impactOccurred()
-            print("Reply gesture triggered for paragraph \(replyGestureParagraphIndex ?? -1)")
+            
+            let originalParagraph = paragraphs[paragraphIndex]
+            let insertLocation = originalParagraph.range.location + originalParagraph.range.length
+            
+            // Determine spacing based on original paragraph spacing
+            let originalSpacing = originalParagraph.paragraphStyle.paragraphSpacing
+            let isOriginallyUnrelated = abs(originalSpacing - AppSettings.unrelatedParagraphSpacing) < 0.1
+            
+            // Create new paragraph style - use unrelated if original was unrelated, otherwise related
+            let newParagraphStyle = NSMutableParagraphStyle()
+            newParagraphStyle.setParagraphStyle(originalParagraph.paragraphStyle)
+            newParagraphStyle.paragraphSpacing = AppSettings.relatedParagraphSpacing // Always related spacing between paragraphs
+            
+            // Use the same font as the original paragraph or fallback to typing attributes
+            let originalAttributes = originalParagraph.content.attributes(at: 0, effectiveRange: nil)
+            let font = originalAttributes[.font] as? UIFont ?? textView.typingAttributes[.font] as? UIFont ?? UIFont.preferredFont(forTextStyle: .body)
+            
+            let newAttributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .paragraphStyle: newParagraphStyle,
+                .foregroundColor: UIColor.label
+            ]
+            
+            let newParagraph = NSAttributedString(string: "\n", attributes: newAttributes)
+            
+            // Insert the new paragraph
+            let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
+            mutableText.insert(newParagraph, at: insertLocation)
+            
+            // Update the new paragraph's spacing
+            let newParagraphRange = NSRange(location: insertLocation, length: 1)
+            let finalNewParagraphStyle = NSMutableParagraphStyle()
+            finalNewParagraphStyle.setParagraphStyle(originalParagraph.paragraphStyle)
+            finalNewParagraphStyle.paragraphSpacing = isOriginallyUnrelated ? 
+                                                      AppSettings.unrelatedParagraphSpacing : 
+                                                      AppSettings.relatedParagraphSpacing
+            mutableText.addAttribute(.paragraphStyle, value: finalNewParagraphStyle, range: newParagraphRange)
+            
+            // Update the original paragraph's spacing to related
+            if isOriginallyUnrelated {
+                let originalRange = originalParagraph.range
+                let originalStyle = NSMutableParagraphStyle()
+                originalStyle.setParagraphStyle(originalParagraph.paragraphStyle)
+                originalStyle.paragraphSpacing = AppSettings.relatedParagraphSpacing
+                mutableText.addAttribute(.paragraphStyle, value: originalStyle, range: originalRange)
+            }
+            
+            // Update text view and state
+            textView.attributedText = mutableText
+            parent.text = mutableText
+            
+            // Set cursor position at the start of the new paragraph
+            let cursorPosition = insertLocation + 1 // After the newline
+            textView.selectedRange = NSRange(location: cursorPosition, length: 0)
+            parent.selectedRange = textView.selectedRange
+            
+            // Update paragraphs and ensure cursor is visible
+            self.parseAttributedText(mutableText)
+            DispatchQueue.main.async {
+                self.centerCursorInTextView()
+                // Show keyboard after caret is positioned
+                textView.becomeFirstResponder()
+            }
         }
         
         private func cleanupReplyGesture() {
