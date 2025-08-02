@@ -5,7 +5,7 @@ class RuledView: UIView {
 
     private var paragraphOverlays: [CAShapeLayer] = []
     private var targetIndicatorLayers: [CAShapeLayer] = []
-    private var dragState: DragState = .none
+    private var draggingSourceIndex: Int?
     public let overlayCornerRadius: CGFloat = 20.0
 
     enum DragState {
@@ -213,16 +213,22 @@ class RuledView: UIView {
                 detent = paragraph.paragraphStyle.paragraphSpacing
             }
 
-            let (fill, stroke) = colors(for: detent, isPinched: isPinched)
+            let (fill, stroke) = colors(for: detent, isPinched: isPinched, isDraggingSource: index == draggingSourceIndex)
             let borderWidth = self.borderWidth(for: paragraphs[index].range)
 
             if index < paragraphOverlays.count {
                 // Update existing layer
-                paragraphOverlays[index].path = path
-                paragraphOverlays[index].fillColor = fill.cgColor
-                paragraphOverlays[index].strokeColor = stroke.cgColor
-                paragraphOverlays[index].opacity = 1
-                paragraphOverlays[index].lineWidth = borderWidth
+                let layer = paragraphOverlays[index]
+                layer.path = path
+                layer.fillColor = fill.cgColor
+                layer.strokeColor = stroke.cgColor
+                layer.opacity = 1
+                layer.lineWidth = borderWidth
+                if index == draggingSourceIndex {
+                    layer.lineDashPattern = [10, 5] // Dashed pattern
+                } else {
+                    layer.lineDashPattern = nil // Solid line
+                }
             } else {
                 // Create new layer
                 let newLayer = CAShapeLayer()
@@ -232,6 +238,11 @@ class RuledView: UIView {
                 newLayer.fillColor = fill.cgColor
                 newLayer.strokeColor = stroke.cgColor
                 newLayer.opacity = 1
+                if index == draggingSourceIndex {
+                    newLayer.lineDashPattern = [10, 5] // Dashed pattern
+                } else {
+                    newLayer.lineDashPattern = nil // Solid line
+                }
                 layer.addSublayer(newLayer)
                 paragraphOverlays.append(newLayer)
             }
@@ -256,6 +267,18 @@ class RuledView: UIView {
     func updateParagraphOverlayOpacity(index: Int, opacity: Float) {
         guard index < paragraphOverlays.count else { return }
         paragraphOverlays[index].opacity = opacity
+    }
+
+    func setDraggingSourceIndex(_ index: Int?) {
+        draggingSourceIndex = index
+        // We need to redraw the overlays to reflect the change
+        if let coordinator = textView?.delegate as? RichTextEditor.Coordinator, let textView = textView {
+            updateAllParagraphOverlays(
+                paragraphs: coordinator.paragraphs,
+                textView: textView,
+                activePinchedPairs: coordinator.activePinchedPairs
+            )
+        }
     }
 
     func updateTargetIndicators(targetIndex: Int?) {
@@ -445,7 +468,11 @@ class RuledView: UIView {
         return baseBorderWidth + additionalWidth
     }
 
-    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false) -> (fill: UIColor, stroke: UIColor) {
+    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false, isDraggingSource: Bool = false) -> (fill: UIColor, stroke: UIColor) {
+        if isDraggingSource {
+            return (UIColor.systemBlue.withAlphaComponent(0.3), .systemBlue)
+        }
+
         guard isPinched else {
             if !AppSettings.shared.paragraphOverlaysEnabled {
                 return (UIColor.clear, UIColor.clear)

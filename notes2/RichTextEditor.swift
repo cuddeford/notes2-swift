@@ -1031,8 +1031,8 @@ struct RichTextEditor: UIViewRepresentable {
             // Create ghost view
             createDragGhost(for: paragraphs[index], at: index, textView: textView)
 
-            // Fade original paragraph
-            updateOriginalParagraphOpacity(index: index, opacity: 0.3)
+            // Highlight the source paragraph
+            setDraggingSource(index)
 
             // Prepare haptics
             dragSelectionGenerator.prepare()
@@ -1233,8 +1233,8 @@ struct RichTextEditor: UIViewRepresentable {
             return mutableAttributedString
         }
 
-        private func updateOriginalParagraphOpacity(index: Int, opacity: Float) {
-            ruledView?.updateParagraphOverlayOpacity(index: index, opacity: opacity)
+        private func setDraggingSource(_ index: Int?) {
+            ruledView?.setDraggingSourceIndex(index)
         }
 
         private func updateTargetIndicators() {
@@ -1250,10 +1250,8 @@ struct RichTextEditor: UIViewRepresentable {
             dragGhostView?.removeFromSuperview()
             dragGhostView = nil
 
-            // Restore original paragraph opacity
-            if let index = draggingParagraphIndex {
-                updateOriginalParagraphOpacity(index: index, opacity: 1.0)
-            }
+            // Restore original paragraph appearance
+            setDraggingSource(nil)
 
             // Clear drag state
             draggingParagraphIndex = nil
