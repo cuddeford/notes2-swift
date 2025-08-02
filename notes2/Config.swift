@@ -70,6 +70,6 @@ class AppSettings: ObservableObject {
 
         self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? false
         self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false
-        self.paragraphOverlaysEnabled = UserDefaults.standard.object(forKey: "paragraphOverlaysEnabled") as? Bool ?? false
+        self.paragraphOverlaysEnabled = UserDefaults.standard.object(forKey: "paragraphOverlaysEnabled") as? Bool ?? true
     }
 }
