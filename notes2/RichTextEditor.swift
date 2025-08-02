@@ -1506,7 +1506,7 @@ struct RichTextEditor: UIViewRepresentable {
         // MARK: - Reply Gesture Handling
         
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
-            guard let textView = textView else { return }
+            guard let textView = textView, !isDragging else { return }
             let location = gesture.location(in: textView)
             
             switch gesture.state {
