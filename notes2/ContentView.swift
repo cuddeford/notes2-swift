@@ -55,7 +55,7 @@ struct ContentView: View {
                 if !searchText.isEmpty {
                     if filteredNotes.isEmpty {
                         Section {
-                            Text("No notes found matching \u{200b}\(searchText)")
+                            Text("No notes found matching \u{200d}\(searchText)")
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 20)
