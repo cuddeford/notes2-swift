@@ -92,6 +92,10 @@ struct RichTextEditor: UIViewRepresentable {
         longPressGesture.minimumPressDuration = 0.25
         longPressGesture.allowableMovement = 20
         textView.addGestureRecognizer(longPressGesture)
+        
+        let swipeToReplyGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSwipeToReplyGesture(_:)))
+        swipeToReplyGesture.delegate = context.coordinator
+        textView.addGestureRecognizer(swipeToReplyGesture)
 
         context.coordinator.textView = textView
         context.coordinator.textContainerInset = textView.textContainerInset
@@ -205,6 +209,14 @@ struct RichTextEditor: UIViewRepresentable {
         // Multitouch support for drag + manual scroll
         private var initialTouchCount: Int = 1
         private var isMultitouchDrag: Bool = false
+        
+        // Swipe-to-reply state
+        private var swipeToReplyParagraphIndex: Int?
+        private var swipeGhostView: UIView?
+        private var swipeOverlayView: UIView?
+        private var swipeInitialLocation: CGPoint?
+        private let swipeThreshold: CGFloat = 100.0
+        private let swipeHapticGenerator = UIImpactFeedbackGenerator(style: .light)
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -1489,5 +1501,118 @@ struct RichTextEditor: UIViewRepresentable {
                 stopAutoScroll()
             }
         }
+        
+        // MARK: - Swipe-to-Reply Gesture Handling
+        
+        @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
+            guard let textView = textView else { return }
+            let location = gesture.location(in: textView)
+            
+            switch gesture.state {
+            case .began:
+                handleSwipeBegan(location: location, textView: textView)
+            case .changed:
+                handleSwipeChanged(gesture: gesture, textView: textView)
+            case .ended, .cancelled:
+                handleSwipeEnded(gesture: gesture, textView: textView)
+            default:
+                break
+            }
+        }
+        
+        private func handleSwipeBegan(location: CGPoint, textView: UITextView) {
+            guard let index = paragraphIndex(at: location, textView: textView) else { return }
+            
+            swipeToReplyParagraphIndex = index
+            swipeInitialLocation = location
+            
+            createSwipeGhost(for: paragraphs[index], at: index, textView: textView)
+            createSwipeOverlay(for: paragraphs[index], at: index, textView: textView)
+        }
+        
+        private func handleSwipeChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
+            guard let ghostView = swipeGhostView else { return }
+            
+            let translation = gesture.translation(in: textView)
+            let horizontalTranslation = max(0, translation.x) // Only allow rightward movement
+            
+            // Apply 1:1 translation to ghost view
+            ghostView.transform = CGAffineTransform(translationX: horizontalTranslation, y: 0)
+            
+            // Check threshold for haptic feedback
+            let hasAnimation = ghostView.layer.animationKeys()?.contains("opacity") ?? false
+            if horizontalTranslation >= swipeThreshold && !hasAnimation {
+                swipeHapticGenerator.impactOccurred()
+            }
+        }
+        
+        private func handleSwipeEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
+            let translation = gesture.translation(in: textView)
+            let horizontalTranslation = max(0, translation.x)
+            
+            if horizontalTranslation >= swipeThreshold {
+                // Trigger swipe action
+                triggerSwipeToReplyAction()
+            }
+            
+            // Cleanup
+            cleanupSwipeToReply()
+        }
+        
+        private func createSwipeGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) {
+            guard let snapshotRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else { return }
+            
+            guard let snapshotView = textView.resizableSnapshotView(from: snapshotRect, afterScreenUpdates: true, withCapInsets: .zero) else { return }
+            
+            let ghostContainerView = UIView(frame: snapshotRect)
+            ghostContainerView.layer.shadowColor = UIColor.label.cgColor
+            ghostContainerView.layer.shadowOpacity = 0.2
+            ghostContainerView.layer.shadowOffset = CGSize(width: 2, height: 2)
+            ghostContainerView.layer.shadowRadius = 5.0
+            
+            snapshotView.frame = ghostContainerView.bounds
+            ghostContainerView.addSubview(snapshotView)
+            
+            textView.addSubview(ghostContainerView)
+            swipeGhostView = ghostContainerView
+        }
+        
+        private func createSwipeOverlay(for paragraph: Paragraph, at index: Int, textView: UITextView) {
+            guard let overlayRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else { return }
+            
+            let overlayView = UIView(frame: overlayRect)
+            overlayView.backgroundColor = textView.backgroundColor ?? .systemBackground
+            overlayView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
+            overlayView.layer.masksToBounds = true
+            
+            textView.addSubview(overlayView)
+            swipeOverlayView = overlayView
+        }
+        
+        private func triggerSwipeToReplyAction() {
+            // Placeholder for reply action - can be customized later
+            swipeHapticGenerator.impactOccurred()
+            print("Swipe-to-reply triggered for paragraph \(swipeToReplyParagraphIndex ?? -1)")
+        }
+        
+        private func cleanupSwipeToReply() {
+            UIView.animate(withDuration: 0.2, animations: {
+                self.swipeGhostView?.alpha = 0
+                self.swipeOverlayView?.alpha = 0
+            }, completion: { _ in
+                self.swipeGhostView?.removeFromSuperview()
+                self.swipeOverlayView?.removeFromSuperview()
+                self.swipeGhostView = nil
+                self.swipeOverlayView = nil
+                self.swipeToReplyParagraphIndex = nil
+                self.swipeInitialLocation = nil
+            })
+        }
+    }
+}
+
+extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
 }
