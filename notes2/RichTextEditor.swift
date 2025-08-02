@@ -1047,9 +1047,13 @@ struct RichTextEditor: UIViewRepresentable {
                 x: location.x - (dragInitialLocation?.x ?? 0),
                 y: location.y - (dragInitialLocation?.y ?? 0)
             )
+
+            // Convert the initial paragraph position to the textView's coordinate space
+            let initialParagraphPositionInTextView = textView.convert(paragraphs[dragIndex].screenPosition, from: nil)
+
             ghostView.center = CGPoint(
-                x: textView.bounds.midX + offset.x,
-                y: textView.convert(paragraphs[dragIndex].screenPosition, to: textView).y + offset.y
+                x: ghostView.center.x, // Keep horizontal position centered
+                y: initialParagraphPositionInTextView.y + offset.y + ghostView.bounds.height / 2
             )
 
             // Find target insertion index
@@ -1189,8 +1193,31 @@ struct RichTextEditor: UIViewRepresentable {
 
         private func rebuildAttributedString(from paragraphs: [Paragraph]) -> NSAttributedString {
             let mutableAttributedString = NSMutableAttributedString()
-            for paragraph in paragraphs {
-                mutableAttributedString.append(paragraph.content)
+            for (index, paragraph) in paragraphs.enumerated() {
+                let isLast = index == paragraphs.count - 1
+                var content = paragraph.content
+
+                if isLast {
+                    // On the last paragraph, ensure it does not end with a newline.
+                    if content.string.hasSuffix("\n") {
+                        content = content.attributedSubstring(from: NSRange(location: 0, length: content.length - 1))
+                    }
+                } else {
+                    // On any other paragraph, ensure it ends with a newline.
+                    if !content.string.hasSuffix("\n") {
+                        let mutableContent = NSMutableAttributedString(attributedString: content)
+                        var attributes: [NSAttributedString.Key: Any] = [: ]
+                        if content.length > 0 {
+                            attributes = content.attributes(at: content.length - 1, effectiveRange: nil)
+                        } else if let textView = self.textView {
+                            attributes = textView.typingAttributes
+                        }
+                        attributes[.paragraphStyle] = paragraph.paragraphStyle
+                        mutableContent.append(NSAttributedString(string: "\n", attributes: attributes))
+                        content = mutableContent
+                    }
+                }
+                mutableAttributedString.append(content)
             }
             return mutableAttributedString
         }
