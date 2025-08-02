@@ -217,6 +217,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var replyGestureInitialLocation: CGPoint?
         private let replyGestureThreshold: CGFloat = 100.0
         private let replyGestureHapticGenerator = UIImpactFeedbackGenerator(style: .light)
+        private var hasTriggeredReplyHaptic = false
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -1534,15 +1535,22 @@ struct RichTextEditor: UIViewRepresentable {
             guard let ghostView = replyGhostView else { return }
             
             let translation = gesture.translation(in: textView)
-            let horizontalTranslation = max(0, translation.x) // Only allow rightward movement
+            let horizontalTranslation = min(max(0, translation.x), replyGestureThreshold) // Limit to threshold
             
-            // Apply 1:1 translation to ghost view
+            // Apply 1:1 translation to ghost view (capped at threshold)
             ghostView.transform = CGAffineTransform(translationX: horizontalTranslation, y: 0)
             
-            // Check threshold for haptic feedback
-            let hasAnimation = ghostView.layer.animationKeys()?.contains("opacity") ?? false
-            if horizontalTranslation >= replyGestureThreshold && !hasAnimation {
+            // Track threshold crossings for multi-haptic feedback
+            let wasAboveThreshold = hasTriggeredReplyHaptic
+            let isAboveThreshold = horizontalTranslation >= replyGestureThreshold
+            
+            // Trigger haptic when crossing threshold from below to above
+            if isAboveThreshold && !wasAboveThreshold {
                 replyGestureHapticGenerator.impactOccurred()
+                hasTriggeredReplyHaptic = true
+            } else if !isAboveThreshold && wasAboveThreshold {
+                // Reset when going back below threshold so it can trigger again
+                hasTriggeredReplyHaptic = false
             }
         }
         
@@ -1606,6 +1614,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.replyOverlayView = nil
                 self.replyGestureParagraphIndex = nil
                 self.replyGestureInitialLocation = nil
+                self.hasTriggeredReplyHaptic = false
             })
         }
     }
