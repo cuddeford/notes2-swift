@@ -1135,7 +1135,7 @@ struct RichTextEditor: UIViewRepresentable {
                     forGlyphRange: paragraph.range,
                     in: textView.textContainer
                 )
-                
+
                 if index == paragraphs.count - 1 {
                     // Ultimate paragraph - use full width for consistent touch area
                     rect = CGRect(
@@ -1145,7 +1145,7 @@ struct RichTextEditor: UIViewRepresentable {
                         height: max(rect.height, textView.font?.lineHeight ?? 20)
                     )
                 }
-                
+
                 if rect.contains(adjustedLocation) {
                     return index
                 }
@@ -1212,7 +1212,7 @@ struct RichTextEditor: UIViewRepresentable {
                     forGlyphRange: paragraph.range,
                     in: textView.textContainer
                 )
-                
+
                 if index == paragraphs.count - 1 {
                     // Ultimate paragraph - use full width for consistent touch area
                     rect = CGRect(
