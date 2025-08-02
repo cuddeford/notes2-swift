@@ -13,10 +13,11 @@ struct NoteView: View {
     @Bindable var note: Note
     @Binding var selectedNoteID: UUID?
     @Environment(\.modelContext) private var context: ModelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var noteText: NSAttributedString
     @State private var selectedRange = NSRange(location: 0, length: 0)
-    @State private var editorCoordinator: RichTextEditor.Coordinator?
+    @StateObject private var coordinatorHolder = CoordinatorHolder()
     @StateObject private var keyboard = KeyboardObserver()
     @StateObject var settings = AppSettings.shared
 
@@ -25,6 +26,9 @@ struct NoteView: View {
     @State private var isDragging = false
     @State private var isAtBottom = true
     @State private var canScroll = false
+    @State private var isAtTop = true
+    @State private var isStatusBarHidden = false
+    @State private var noteReady = false
 
     static private func noteTextStyle(for aFont: UIFont) -> NoteTextStyle {
         let title1Size = UIFont.preferredFont(forTextStyle: .title1).pointSize
@@ -107,15 +111,12 @@ struct NoteView: View {
                 note: note,
                 keyboard: keyboard,
                 onCoordinatorReady: { coordinator in
-                    self.editorCoordinator = coordinator
+                    coordinatorHolder.coordinator = coordinator
                 },
                 isAtBottom: $isAtBottom,
-                canScroll: $canScroll
+                canScroll: $canScroll,
+                isAtTop: $isAtTop
             )
-            .onAppear {
-                // Initial parsing and spatial property update when the view appears
-                editorCoordinator?.parseAttributedText(noteText)
-            }
             .onChange(of: noteText) { oldValue, newValue in
                 if let data = try? newValue.data(
                     from: NSRange(location: 0, length: newValue.length),
@@ -125,9 +126,9 @@ struct NoteView: View {
                     note.updatedAt = Date()
                 }
                 // Re-parse and update spatial properties when noteText changes
-                editorCoordinator?.parseAttributedText(newValue)
+                coordinatorHolder.coordinator?.parseAttributedText(newValue)
             }
-            .onChange(of: editorCoordinator?.paragraphs) { oldParagraphs, newParagraphs in
+            .onChange(of: coordinatorHolder.coordinator?.paragraphs) { oldParagraphs, newParagraphs in
                 // Handle changes in paragraphs, e.g., update UI based on spatial properties
                 // print("Paragraphs changed: \(newParagraphs?.count ?? 0) paragraphs")
                 // You can now access newParagraphs[i].height, newParagraphs[i].screenPosition, etc.
@@ -135,6 +136,35 @@ struct NoteView: View {
 
             if isDragging {
                 NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
+            }
+
+            VStack {
+                HStack {
+                    ScrollToTopButton(
+                        action: { coordinatorHolder.coordinator?.scrollToTop() },
+                        isAtTop: isAtTop,
+                        canScroll: canScroll,
+                    )
+                    .padding(16)
+
+                    Spacer()
+
+                    Button(action: {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.gray)
+                            .padding()
+                            .opacity(keyboard.isKeyboardVisible ? isAtTop ? 0.5 : 0 : 0.5)
+                    }
+                    .padding(16)
+                    .animation(.easeInOut, value: keyboard.isKeyboardVisible)
+                    .animation(.easeInOut, value: isAtTop)
+                }
+                Spacer()
             }
         }
         .gesture(
@@ -158,10 +188,7 @@ struct NoteView: View {
                     if isDragging, value.translation.width < -100 { // Swipe left
                         let newNote = Note()
                         context.insert(newNote)
-                        selectedNoteID = nil
-                        DispatchQueue.main.async {
-                            selectedNoteID = newNote.id
-                        }
+                        selectedNoteID = newNote.id
                     }
                     // Reset drag state
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -171,28 +198,46 @@ struct NoteView: View {
                     dragLocation = .zero
                 }
         )
-        .toolbar(UIDevice.current.userInterfaceIdiom == .phone ? .hidden : .visible, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea()
         .overlay(
             EditorToolbarOverlay(
                 keyboard: keyboard,
                 settings: settings,
-                onBold: { editorCoordinator?.toggleAttribute(.bold) },
-                onItalic: { editorCoordinator?.toggleAttribute(.italic) },
-                onUnderline: { editorCoordinator?.toggleAttribute(.underline) },
-                onTitle1: { editorCoordinator?.toggleAttribute(.title1) },
-                onTitle2: { editorCoordinator?.toggleAttribute(.title2) },
-                onBody: { editorCoordinator?.toggleAttribute(.body) },
-                onScrollToBottom: { editorCoordinator?.scrollToBottom() },
+                onBold: { coordinatorHolder.coordinator?.toggleAttribute(.bold) },
+                onItalic: { coordinatorHolder.coordinator?.toggleAttribute(.italic) },
+                onUnderline: { coordinatorHolder.coordinator?.toggleAttribute(.underline) },
+                onTitle1: { coordinatorHolder.coordinator?.toggleAttribute(.title1) },
+                onTitle2: { coordinatorHolder.coordinator?.toggleAttribute(.title2) },
+                onBody: { coordinatorHolder.coordinator?.toggleAttribute(.body) },
+                onScrollToBottom: {
+                    coordinatorHolder.coordinator?.scrollToBottom()
+                },
                 isAtBottom: isAtBottom,
-                canScroll: canScroll
+                canScroll: canScroll,
+                isAtTop: isAtTop,
+                onDismiss: {
+                    dismiss()
+                },
+                onNewNote: {
+                    let newNote = Note()
+                    context.insert(newNote)
+                    selectedNoteID = newNote.id
+                }
             )
         )
         .onAppear {
+            isStatusBarHidden = true
             UserDefaults.standard.set(note.id.uuidString, forKey: "lastOpenedNoteID")
+            noteReady = true
         }
         .onDisappear {
+            isStatusBarHidden = false
             UserDefaults.standard.removeObject(forKey: "lastOpenedNoteID")
+            noteReady = false
         }
+        .statusBar(hidden: isStatusBarHidden)
+        .opacity(noteReady ? 1 : 0)
+        .animation(.easeInOut(duration: 0.75).delay(0.1), value: noteReady)
     }
 }

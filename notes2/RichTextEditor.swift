@@ -32,6 +32,7 @@ struct RichTextEditor: UIViewRepresentable {
 
     @Binding var isAtBottom: Bool
     @Binding var canScroll: Bool
+    @Binding var isAtTop: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
         let textView = CustomTextView()
@@ -84,8 +85,6 @@ struct RichTextEditor: UIViewRepresentable {
             textView.typingAttributes = initialAttributes
         }
 
-
-
         let pinchGesture = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePinchGesture(_:)))
         textView.addGestureRecognizer(pinchGesture)
 
@@ -99,6 +98,7 @@ struct RichTextEditor: UIViewRepresentable {
         context.coordinator.textViewWidth = textView.bounds.width
         DispatchQueue.main.async { // Ensure UI updates happen on the main thread
             textView.becomeFirstResponder()
+            context.coordinator.parseAttributedText(textView.attributedText)
         }
         return textView
     }
@@ -345,11 +345,12 @@ struct RichTextEditor: UIViewRepresentable {
             let canScroll = contentHeight > boundsHeight
             let maxOffset = max(0, contentHeight - scrollView.bounds.height + scrollView.adjustedContentInset.bottom)
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
+            let isAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 60.0
 
-
-            if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll {
+            if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
                 self.parent.canScroll = canScroll
                 self.parent.isAtBottom = isAtBottom
+                self.parent.isAtTop = isAtTop
             }
 
             // Check for magnetic zone transitions during scrolling, but only when user is dragging
@@ -935,9 +936,13 @@ struct RichTextEditor: UIViewRepresentable {
             let maxOffset = max(0, contentHeight - textView.bounds.height + textView.adjustedContentInset.bottom)
             let bottomOffset = CGPoint(x: 0, y: maxOffset)
 
-            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
-                textView.setContentOffset(bottomOffset, animated: false)
-            }, completion: nil)
+            textView.setContentOffset(bottomOffset, animated: true)
+        }
+
+        func scrollToTop() {
+            guard let textView = self.textView else { return }
+            let topOffset = CGPoint(x: 0, y: -textView.adjustedContentInset.top)
+            textView.setContentOffset(topOffset, animated: true)
         }
 
         private func animateNewParagraphSpacing(cursorLocation: Int) {

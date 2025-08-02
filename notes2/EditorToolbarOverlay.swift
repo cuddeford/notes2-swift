@@ -19,30 +19,32 @@ struct EditorToolbarOverlay: View {
     var onScrollToBottom: () -> Void
     var isAtBottom: Bool
     var canScroll: Bool
+    var isAtTop: Bool
+    var onDismiss: () -> Void
+    var onNewNote: () -> Void
 
     private var isLandscape: Bool {
-        UIDevice.current.orientation.isLandscape || 
+        UIDevice.current.orientation.isLandscape ||
         (UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first?.interfaceOrientation.isLandscape ?? false)
     }
-    
+
     private var toolbarBottomPadding: CGFloat {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        
+
         if isPad {
             return isLandscape ?
                 max(keyboard.keyboardHeight - 120, 0) :
                 max(keyboard.keyboardHeight + 10, 80)
         } else {
-            return isLandscape ? 
+            return isLandscape ?
                 max(keyboard.keyboardHeight - 100, 0) :
                 max(keyboard.keyboardHeight - 10, 60)
         }
     }
-    
-    var body: some View {
 
+    var body: some View {
         VStack {
             Spacer()
             VStack() {
@@ -61,7 +63,10 @@ struct EditorToolbarOverlay: View {
                         onTitle1: onTitle1,
                         onTitle2: onTitle2,
                         onBody: onBody,
-                        settings: settings
+                        onDismiss: onDismiss,
+                        onNewNote: onNewNote,
+                        isAtTop: isAtTop,
+                        settings: settings,
                     )
                     .transition(.opacity)
                 }
