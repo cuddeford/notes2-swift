@@ -1177,7 +1177,7 @@ struct RichTextEditor: UIViewRepresentable {
                 )
 
                 if index == paragraphs.count - 1 {
-                    // Ultimate paragraph - use full width for consistent touch area
+                    // Last paragraph - use full width for consistent touch area
                     rect = CGRect(
                         x: 0,
                         y: rect.minY,
