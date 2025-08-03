@@ -57,6 +57,7 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
 - **Swipe right-to-left on NoteView**: Create new note
 - **Swipe right-to-left on ContentView**: Navigate to last edited note
 - **Swipe actions**: Pin/unpin and delete notes
+- **Drag-to-Reorder**: Long-press to drag paragraphs.
 
 **Utilities:**
 - `KeyboardObserver.swift`: Keyboard visibility and height changes
@@ -113,6 +114,9 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
   - **Multitouch Support**: One finger holds paragraph, second finger scrolls
   - **Smooth Animations**: 0.2s fade transitions for visual feedback
   - **Haptic Feedback**: Light impact on drop, selection feedback on target changes
+- **Reply Gesture**: Swipe a paragraph to the right to create a new paragraph below it.
+  - **Visual Feedback**: The paragraph is duplicated and follows the finger. The original paragraph is obscured.
+  - **Haptic Feedback**: A light haptic feedback is triggered when the gesture is completed.
 
 **Visual System:**
 - **RuledView**: Real-time paragraph visualization with semi-transparent overlays

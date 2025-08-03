@@ -93,6 +93,10 @@ struct RichTextEditor: UIViewRepresentable {
         longPressGesture.allowableMovement = 20
         textView.addGestureRecognizer(longPressGesture)
 
+        let swipeToReplyGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSwipeToReplyGesture(_:)))
+        swipeToReplyGesture.delegate = context.coordinator
+        textView.addGestureRecognizer(swipeToReplyGesture)
+
         context.coordinator.textView = textView
         context.coordinator.textContainerInset = textView.textContainerInset
         context.coordinator.textViewWidth = textView.bounds.width
@@ -205,6 +209,16 @@ struct RichTextEditor: UIViewRepresentable {
         // Multitouch support for drag + manual scroll
         private var initialTouchCount: Int = 1
         private var isMultitouchDrag: Bool = false
+
+        // Reply gesture state
+        private var replyGestureParagraphIndex: Int?
+        private var replyGhostView: UIView?
+        private var replyOverlayView: UIView?
+        private var replyGestureInitialLocation: CGPoint?
+        private let replyGestureThreshold: CGFloat = 100.0
+        private let replyGestureHapticGenerator = UIImpactFeedbackGenerator(style: .light)
+        private var hasTriggeredReplyHaptic = false
+        private var isHorizontalSwipe = false
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -694,7 +708,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
-            guard let textView = textView else { return }
+            guard let textView = textView, !isDragging else { return }
 
             if gesture.state == .began && gesture.numberOfTouches >= 2 {
                 handlePinchBegan(gesture, textView: textView)
@@ -1489,5 +1503,243 @@ struct RichTextEditor: UIViewRepresentable {
                 stopAutoScroll()
             }
         }
+
+        // MARK: - Reply Gesture Handling
+
+        @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
+            guard let textView = textView, !isDragging, !isPinching else { return }
+            let location = gesture.location(in: textView)
+
+            switch gesture.state {
+            case .began:
+                handleReplyGestureBegan(location: location, textView: textView)
+            case .changed:
+                handleReplyGestureChanged(gesture: gesture, textView: textView)
+            case .ended, .cancelled:
+                handleReplyGestureEnded(gesture: gesture, textView: textView)
+            default:
+                break
+            }
+        }
+
+        private func handleReplyGestureBegan(location: CGPoint, textView: UITextView) {
+            guard replyGhostView == nil, let index = paragraphIndex(at: location, textView: textView) else { return }
+
+            replyGestureParagraphIndex = index
+            replyGestureInitialLocation = location
+
+            // 1. Create the ghost view from a snapshot of the original text FIRST.
+            guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
+
+            // 2. Create and add the overlay to obscure the original text.
+            createReplyOverlay(for: paragraphs[index], at: index, textView: textView)
+
+            // 3. Add the ghost view on top of everything.
+            self.replyGhostView = ghost
+            textView.addSubview(ghost)
+        }
+
+        private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
+            guard let ghostView = replyGhostView else { return }
+
+            let translation = gesture.translation(in: textView)
+
+            // Check if this is a horizontal swipe on the first movement
+            if !isHorizontalSwipe {
+                let horizontalMovement = abs(translation.x)
+                let verticalMovement = abs(translation.y)
+
+                // Cancel if vertical movement is dominant
+                if verticalMovement > horizontalMovement && verticalMovement > 10 {
+                    cleanupReplyGesture()
+                    return
+                }
+
+                // Mark as horizontal swipe if horizontal is dominant
+                if horizontalMovement > verticalMovement {
+                    isHorizontalSwipe = true
+                }
+            }
+
+            // Only proceed if it's a horizontal swipe
+            guard isHorizontalSwipe else {
+                cleanupReplyGesture()
+                return
+            }
+
+            let horizontalTranslation = min(max(0, translation.x), replyGestureThreshold) // Limit to threshold
+
+            // Apply 1:1 translation to ghost view (capped at threshold)
+            ghostView.transform = CGAffineTransform(translationX: horizontalTranslation, y: 0)
+
+            // Track threshold crossings for multi-haptic feedback
+            let wasAboveThreshold = hasTriggeredReplyHaptic
+            let isAboveThreshold = horizontalTranslation >= replyGestureThreshold
+
+            // Trigger haptic when crossing threshold from below to above
+            if isAboveThreshold && !wasAboveThreshold {
+                replyGestureHapticGenerator.impactOccurred()
+                hasTriggeredReplyHaptic = true
+            } else if !isAboveThreshold && wasAboveThreshold {
+                // Reset when going back below threshold so it can trigger again
+                hasTriggeredReplyHaptic = false
+            }
+        }
+
+        private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
+            guard replyGhostView != nil else { return }
+            let translation = gesture.translation(in: textView)
+            let horizontalTranslation = max(0, translation.x)
+
+            // Only trigger if it's a confirmed horizontal swipe
+            if isHorizontalSwipe && horizontalTranslation >= replyGestureThreshold {
+                triggerReplyAction()
+            }
+
+            // Cleanup
+            cleanupReplyGesture()
+        }
+
+        private func createReplyGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) -> UIView? {
+            guard let snapshotRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else { return nil }
+            guard let snapshotView = textView.resizableSnapshotView(from: snapshotRect, afterScreenUpdates: true, withCapInsets: .zero) else { return nil }
+
+            let ghostContainerView = UIView(frame: snapshotRect)
+
+            snapshotView.frame = ghostContainerView.bounds
+            ghostContainerView.addSubview(snapshotView)
+
+            return ghostContainerView
+        }
+
+        private func createReplyOverlay(for paragraph: Paragraph, at index: Int, textView: UITextView) {
+            guard let overlayRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else { return }
+
+            let overlayView = UIView(frame: overlayRect)
+            // Use systemBackground to ensure it's opaque and covers the text
+            overlayView.backgroundColor = .systemBackground
+            overlayView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
+            overlayView.layer.masksToBounds = true
+
+            textView.addSubview(overlayView)
+            replyOverlayView = overlayView
+        }
+
+        private func triggerReplyAction() {
+            guard let textView = textView,
+                  let paragraphIndex = replyGestureParagraphIndex,
+                  paragraphIndex < paragraphs.count else { return }
+
+            replyGestureHapticGenerator.impactOccurred()
+
+            let originalParagraph = paragraphs[paragraphIndex]
+            let insertLocation = originalParagraph.range.location + originalParagraph.range.length
+
+            // Determine spacing based on original paragraph spacing
+            let originalSpacing = originalParagraph.paragraphStyle.paragraphSpacing
+            let isOriginallyUnrelated = abs(originalSpacing - AppSettings.unrelatedParagraphSpacing) < 0.1
+
+            // Create new paragraph style - use unrelated if original was unrelated, otherwise related
+            let newParagraphStyle = NSMutableParagraphStyle()
+            newParagraphStyle.setParagraphStyle(originalParagraph.paragraphStyle)
+            newParagraphStyle.paragraphSpacing = AppSettings.relatedParagraphSpacing // Always related spacing between paragraphs
+
+            // Use the same font as the original paragraph or fallback to typing attributes
+            let originalAttributes: [NSAttributedString.Key: Any]
+            if originalParagraph.content.length > 0 {
+                originalAttributes = originalParagraph.content.attributes(at: 0, effectiveRange: nil)
+            } else {
+                originalAttributes = textView.typingAttributes
+            }
+            let font = originalAttributes[.font] as? UIFont ?? textView.typingAttributes[.font] as? UIFont ?? UIFont.preferredFont(forTextStyle: .body)
+
+            let newAttributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .paragraphStyle: newParagraphStyle,
+                .foregroundColor: UIColor.label
+            ]
+
+            let newParagraph = NSAttributedString(string: "\n", attributes: newAttributes)
+
+            // Insert the new paragraph
+            let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
+            mutableText.insert(newParagraph, at: insertLocation)
+
+            // Update the new paragraph's spacing
+            let newParagraphRange = NSRange(location: insertLocation, length: 1)
+            let finalNewParagraphStyle = NSMutableParagraphStyle()
+            finalNewParagraphStyle.setParagraphStyle(originalParagraph.paragraphStyle)
+            finalNewParagraphStyle.paragraphSpacing = isOriginallyUnrelated ?
+                                                      AppSettings.unrelatedParagraphSpacing :
+                                                      AppSettings.relatedParagraphSpacing
+            mutableText.addAttribute(.paragraphStyle, value: finalNewParagraphStyle, range: newParagraphRange)
+
+            // Update the original paragraph's spacing to related
+            if isOriginallyUnrelated {
+                let originalRange = originalParagraph.range
+                let originalStyle = NSMutableParagraphStyle()
+                originalStyle.setParagraphStyle(originalParagraph.paragraphStyle)
+                originalStyle.paragraphSpacing = AppSettings.relatedParagraphSpacing
+                mutableText.addAttribute(.paragraphStyle, value: originalStyle, range: originalRange)
+            }
+
+            // Update text view and state
+            textView.attributedText = mutableText
+            parent.text = mutableText
+
+            // Handle cursor positioning for edge case of last paragraph
+            let isLastParagraph = paragraphIndex == paragraphs.count - 1
+            let cursorPosition = isLastParagraph ? insertLocation + 1 : insertLocation
+            textView.selectedRange = NSRange(location: cursorPosition, length: 0)
+            parent.selectedRange = textView.selectedRange
+
+            // Update paragraphs and ensure cursor is visible
+            self.parseAttributedText(mutableText)
+            DispatchQueue.main.async {
+                self.centerCursorInTextView()
+                // Show keyboard after caret is positioned
+                textView.becomeFirstResponder()
+            }
+        }
+
+        private func cleanupReplyGesture() {
+            func cleanup() {
+                self.replyGhostView?.removeFromSuperview()
+                self.replyOverlayView?.removeFromSuperview()
+                self.replyGhostView = nil
+                self.replyOverlayView = nil
+                self.replyGestureParagraphIndex = nil
+                self.replyGestureInitialLocation = nil
+                self.hasTriggeredReplyHaptic = false
+                self.isHorizontalSwipe = false
+            }
+
+            guard let ghostView = replyGhostView, replyOverlayView != nil else {
+                // Fallback to immediate cleanup if views don't exist
+                cleanup()
+                return
+            }
+
+            // Spring animation for ghost return to original position
+            UIView.animate(
+                withDuration: 0.3,
+                delay: 0,
+                usingSpringWithDamping: 0.8,
+                initialSpringVelocity: 0.5,
+                options: [.curveEaseOut, .allowUserInteraction],
+                animations: {
+                    ghostView.transform = CGAffineTransform.identity
+                },
+                completion: { _ in
+                    cleanup()
+                }
+            )
+        }
+    }
+}
+
+extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
 }
