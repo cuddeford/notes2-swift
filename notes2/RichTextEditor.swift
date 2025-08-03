@@ -336,7 +336,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         func updateTypingAttributes() {
             guard let textView = textView else { return }
-            let loc = max(0, min(textView.selectedRange.location - 1, textView.attributedText.length - 1))
+            let loc = max(0, min(textView.selectedRange.location, textView.attributedText.length - 1))
             if textView.attributedText.length > 0 && loc >= 0 {
                 var attrs = textView.attributedText.attributes(at: loc, effectiveRange: nil)
                 // Ensure paragraph style has correct line heights based on the font
@@ -1836,7 +1836,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Create new paragraph style - use unrelated if original was unrelated, otherwise related
             let newParagraphStyle = NSMutableParagraphStyle()
             newParagraphStyle.setParagraphStyle(originalParagraph.paragraphStyle)
-            newParagraphStyle.paragraphSpacing = AppSettings.relatedParagraphSpacing // Always related spacing between paragraphs
+            newParagraphStyle.paragraphSpacing = isOriginallyUnrelated ? AppSettings.unrelatedParagraphSpacing : AppSettings.relatedParagraphSpacing
 
             // Use the same font as the original paragraph or fallback to typing attributes
             let originalAttributes: [NSAttributedString.Key: Any]
