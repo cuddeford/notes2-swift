@@ -215,7 +215,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var replyGhostView: UIView?
         private var replyOverlayView: UIView?
         private var replyGestureInitialLocation: CGPoint?
-        private let replyGestureThreshold: CGFloat = 100.0
+        private let replyGestureThreshold: CGFloat = 75.0
         private let replyGestureHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var hasTriggeredReplyHaptic = false
         private var isHorizontalSwipe = false
