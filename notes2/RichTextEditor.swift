@@ -1523,15 +1523,20 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureBegan(location: CGPoint, textView: UITextView) {
-            guard let index = paragraphIndex(at: location, textView: textView) else { return }
+            guard replyGhostView == nil, let index = paragraphIndex(at: location, textView: textView) else { return }
 
             replyGestureParagraphIndex = index
             replyGestureInitialLocation = location
 
-            // Create the overlay first so it's behind the ghost
+            // 1. Create the ghost view from a snapshot of the original text FIRST.
+            guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
+
+            // 2. Create and add the overlay to obscure the original text.
             createReplyOverlay(for: paragraphs[index], at: index, textView: textView)
-            // Then create the ghost view on top
-            createReplyGhost(for: paragraphs[index], at: index, textView: textView)
+
+            // 3. Add the ghost view on top of everything.
+            self.replyGhostView = ghost
+            textView.addSubview(ghost)
         }
 
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
@@ -1582,6 +1587,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
+            guard let ghostView = replyGhostView else { return }
             let translation = gesture.translation(in: textView)
             let horizontalTranslation = max(0, translation.x)
 
@@ -1594,18 +1600,16 @@ struct RichTextEditor: UIViewRepresentable {
             cleanupReplyGesture()
         }
 
-        private func createReplyGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) {
-            guard let snapshotRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else { return }
-
-            guard let snapshotView = textView.resizableSnapshotView(from: snapshotRect, afterScreenUpdates: true, withCapInsets: .zero) else { return }
+        private func createReplyGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) -> UIView? {
+            guard let snapshotRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else { return nil }
+            guard let snapshotView = textView.resizableSnapshotView(from: snapshotRect, afterScreenUpdates: true, withCapInsets: .zero) else { return nil }
 
             let ghostContainerView = UIView(frame: snapshotRect)
 
             snapshotView.frame = ghostContainerView.bounds
             ghostContainerView.addSubview(snapshotView)
 
-            textView.addSubview(ghostContainerView)
-            replyGhostView = ghostContainerView
+            return ghostContainerView
         }
 
         private func createReplyOverlay(for paragraph: Paragraph, at index: Int, textView: UITextView) {
@@ -1721,7 +1725,6 @@ struct RichTextEditor: UIViewRepresentable {
                 options: [.curveEaseOut, .allowUserInteraction],
                 animations: {
                     ghostView.transform = CGAffineTransform.identity
-                    overlayView.alpha = 0
                 },
                 completion: { _ in
                     self.replyGhostView?.removeFromSuperview()
