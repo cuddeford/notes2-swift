@@ -1572,16 +1572,24 @@ struct RichTextEditor: UIViewRepresentable {
             // Apply 1:1 translation to ghost view (capped at threshold)
             ghostView.transform = CGAffineTransform(translationX: horizontalTranslation, y: 0)
 
+            // Fade in the icon as the user swipes
+            if let overlay = replyOverlayView, let iconView = overlay.subviews.first {
+                let percentage = horizontalTranslation / replyGestureThreshold
+                let iconAlpha = min(percentage, 1.0)
+                iconView.alpha = iconAlpha
+
+                let scale = 1.0 + (percentage) * 0.5 // Scale up to 1.5
+                iconView.transform = CGAffineTransform(scaleX: scale, y: scale)
+            }
+
             // Track threshold crossings for multi-haptic feedback
             let wasAboveThreshold = hasTriggeredReplyHaptic
             let isAboveThreshold = horizontalTranslation >= replyGestureThreshold
 
-            // Trigger haptic when crossing threshold from below to above
             if isAboveThreshold && !wasAboveThreshold {
                 replyGestureHapticGenerator.impactOccurred()
                 hasTriggeredReplyHaptic = true
             } else if !isAboveThreshold && wasAboveThreshold {
-                // Reset when going back below threshold so it can trigger again
                 hasTriggeredReplyHaptic = false
             }
         }
@@ -1620,6 +1628,24 @@ struct RichTextEditor: UIViewRepresentable {
             overlayView.backgroundColor = .systemBackground
             overlayView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
             overlayView.layer.masksToBounds = true
+
+            // --- Add the reply icon ---
+            let iconView = UIHostingController(rootView:
+                Image(systemName: "plus")
+                    .font(.title)
+                    .foregroundColor(.gray)
+                    .padding()
+            ).view!
+            iconView.backgroundColor = .clear
+            iconView.translatesAutoresizingMaskIntoConstraints = false
+            overlayView.addSubview(iconView)
+
+            // Center the icon vertically and position it on the left
+            NSLayoutConstraint.activate([
+                iconView.leadingAnchor.constraint(equalTo: overlayView.leadingAnchor, constant: 4),
+                iconView.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor)
+            ])
+            // --- End of icon code ---
 
             textView.addSubview(overlayView)
             replyOverlayView = overlayView
@@ -1714,7 +1740,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.isHorizontalSwipe = false
             }
 
-            guard let ghostView = replyGhostView, replyOverlayView != nil else {
+            guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
                 // Fallback to immediate cleanup if views don't exist
                 cleanup()
                 return
@@ -1729,6 +1755,8 @@ struct RichTextEditor: UIViewRepresentable {
                 options: [.curveEaseOut, .allowUserInteraction],
                 animations: {
                     ghostView.transform = CGAffineTransform.identity
+                    overlayView.subviews.first?.alpha = 0.0
+                    overlayView.subviews.first?.transform = .identity
                 },
                 completion: { _ in
                     cleanup()
