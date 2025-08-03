@@ -1800,10 +1800,10 @@ struct RichTextEditor: UIViewRepresentable {
                 // Use rebuild logic for proper paragraph handling
                 var newParagraphs = paragraphs
                 newParagraphs.remove(at: paragraphIndex)
-                
+
                 // Rebuild the entire text using proven logic
                 let newAttributedString = rebuildAttributedString(from: newParagraphs)
-                
+
                 textView.attributedText = newAttributedString
                 parent.text = newAttributedString
 
