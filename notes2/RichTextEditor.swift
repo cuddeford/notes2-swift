@@ -1797,15 +1797,18 @@ struct RichTextEditor: UIViewRepresentable {
                 textView.selectedRange = NSRange(location: 0, length: 0)
                 parent.selectedRange = textView.selectedRange
             } else {
-                // Normal deletion for multiple paragraphs
-                let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
-                mutableText.deleteCharacters(in: deleteRange)
+                // Use rebuild logic for proper paragraph handling
+                var newParagraphs = paragraphs
+                newParagraphs.remove(at: paragraphIndex)
+                
+                // Rebuild the entire text using proven logic
+                let newAttributedString = rebuildAttributedString(from: newParagraphs)
+                
+                textView.attributedText = newAttributedString
+                parent.text = newAttributedString
 
-                textView.attributedText = mutableText
-                parent.text = mutableText
-
-                // Position cursor at start of deleted paragraph's location
-                let cursorLocation = min(deleteRange.location, mutableText.length)
+                // Position cursor appropriately based on deletion
+                let cursorLocation = min(deleteRange.location, newAttributedString.length)
                 textView.selectedRange = NSRange(location: cursorLocation, length: 0)
                 parent.selectedRange = textView.selectedRange
             }
