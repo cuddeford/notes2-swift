@@ -1604,11 +1604,15 @@ struct RichTextEditor: UIViewRepresentable {
                 let iconAlpha = min(percentage, 1.0)
                 iconView.alpha = iconAlpha
 
-                let scale = 1.0 + (percentage) * 0.5 // Scale up to 1.5
-                iconView.transform = CGAffineTransform(scaleX: scale, y: scale)
+                if let progressContainer = self.holdProgressView {
+                    progressContainer.alpha = iconAlpha
+                }
 
                 // Handle hold-to-confirm for delete
                 if swipeDirection == .left {
+                    let scale = 1.0 + (percentage) * 0.1 // Scale up to 1.1
+                    iconView.transform = CGAffineTransform(scaleX: scale, y: scale)
+
                     if isAboveThreshold {
                         if !isHolding {
                             // Start hold
@@ -1649,6 +1653,9 @@ struct RichTextEditor: UIViewRepresentable {
                             }
                         }
                     }
+                } else {
+                    let scale = 1.0 + (percentage) * 0.5 // Scale up to 1.5
+                    iconView.transform = CGAffineTransform(scaleX: scale, y: scale)
                 }
             }
 
@@ -1703,13 +1710,13 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func createCircularProgressView() -> UIView {
-            let size: CGFloat = 44
+            let size: CGFloat = 52
             let progressView = UIView(frame: CGRect(x: 0, y: 0, width: size, height: size))
 
             // Create circular progress layer
             let progressLayer = CAShapeLayer()
             let center = CGPoint(x: size/2, y: size/2)
-            let radius: CGFloat = 18
+            let radius: CGFloat = 26
             let startAngle = -CGFloat.pi / 2 // Start at top
             let endAngle = startAngle + 2 * CGFloat.pi
 
@@ -1782,9 +1789,13 @@ struct RichTextEditor: UIViewRepresentable {
                 progressContainer.translatesAutoresizingMaskIntoConstraints = false
                 overlayView.addSubview(progressContainer)
 
+                // Position the progress indicator with manual offsets
+                let horizontalOffset: CGFloat = -62.5 // Adjust this to move left/right
+                let verticalOffset: CGFloat = -26 // Adjust this to move up/down
+
                 NSLayoutConstraint.activate([
-                    progressContainer.centerXAnchor.constraint(equalTo: iconView.centerXAnchor),
-                    progressContainer.centerYAnchor.constraint(equalTo: iconView.centerYAnchor)
+                    progressContainer.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor, constant: verticalOffset),
+                    progressContainer.trailingAnchor.constraint(equalTo: overlayView.trailingAnchor, constant: horizontalOffset)
                 ])
 
                 holdProgressView = progressContainer
@@ -1959,6 +1970,10 @@ struct RichTextEditor: UIViewRepresentable {
                     ghostView.transform = CGAffineTransform.identity
                     overlayView.subviews.first?.alpha = 0.0
                     overlayView.subviews.first?.transform = .identity
+
+                    if let progressContainer = self.holdProgressView {
+                        progressContainer.alpha = 0.0
+                    }
                 },
                 completion: { _ in
                     cleanup()
