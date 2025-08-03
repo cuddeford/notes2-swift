@@ -1678,12 +1678,10 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
 
-            // Track threshold crossings for traditional haptic feedback (fallback)
+            // Track threshold crossings for haptic feedback
             let wasAboveThreshold = hasTriggeredReplyHaptic
             if isAboveThreshold && !wasAboveThreshold {
-                if swipeDirection == .right {
-                    replyGestureHapticGenerator.impactOccurred() // Reply uses immediate confirmation
-                }
+                replyGestureHapticGenerator.impactOccurred() // Trigger haptic for both directions
                 hasTriggeredReplyHaptic = true
             } else if !isAboveThreshold && wasAboveThreshold {
                 hasTriggeredReplyHaptic = false
