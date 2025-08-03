@@ -228,6 +228,7 @@ struct RichTextEditor: UIViewRepresentable {
         private let holdDuration: CFTimeInterval = 1.5
         private let holdHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var holdProgressView: UIView?
+        private var holdDisplayLink: CADisplayLink?
 
         enum SwipeDirection {
             case none
@@ -1549,6 +1550,31 @@ struct RichTextEditor: UIViewRepresentable {
             textView.addSubview(ghost)
         }
 
+        @objc private func updateHoldProgress() {
+            guard isHolding, let holdStartTime = holdStartTime else { return }
+
+            let elapsed = CACurrentMediaTime() - holdStartTime
+            holdProgress = min(elapsed / holdDuration, 1.0)
+
+            // Update progress indicator without implicit animations
+            if let progressContainer = holdProgressView,
+               let progressLayer = progressContainer.layer.sublayers?.first as? CAShapeLayer {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                progressLayer.strokeEnd = holdProgress
+                CATransaction.commit()
+            }
+
+            // Haptic feedback during hold
+            let hapticInterval: CFTimeInterval = 0.5
+            let currentInterval = Int(elapsed / hapticInterval)
+            let lastInterval = Int((elapsed - 0.016) / hapticInterval) // Small delta to prevent multiple triggers
+
+            if currentInterval > lastInterval && currentInterval <= 3 {
+                holdHapticGenerator.impactOccurred()
+            }
+        }
+
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
             guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { return }
 
@@ -1619,25 +1645,11 @@ struct RichTextEditor: UIViewRepresentable {
                             isHolding = true
                             holdStartTime = CACurrentMediaTime()
                             holdProgress = 0.0
-                        }
 
-                        // Calculate hold progress
-                        let elapsed = CACurrentMediaTime() - (holdStartTime ?? 0)
-                        holdProgress = min(elapsed / holdDuration, 1.0)
-
-                        // Update progress indicator
-                        if let progressContainer = holdProgressView,
-                           let progressLayer = progressContainer.layer.sublayers?.first as? CAShapeLayer {
-                            progressLayer.strokeEnd = holdProgress
-                        }
-
-                        // Haptic feedback during hold
-                        let hapticInterval: CFTimeInterval = 0.5
-                        let currentInterval = Int(elapsed / hapticInterval)
-                        let lastInterval = Int((elapsed - 0.016) / hapticInterval) // Small delta to prevent multiple triggers
-
-                        if currentInterval > lastInterval && currentInterval <= 3 {
-                            holdHapticGenerator.impactOccurred()
+                            // Start display link for continuous updates
+                            holdDisplayLink?.invalidate()
+                            holdDisplayLink = CADisplayLink(target: self, selector: #selector(updateHoldProgress))
+                            holdDisplayLink?.add(to: .main, forMode: .common)
                         }
                     } else {
                         // Reset hold state
@@ -1646,10 +1658,19 @@ struct RichTextEditor: UIViewRepresentable {
                             holdStartTime = nil
                             holdProgress = 0.0
 
-                            // Reset progress indicator
+                            // Stop display link
+                            holdDisplayLink?.invalidate()
+                            holdDisplayLink = nil
+
+                            // Reset progress indicator with smooth rewind animation
                             if let progressContainer = holdProgressView,
                                let progressLayer = progressContainer.layer.sublayers?.first as? CAShapeLayer {
-                                progressLayer.strokeEnd = 0
+                                let animation = CABasicAnimation(keyPath: "strokeEnd")
+                                animation.toValue = 0.0
+                                animation.duration = 0.2
+                                animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                                progressLayer.add(animation, forKey: "strokeEndAnimation")
+                                progressLayer.strokeEnd = 0.0
                             }
                         }
                     }
@@ -1951,6 +1972,10 @@ struct RichTextEditor: UIViewRepresentable {
                 self.holdStartTime = nil
                 self.holdProgress = 0.0
                 self.holdProgressView = nil
+
+                // Stop display link
+                self.holdDisplayLink?.invalidate()
+                self.holdDisplayLink = nil
             }
 
             guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
