@@ -219,6 +219,22 @@ struct RichTextEditor: UIViewRepresentable {
         private let replyGestureHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var hasTriggeredReplyHaptic = false
         private var isHorizontalSwipe = false
+        private var swipeDirection: SwipeDirection = .none
+
+        // Hold-to-confirm state
+        private var holdStartTime: CFTimeInterval?
+        private var isHolding = false
+        private var holdProgress: CGFloat = 0.0
+        private let holdDuration: CFTimeInterval = 1.5
+        private let holdHapticGenerator = UIImpactFeedbackGenerator(style: .light)
+        private var holdProgressView: UIView?
+        private var holdDisplayLink: CADisplayLink?
+
+        enum SwipeDirection {
+            case none
+            case right
+            case left
+        }
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -1528,19 +1544,37 @@ struct RichTextEditor: UIViewRepresentable {
             replyGestureParagraphIndex = index
             replyGestureInitialLocation = location
 
-            // 1. Create the ghost view from a snapshot of the original text FIRST.
+            // Create the ghost view from a snapshot of the original text
             guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
-
-            // 2. Create and add the overlay to obscure the original text.
-            createReplyOverlay(for: paragraphs[index], at: index, textView: textView)
-
-            // 3. Add the ghost view on top of everything.
             self.replyGhostView = ghost
             textView.addSubview(ghost)
         }
 
+        @objc private func updateHoldProgress() {
+            guard isHolding, let holdStartTime = holdStartTime else { return }
+
+            let elapsed = CACurrentMediaTime() - holdStartTime
+            let newProgress = min(elapsed / holdDuration, 1.0)
+            
+            // Check if we just reached 100%
+            if newProgress >= 1.0 && holdProgress < 1.0 {
+                holdHapticGenerator.impactOccurred()
+            }
+            
+            holdProgress = newProgress
+
+            // Update progress indicator without implicit animations
+            if let progressContainer = holdProgressView,
+               let progressLayer = progressContainer.layer.sublayers?.first as? CAShapeLayer {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                progressLayer.strokeEnd = holdProgress
+                CATransaction.commit()
+            }
+        }
+
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard let ghostView = replyGhostView else { return }
+            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { return }
 
             let translation = gesture.translation(in: textView)
 
@@ -1555,9 +1589,18 @@ struct RichTextEditor: UIViewRepresentable {
                     return
                 }
 
-                // Mark as horizontal swipe if horizontal is dominant
+                // Mark as horizontal swipe and determine direction
                 if horizontalMovement > verticalMovement {
                     isHorizontalSwipe = true
+                    swipeDirection = translation.x > 0 ? .right : .left
+
+                    // Create overlay after direction is determined, insert below ghost
+                    if let ghostView = replyGhostView {
+                        createReplyOverlay(for: paragraphs[paragraphIndex], at: paragraphIndex, textView: textView)
+                        if let overlay = replyOverlayView {
+                            textView.insertSubview(overlay, belowSubview: ghostView)
+                        }
+                    }
                 }
             }
 
@@ -1567,27 +1610,78 @@ struct RichTextEditor: UIViewRepresentable {
                 return
             }
 
-            let horizontalTranslation = min(max(0, translation.x), replyGestureThreshold) // Limit to threshold
+            let horizontalTranslation: CGFloat
+            if swipeDirection == .right {
+                horizontalTranslation = min(max(0, translation.x), replyGestureThreshold)
+            } else {
+                horizontalTranslation = max(min(0, translation.x), -replyGestureThreshold)
+            }
 
             // Apply 1:1 translation to ghost view (capped at threshold)
             ghostView.transform = CGAffineTransform(translationX: horizontalTranslation, y: 0)
 
-            // Fade in the icon as the user swipes
+            // Handle hold-to-confirm
+            let percentage = abs(horizontalTranslation) / replyGestureThreshold
+            let isAboveThreshold = percentage >= 1.0
+
             if let overlay = replyOverlayView, let iconView = overlay.subviews.first {
-                let percentage = horizontalTranslation / replyGestureThreshold
                 let iconAlpha = min(percentage, 1.0)
                 iconView.alpha = iconAlpha
 
-                let scale = 1.0 + (percentage) * 0.5 // Scale up to 1.5
-                iconView.transform = CGAffineTransform(scaleX: scale, y: scale)
+                if let progressContainer = self.holdProgressView {
+                    progressContainer.alpha = iconAlpha
+                }
+
+                // Handle hold-to-confirm for delete
+                if swipeDirection == .left {
+                    let scale = 1.0 + (percentage) * 0.1 // Scale up to 1.1
+                    iconView.transform = CGAffineTransform(scaleX: scale, y: scale)
+
+                    if isAboveThreshold {
+                        if !isHolding {
+                            // Start hold
+                            isHolding = true
+                            holdStartTime = CACurrentMediaTime()
+                            holdProgress = 0.0
+
+                            // Start display link for continuous updates
+                            holdDisplayLink?.invalidate()
+                            holdDisplayLink = CADisplayLink(target: self, selector: #selector(updateHoldProgress))
+                            holdDisplayLink?.add(to: .main, forMode: .common)
+                        }
+                    } else {
+                        // Reset hold state
+                        if isHolding {
+                            isHolding = false
+                            holdStartTime = nil
+                            holdProgress = 0.0
+
+                            // Stop display link
+                            holdDisplayLink?.invalidate()
+                            holdDisplayLink = nil
+
+                            // Reset progress indicator with smooth rewind animation
+                            if let progressContainer = holdProgressView,
+                               let progressLayer = progressContainer.layer.sublayers?.first as? CAShapeLayer {
+                                let animation = CABasicAnimation(keyPath: "strokeEnd")
+                                animation.toValue = 0.0
+                                animation.duration = 0.2
+                                animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                                progressLayer.add(animation, forKey: "strokeEndAnimation")
+                                progressLayer.strokeEnd = 0.0
+                            }
+                        }
+                    }
+                } else {
+                    let scale = 1.0 + (percentage) * 0.5 // Scale up to 1.5
+                    iconView.transform = CGAffineTransform(scaleX: scale, y: scale)
+                }
             }
 
-            // Track threshold crossings for multi-haptic feedback
+            // Track threshold crossings for haptic feedback
             let wasAboveThreshold = hasTriggeredReplyHaptic
-            let isAboveThreshold = horizontalTranslation >= replyGestureThreshold
-
             if isAboveThreshold && !wasAboveThreshold {
-                replyGestureHapticGenerator.impactOccurred()
+                replyGestureHapticGenerator.impactOccurred() // Trigger haptic for both directions
                 hasTriggeredReplyHaptic = true
             } else if !isAboveThreshold && wasAboveThreshold {
                 hasTriggeredReplyHaptic = false
@@ -1597,11 +1691,23 @@ struct RichTextEditor: UIViewRepresentable {
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
             guard replyGhostView != nil else { return }
             let translation = gesture.translation(in: textView)
-            let horizontalTranslation = max(0, translation.x)
+            let horizontalTranslation = swipeDirection == .right
+                ? min(max(0, translation.x), replyGestureThreshold)
+                : max(min(0, translation.x), -replyGestureThreshold)
 
-            // Only trigger if it's a confirmed horizontal swipe
-            if isHorizontalSwipe && horizontalTranslation >= replyGestureThreshold {
-                triggerReplyAction()
+            // Check hold-to-confirm completion for delete
+            if isHorizontalSwipe {
+                if swipeDirection == .right {
+                    // Reply uses immediate confirmation
+                    if abs(horizontalTranslation) >= replyGestureThreshold {
+                        triggerReplyAction()
+                    }
+                } else if swipeDirection == .left {
+                    // Delete uses hold-to-confirm
+                    if holdProgress >= 1.0 {
+                        triggerDeleteAction()
+                    }
+                }
             }
 
             // Cleanup
@@ -1620,6 +1726,38 @@ struct RichTextEditor: UIViewRepresentable {
             return ghostContainerView
         }
 
+        private func createCircularProgressView() -> UIView {
+            let size: CGFloat = 52
+            let progressView = UIView(frame: CGRect(x: 0, y: 0, width: size, height: size))
+
+            // Create circular progress layer
+            let progressLayer = CAShapeLayer()
+            let center = CGPoint(x: size/2, y: size/2)
+            let radius: CGFloat = 26
+            let startAngle = -CGFloat.pi / 2 // Start at top
+            let endAngle = startAngle + 2 * CGFloat.pi
+
+            let circularPath = UIBezierPath(
+                arcCenter: center,
+                radius: radius,
+                startAngle: startAngle,
+                endAngle: endAngle,
+                clockwise: true
+            )
+
+            progressLayer.path = circularPath.cgPath
+            progressLayer.fillColor = UIColor.clear.cgColor
+            progressLayer.strokeColor = UIColor.systemRed.cgColor
+            progressLayer.lineWidth = 3
+            progressLayer.strokeEnd = 0
+            progressLayer.lineCap = .round
+
+            progressView.layer.addSublayer(progressLayer)
+            progressView.tag = 1001 // For later reference
+
+            return progressView
+        }
+
         private func createReplyOverlay(for paragraph: Paragraph, at index: Int, textView: UITextView) {
             guard let overlayRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else { return }
 
@@ -1629,25 +1767,57 @@ struct RichTextEditor: UIViewRepresentable {
             overlayView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
             overlayView.layer.masksToBounds = true
 
-            // --- Add the reply icon ---
+            // Determine icon and position based on swipe direction
+            let iconName: String
+            let iconColor: UIColor
+            let horizontalPosition: NSLayoutXAxisAnchor
+            let horizontalConstant: CGFloat
+
+            if swipeDirection == .left {
+                iconName = "trash"
+                iconColor = .systemRed
+                horizontalPosition = overlayView.trailingAnchor
+                horizontalConstant = -52 // Move further from edge to prevent clipping
+            } else {
+                iconName = "plus"
+                iconColor = .systemGreen
+                horizontalPosition = overlayView.leadingAnchor
+                horizontalConstant = 20 // Move further from edge to prevent clipping
+            }
+
             let iconView = UIHostingController(rootView:
-                Image(systemName: "plus")
+                Image(systemName: iconName)
                     .font(.title)
-                    .foregroundColor(.gray)
-                    .padding()
+                    .foregroundColor(Color(iconColor))
             ).view!
             iconView.backgroundColor = .clear
             iconView.translatesAutoresizingMaskIntoConstraints = false
             overlayView.addSubview(iconView)
 
-            // Center the icon vertically and position it on the left
+            // Position the icon with proper padding from edges
             NSLayoutConstraint.activate([
-                iconView.leadingAnchor.constraint(equalTo: overlayView.leadingAnchor, constant: 4),
-                iconView.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor)
+                iconView.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor),
+                iconView.leadingAnchor.constraint(equalTo: horizontalPosition, constant: horizontalConstant)
             ])
-            // --- End of icon code ---
 
-            textView.addSubview(overlayView)
+            // Add circular progress indicator for delete confirmation
+            if swipeDirection == .left {
+                let progressContainer = createCircularProgressView()
+                progressContainer.translatesAutoresizingMaskIntoConstraints = false
+                overlayView.addSubview(progressContainer)
+
+                // Position the progress indicator with manual offsets
+                let horizontalOffset: CGFloat = -62.5 // Adjust this to move left/right
+                let verticalOffset: CGFloat = -26 // Adjust this to move up/down
+
+                NSLayoutConstraint.activate([
+                    progressContainer.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor, constant: verticalOffset),
+                    progressContainer.trailingAnchor.constraint(equalTo: overlayView.trailingAnchor, constant: horizontalOffset)
+                ])
+
+                holdProgressView = progressContainer
+            }
+
             replyOverlayView = overlayView
         }
 
@@ -1728,6 +1898,59 @@ struct RichTextEditor: UIViewRepresentable {
             }
         }
 
+        private func triggerDeleteAction() {
+            guard let textView = textView,
+                  let paragraphIndex = replyGestureParagraphIndex,
+                  paragraphIndex < paragraphs.count else { return }
+
+            // Use medium haptic for delete confirmation
+            let deleteHapticGenerator = UIImpactFeedbackGenerator(style: .medium)
+            deleteHapticGenerator.impactOccurred()
+
+            let paragraphToDelete = paragraphs[paragraphIndex]
+            let deleteRange = paragraphToDelete.range
+
+            // Don't allow deleting the last paragraph - just clear it instead
+            if paragraphs.count == 1 {
+                let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
+                mutableText.replaceCharacters(in: deleteRange, with: "")
+
+                // Add an empty paragraph to maintain structure
+                let emptyParagraphStyle = NSMutableParagraphStyle()
+                emptyParagraphStyle.paragraphSpacing = parent.settings.defaultParagraphSpacing
+                let emptyAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.preferredFont(forTextStyle: .body),
+                    .paragraphStyle: emptyParagraphStyle,
+                    .foregroundColor: UIColor.label
+                ]
+                let emptyParagraph = NSAttributedString(string: "", attributes: emptyAttributes)
+                mutableText.append(emptyParagraph)
+
+                textView.attributedText = mutableText
+                parent.text = mutableText
+                textView.selectedRange = NSRange(location: 0, length: 0)
+                parent.selectedRange = textView.selectedRange
+            } else {
+                // Use rebuild logic for proper paragraph handling
+                var newParagraphs = paragraphs
+                newParagraphs.remove(at: paragraphIndex)
+
+                // Rebuild the entire text using proven logic
+                let newAttributedString = rebuildAttributedString(from: newParagraphs)
+
+                textView.attributedText = newAttributedString
+                parent.text = newAttributedString
+
+                // Position cursor appropriately based on deletion
+                let cursorLocation = min(deleteRange.location, newAttributedString.length)
+                textView.selectedRange = NSRange(location: cursorLocation, length: 0)
+                parent.selectedRange = textView.selectedRange
+            }
+
+            // Update paragraphs and ensure cursor is visible
+            self.parseAttributedText(textView.attributedText)
+        }
+
         private func cleanupReplyGesture() {
             func cleanup() {
                 self.replyGhostView?.removeFromSuperview()
@@ -1738,6 +1961,17 @@ struct RichTextEditor: UIViewRepresentable {
                 self.replyGestureInitialLocation = nil
                 self.hasTriggeredReplyHaptic = false
                 self.isHorizontalSwipe = false
+                self.swipeDirection = .none
+
+                // Reset hold-to-confirm state
+                self.isHolding = false
+                self.holdStartTime = nil
+                self.holdProgress = 0.0
+                self.holdProgressView = nil
+
+                // Stop display link
+                self.holdDisplayLink?.invalidate()
+                self.holdDisplayLink = nil
             }
 
             guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
@@ -1757,6 +1991,10 @@ struct RichTextEditor: UIViewRepresentable {
                     ghostView.transform = CGAffineTransform.identity
                     overlayView.subviews.first?.alpha = 0.0
                     overlayView.subviews.first?.transform = .identity
+
+                    if let progressContainer = self.holdProgressView {
+                        progressContainer.alpha = 0.0
+                    }
                 },
                 completion: { _ in
                     cleanup()
