@@ -1554,7 +1554,14 @@ struct RichTextEditor: UIViewRepresentable {
             guard isHolding, let holdStartTime = holdStartTime else { return }
 
             let elapsed = CACurrentMediaTime() - holdStartTime
-            holdProgress = min(elapsed / holdDuration, 1.0)
+            let newProgress = min(elapsed / holdDuration, 1.0)
+            
+            // Check if we just reached 100%
+            if newProgress >= 1.0 && holdProgress < 1.0 {
+                holdHapticGenerator.impactOccurred()
+            }
+            
+            holdProgress = newProgress
 
             // Update progress indicator without implicit animations
             if let progressContainer = holdProgressView,
@@ -1563,15 +1570,6 @@ struct RichTextEditor: UIViewRepresentable {
                 CATransaction.setDisableActions(true)
                 progressLayer.strokeEnd = holdProgress
                 CATransaction.commit()
-            }
-
-            // Haptic feedback during hold
-            let hapticInterval: CFTimeInterval = 0.5
-            let currentInterval = Int(elapsed / hapticInterval)
-            let lastInterval = Int((elapsed - 0.016) / hapticInterval) // Small delta to prevent multiple triggers
-
-            if currentInterval > lastInterval && currentInterval <= 3 {
-                holdHapticGenerator.impactOccurred()
             }
         }
 
