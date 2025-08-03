@@ -1587,7 +1587,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard let ghostView = replyGhostView else { return }
+            guard replyGhostView != nil else { return }
             let translation = gesture.translation(in: textView)
             let horizontalTranslation = max(0, translation.x)
 
@@ -1714,7 +1714,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.isHorizontalSwipe = false
             }
 
-            guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
+            guard let ghostView = replyGhostView, replyOverlayView != nil else {
                 // Fallback to immediate cleanup if views don't exist
                 cleanup()
                 return
