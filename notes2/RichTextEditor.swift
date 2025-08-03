@@ -1613,15 +1613,15 @@ struct RichTextEditor: UIViewRepresentable {
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
             guard replyGhostView != nil else { return }
             let translation = gesture.translation(in: textView)
-            let horizontalTranslation = translation.x
+            let horizontalTranslation = swipeDirection == .right
+                ? min(max(0, translation.x), replyGestureThreshold)
+                : max(min(0, translation.x), -replyGestureThreshold)
 
             // Only trigger if it's a confirmed horizontal swipe
             if isHorizontalSwipe && abs(horizontalTranslation) >= replyGestureThreshold {
                 if swipeDirection == .right {
-                    print("Triggering reply action")
                     triggerReplyAction()
                 } else if swipeDirection == .left {
-                    print("Triggering delete action")
                     triggerDeleteAction()
                 }
             }
