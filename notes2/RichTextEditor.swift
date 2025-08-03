@@ -1130,10 +1130,8 @@ struct RichTextEditor: UIViewRepresentable {
             let newTargetIndex = calculateTargetIndex(for: location, textView: textView)
 
             // Move paragraph immediately when target changes
-            if newTargetIndex != dragTargetIndex {
-                // Use stored dragging index instead of UUID lookup to avoid identity loss
-                let currentDragIndex = draggingParagraphIndex ?? 0
-
+            let currentDragIndex = draggingParagraphIndex ?? 0
+            if newTargetIndex != currentDragIndex {
                 reorderParagraph(from: currentDragIndex, to: newTargetIndex, textView: textView, isLiveDrag: true)
 
                 // Update drag index to reflect new position
@@ -1143,7 +1141,7 @@ struct RichTextEditor: UIViewRepresentable {
                 // Update the blue styling to the new position
                 setDraggingSource(newTargetIndex)
 
-                // Haptic feedback for movement
+                // Haptic feedback for movement - only when index actually changes
                 dragSelectionGenerator.selectionChanged()
             }
 
