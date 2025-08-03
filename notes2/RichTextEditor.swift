@@ -219,6 +219,13 @@ struct RichTextEditor: UIViewRepresentable {
         private let replyGestureHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var hasTriggeredReplyHaptic = false
         private var isHorizontalSwipe = false
+        private var swipeDirection: SwipeDirection = .none
+
+        enum SwipeDirection {
+            case none
+            case right
+            case left
+        }
 
         @Published var paragraphs: [Paragraph] = []
         @Published var textContainerInset: UIEdgeInsets = .zero
@@ -1528,19 +1535,14 @@ struct RichTextEditor: UIViewRepresentable {
             replyGestureParagraphIndex = index
             replyGestureInitialLocation = location
 
-            // 1. Create the ghost view from a snapshot of the original text FIRST.
+            // Create the ghost view from a snapshot of the original text
             guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
-
-            // 2. Create and add the overlay to obscure the original text.
-            createReplyOverlay(for: paragraphs[index], at: index, textView: textView)
-
-            // 3. Add the ghost view on top of everything.
             self.replyGhostView = ghost
             textView.addSubview(ghost)
         }
 
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard let ghostView = replyGhostView else { return }
+            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { return }
 
             let translation = gesture.translation(in: textView)
 
@@ -1555,9 +1557,18 @@ struct RichTextEditor: UIViewRepresentable {
                     return
                 }
 
-                // Mark as horizontal swipe if horizontal is dominant
+                // Mark as horizontal swipe and determine direction
                 if horizontalMovement > verticalMovement {
                     isHorizontalSwipe = true
+                    swipeDirection = translation.x > 0 ? .right : .left
+
+                    // Create overlay after direction is determined, insert below ghost
+                    if let ghostView = replyGhostView {
+                        createReplyOverlay(for: paragraphs[paragraphIndex], at: paragraphIndex, textView: textView)
+                        if let overlay = replyOverlayView {
+                            textView.insertSubview(overlay, belowSubview: ghostView)
+                        }
+                    }
                 }
             }
 
@@ -1567,14 +1578,19 @@ struct RichTextEditor: UIViewRepresentable {
                 return
             }
 
-            let horizontalTranslation = min(max(0, translation.x), replyGestureThreshold) // Limit to threshold
+            let horizontalTranslation: CGFloat
+            if swipeDirection == .right {
+                horizontalTranslation = min(max(0, translation.x), replyGestureThreshold)
+            } else {
+                horizontalTranslation = max(min(0, translation.x), -replyGestureThreshold)
+            }
 
             // Apply 1:1 translation to ghost view (capped at threshold)
             ghostView.transform = CGAffineTransform(translationX: horizontalTranslation, y: 0)
 
             // Fade in the icon as the user swipes
             if let overlay = replyOverlayView, let iconView = overlay.subviews.first {
-                let percentage = horizontalTranslation / replyGestureThreshold
+                let percentage = abs(horizontalTranslation) / replyGestureThreshold
                 let iconAlpha = min(percentage, 1.0)
                 iconView.alpha = iconAlpha
 
@@ -1584,7 +1600,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Track threshold crossings for multi-haptic feedback
             let wasAboveThreshold = hasTriggeredReplyHaptic
-            let isAboveThreshold = horizontalTranslation >= replyGestureThreshold
+            let isAboveThreshold = abs(horizontalTranslation) >= replyGestureThreshold
 
             if isAboveThreshold && !wasAboveThreshold {
                 replyGestureHapticGenerator.impactOccurred()
@@ -1597,11 +1613,17 @@ struct RichTextEditor: UIViewRepresentable {
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
             guard replyGhostView != nil else { return }
             let translation = gesture.translation(in: textView)
-            let horizontalTranslation = max(0, translation.x)
+            let horizontalTranslation = translation.x
 
             // Only trigger if it's a confirmed horizontal swipe
-            if isHorizontalSwipe && horizontalTranslation >= replyGestureThreshold {
-                triggerReplyAction()
+            if isHorizontalSwipe && abs(horizontalTranslation) >= replyGestureThreshold {
+                if swipeDirection == .right {
+                    print("Triggering reply action")
+                    triggerReplyAction()
+                } else if swipeDirection == .left {
+                    print("Triggering delete action")
+                    triggerDeleteAction()
+                }
             }
 
             // Cleanup
@@ -1629,25 +1651,39 @@ struct RichTextEditor: UIViewRepresentable {
             overlayView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
             overlayView.layer.masksToBounds = true
 
-            // --- Add the reply icon ---
+            // Determine icon and position based on swipe direction
+            let iconName: String
+            let iconColor: UIColor
+            let horizontalPosition: NSLayoutXAxisAnchor
+            let horizontalConstant: CGFloat
+
+            if swipeDirection == .left {
+                iconName = "trash"
+                iconColor = .systemRed
+                horizontalPosition = overlayView.trailingAnchor
+                horizontalConstant = -52 // Move further from edge to prevent clipping
+            } else {
+                iconName = "plus"
+                iconColor = .systemGreen
+                horizontalPosition = overlayView.leadingAnchor
+                horizontalConstant = 20 // Move further from edge to prevent clipping
+            }
+
             let iconView = UIHostingController(rootView:
-                Image(systemName: "plus")
+                Image(systemName: iconName)
                     .font(.title)
-                    .foregroundColor(.gray)
-                    .padding()
+                    .foregroundColor(Color(iconColor))
             ).view!
             iconView.backgroundColor = .clear
             iconView.translatesAutoresizingMaskIntoConstraints = false
             overlayView.addSubview(iconView)
 
-            // Center the icon vertically and position it on the left
+            // Position the icon with proper padding from edges
             NSLayoutConstraint.activate([
-                iconView.leadingAnchor.constraint(equalTo: overlayView.leadingAnchor, constant: 4),
-                iconView.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor)
+                iconView.centerYAnchor.constraint(equalTo: overlayView.centerYAnchor),
+                iconView.leadingAnchor.constraint(equalTo: horizontalPosition, constant: horizontalConstant)
             ])
-            // --- End of icon code ---
 
-            textView.addSubview(overlayView)
             replyOverlayView = overlayView
         }
 
@@ -1728,6 +1764,60 @@ struct RichTextEditor: UIViewRepresentable {
             }
         }
 
+        private func triggerDeleteAction() {
+            guard let textView = textView,
+                  let paragraphIndex = replyGestureParagraphIndex,
+                  paragraphIndex < paragraphs.count else { return }
+
+            // Use medium haptic for delete confirmation
+            let deleteHapticGenerator = UIImpactFeedbackGenerator(style: .medium)
+            deleteHapticGenerator.impactOccurred()
+
+            let paragraphToDelete = paragraphs[paragraphIndex]
+            let deleteRange = paragraphToDelete.range
+
+            // Don't allow deleting the last paragraph - just clear it instead
+            if paragraphs.count == 1 {
+                let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
+                mutableText.replaceCharacters(in: deleteRange, with: "")
+
+                // Add an empty paragraph to maintain structure
+                let emptyParagraphStyle = NSMutableParagraphStyle()
+                emptyParagraphStyle.paragraphSpacing = parent.settings.defaultParagraphSpacing
+                let emptyAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.preferredFont(forTextStyle: .body),
+                    .paragraphStyle: emptyParagraphStyle,
+                    .foregroundColor: UIColor.label
+                ]
+                let emptyParagraph = NSAttributedString(string: "", attributes: emptyAttributes)
+                mutableText.append(emptyParagraph)
+
+                textView.attributedText = mutableText
+                parent.text = mutableText
+                textView.selectedRange = NSRange(location: 0, length: 0)
+                parent.selectedRange = textView.selectedRange
+            } else {
+                // Normal deletion for multiple paragraphs
+                let mutableText = NSMutableAttributedString(attributedString: textView.attributedText)
+                mutableText.deleteCharacters(in: deleteRange)
+
+                textView.attributedText = mutableText
+                parent.text = mutableText
+
+                // Position cursor at start of deleted paragraph's location
+                let cursorLocation = min(deleteRange.location, mutableText.length)
+                textView.selectedRange = NSRange(location: cursorLocation, length: 0)
+                parent.selectedRange = textView.selectedRange
+            }
+
+            // Update paragraphs and ensure cursor is visible
+            self.parseAttributedText(textView.attributedText)
+            DispatchQueue.main.async {
+                self.centerCursorInTextView()
+                textView.becomeFirstResponder()
+            }
+        }
+
         private func cleanupReplyGesture() {
             func cleanup() {
                 self.replyGhostView?.removeFromSuperview()
@@ -1738,6 +1828,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.replyGestureInitialLocation = nil
                 self.hasTriggeredReplyHaptic = false
                 self.isHorizontalSwipe = false
+                self.swipeDirection = .none
             }
 
             guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
