@@ -1703,8 +1703,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func cleanupReplyGesture() {
-            guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
-                // Fallback to immediate cleanup if views don't exist
+            func cleanup() {
                 self.replyGhostView?.removeFromSuperview()
                 self.replyOverlayView?.removeFromSuperview()
                 self.replyGhostView = nil
@@ -1713,6 +1712,11 @@ struct RichTextEditor: UIViewRepresentable {
                 self.replyGestureInitialLocation = nil
                 self.hasTriggeredReplyHaptic = false
                 self.isHorizontalSwipe = false
+            }
+
+            guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
+                // Fallback to immediate cleanup if views don't exist
+                cleanup()
                 return
             }
 
@@ -1727,14 +1731,7 @@ struct RichTextEditor: UIViewRepresentable {
                     ghostView.transform = CGAffineTransform.identity
                 },
                 completion: { _ in
-                    self.replyGhostView?.removeFromSuperview()
-                    self.replyOverlayView?.removeFromSuperview()
-                    self.replyGhostView = nil
-                    self.replyOverlayView = nil
-                    self.replyGestureParagraphIndex = nil
-                    self.replyGestureInitialLocation = nil
-                    self.hasTriggeredReplyHaptic = false
-                    self.isHorizontalSwipe = false
+                    cleanup()
                 }
             )
         }
