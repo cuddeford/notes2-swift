@@ -1812,10 +1812,6 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Update paragraphs and ensure cursor is visible
             self.parseAttributedText(textView.attributedText)
-            DispatchQueue.main.async {
-                self.centerCursorInTextView()
-                textView.becomeFirstResponder()
-            }
         }
 
         private func cleanupReplyGesture() {
