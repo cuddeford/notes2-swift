@@ -225,7 +225,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var holdStartTime: CFTimeInterval?
         private var isHolding = false
         private var holdProgress: CGFloat = 0.0
-        private let holdDuration: CFTimeInterval = 1.5
+        private let holdDuration: CFTimeInterval = 0.8
         private let holdHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var holdProgressView: UIView?
         private var holdDisplayLink: CADisplayLink?
@@ -1553,12 +1553,12 @@ struct RichTextEditor: UIViewRepresentable {
 
             let elapsed = CACurrentMediaTime() - holdStartTime
             let newProgress = min(elapsed / holdDuration, 1.0)
-            
+
             // Check if we just reached 100%
             if newProgress >= 1.0 && holdProgress < 1.0 {
                 holdHapticGenerator.impactOccurred()
             }
-            
+
             holdProgress = newProgress
 
             // Update progress indicator without implicit animations
