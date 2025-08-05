@@ -136,7 +136,7 @@ struct ContentView: View {
             .animation(.default, value: pinnedVisible)
             .animation(.default, value: recentsVisible)
             .animation(.default, value: historyVisible)
-            .navigationTitle("Notes2")
+            .navigationTitle("Spring")
             .searchable(text: $searchText, placement: .automatic, prompt: "Search notes...")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
