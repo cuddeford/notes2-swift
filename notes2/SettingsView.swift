@@ -50,15 +50,15 @@ struct SettingsView: View {
             }
 
             Section {
-                Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
+                Toggle("Magnetic scrolling", isOn: $settings.magneticScrollingEnabled)
             } footer: {
-                Text("Snaps the current thought to the top of the screen when scrolling.")
+                Text("Snap a thought to the top of the screen when scrolling.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
             Section {
-                Toggle("Drag to Reorder Thoughts", isOn: $settings.dragToReorderParagraphEnabled)
+                Toggle("Drag to reorder thoughts", isOn: $settings.dragToReorderParagraphEnabled)
             } footer: {
                 Text("Reorder thoughts by long-pressing and dragging them.")
                     .font(.caption)
