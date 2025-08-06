@@ -33,7 +33,7 @@ struct LastNoteIndicatorView: View {
             .padding()
             .background(backgroundColor)
             .foregroundColor(.white)
-            .cornerRadius(10)
+            .cornerRadius(16)
             .position(x: UIScreen.main.bounds.width + translation.width - 60, y: location.y - 150 - topInset)
             .animation(.interactiveSpring(), value: translation)
             .transition(.opacity)

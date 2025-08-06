@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var selectedNoteID: UUID?
     @State private var selectedCompositeID: String?
     @State private var isShowingSettings = false
+    @StateObject var settings = AppSettings.shared
 
     @State private var listDragOffset: CGSize = .zero
     @State private var listDragLocation: CGPoint = .zero
@@ -191,7 +192,7 @@ struct ContentView: View {
             }
         }
         .overlay {
-            if isListDragging {
+            if isListDragging && settings.lastNoteIndicatorGestureEnabled {
                 let isUntitled = recentNotes.first?.firstLine.isEmpty ?? true
                 LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: isUntitled ? "empty" : recentNotes.first!.firstLine, isUntitled: isUntitled)
             }

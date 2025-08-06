@@ -58,6 +58,24 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Create new note", isOn: $settings.newNoteIndicatorGestureEnabled)
+            } header: {
+               Text("Gestures")
+            } footer: {
+                Text("Swipe from right edge of screen inside a note to create a new note.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
+            Section {
+                Toggle("Open last note", isOn: $settings.lastNoteIndicatorGestureEnabled)
+            } footer: {
+                Text("Swipe from right edge of screen on notes list to open most recent note.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
+            Section {
                 Toggle("Drag to reorder thoughts", isOn: $settings.dragToReorderParagraphEnabled)
             } footer: {
                 Text("Reorder thoughts by long-pressing and dragging them.")

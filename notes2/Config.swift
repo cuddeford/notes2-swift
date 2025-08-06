@@ -42,6 +42,14 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(paragraphOverlaysEnabled, forKey: "paragraphOverlaysEnabled") }
     }
 
+    @Published var newNoteIndicatorGestureEnabled: Bool {
+        didSet { UserDefaults.standard.set(newNoteIndicatorGestureEnabled, forKey: "newNoteIndicatorGestureEnabled") }
+    }
+
+    @Published var lastNoteIndicatorGestureEnabled: Bool {
+        didSet { UserDefaults.standard.set(lastNoteIndicatorGestureEnabled, forKey: "lastNoteIndicatorGestureEnabled") }
+    }
+
     static func registerDefaults() {
         let defaults: [String: Any] = [
             "recentsVisible": true,
@@ -51,6 +59,8 @@ class AppSettings: ObservableObject {
             "magneticScrollingEnabled": false,
             "dragToReorderParagraphEnabled": true,
             "paragraphOverlaysEnabled": true,
+            "newNoteIndicatorGestureEnabled": false,
+            "lastNoteIndicatorGestureEnabled": false,
             "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
             "padding": 20.0
@@ -71,5 +81,7 @@ class AppSettings: ObservableObject {
         self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? false
         self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false
         self.paragraphOverlaysEnabled = UserDefaults.standard.object(forKey: "paragraphOverlaysEnabled") as? Bool ?? true
+        self.newNoteIndicatorGestureEnabled = UserDefaults.standard.object(forKey: "newNoteIndicatorGestureEnabled") as? Bool ?? true
+        self.lastNoteIndicatorGestureEnabled = UserDefaults.standard.object(forKey: "lastNoteIndicatorGestureEnabled") as? Bool ?? true
     }
 }

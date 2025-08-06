@@ -22,7 +22,7 @@ struct NewNoteIndicatorView: View {
             .padding()
             .background(backgroundColor)
             .foregroundColor(.white)
-            .cornerRadius(10)
+            .cornerRadius(16)
             .position(x: UIScreen.main.bounds.width + translation.width - 60, y: location.y - 50)
             .animation(.interactiveSpring(), value: translation)
             .transition(.opacity)

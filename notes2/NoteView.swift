@@ -141,7 +141,7 @@ struct NoteView: View {
             //     print("--- RTFD Base64 End ---")
             // }
 
-            if isDragging {
+            if isDragging && settings.newNoteIndicatorGestureEnabled {
                 NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
             }
 
@@ -175,8 +175,8 @@ struct NoteView: View {
         .gesture(
             DragGesture(minimumDistance: 25, coordinateSpace: .global)
                 .onChanged { value in
-                    // Only activate if the drag starts from the right edge of the screen
-                    if value.startLocation.x > UIScreen.main.bounds.width - 50 {
+                    // Only activate if the drag starts from the right edge of the screen and gesture is enabled
+                    if value.startLocation.x > UIScreen.main.bounds.width - 50 && settings.newNoteIndicatorGestureEnabled {
                         // Set the location first
                         dragOffset = value.translation
                         dragLocation = value.location
