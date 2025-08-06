@@ -100,10 +100,22 @@ struct RichTextEditor: UIViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.textContainerInset = textView.textContainerInset
         context.coordinator.textViewWidth = textView.bounds.width
+
+        context.coordinator.parseAttributedText(textView.attributedText)
+
         DispatchQueue.main.async { // Ensure UI updates happen on the main thread
             textView.becomeFirstResponder()
             context.coordinator.parseAttributedText(textView.attributedText)
         }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            context.coordinator.parseAttributedText(textView.attributedText)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            context.coordinator.parseAttributedText(textView.attributedText)
+        }
+
         return textView
     }
 
