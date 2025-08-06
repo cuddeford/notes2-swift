@@ -51,7 +51,7 @@ class AppSettings: ObservableObject {
             "magneticScrollingEnabled": false,
             "dragToReorderParagraphEnabled": false,
             "paragraphOverlaysEnabled": true,
-            "defaultParagraphSpacing": unrelatedParagraphSpacing,
+            "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
             "padding": 20.0
         ]
