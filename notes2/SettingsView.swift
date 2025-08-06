@@ -33,18 +33,18 @@ struct SettingsView: View {
 
             Section {
                 Toggle(isOn: isDefaultSpacingRelated) {
-                    Text("Paragraphs default to: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)
+                    Text("Thoughts start: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)
                 }
             } footer: {
-                Text("Controls the default spacing between paragraphs when you create a new note. Pinch two paragraphs to mark them as related or unrelated.")
+                Text("Controls the default spacing between thoughts when you start a new note. Pinch two thoughts together or apart to mark them as related or unrelated.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
             Section {
-                Toggle("Enable paragraph overlays", isOn: $settings.paragraphOverlaysEnabled)
+                Toggle("Thought bubbles", isOn: $settings.paragraphOverlaysEnabled)
             } footer: {
-                Text("Shows visual boundaries around paragraphs, like thought bubbles.")
+                Text("Shows visual boundaries around thoughts.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -52,15 +52,15 @@ struct SettingsView: View {
             Section {
                 Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
             } footer: {
-                Text("Snaps the current paragraph to the top of the screen when scrolling.")
+                Text("Snaps the current thought to the top of the screen when scrolling.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
             Section {
-                Toggle("Drag to Reorder Paragraphs", isOn: $settings.dragToReorderParagraphEnabled)
+                Toggle("Drag to Reorder Thoughts", isOn: $settings.dragToReorderParagraphEnabled)
             } footer: {
-                Text("Reorder paragraphs by long-pressing and dragging them. (Work in Progress)")
+                Text("Reorder thoughts by long-pressing and dragging them.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
