@@ -15,7 +15,7 @@ class RuledView: UIView {
     // Haptic feedback state for border thickness
     private var hapticBorderStates: [NSRange: HapticBorderState] = [:]
     private let baseBorderWidth: CGFloat = 2.0
-    private let heavyHapticAddition: CGFloat = 20.0
+    private let heavyHapticAddition: CGFloat = 15.0
     private let lightHapticAddition: CGFloat = 6.0
     private let animationDuration: CFTimeInterval = 0.15
 
@@ -376,9 +376,9 @@ class RuledView: UIView {
         let additionalWidth: CGFloat
         switch hapticState.type {
         case .heavy:
-            additionalWidth = heavyHapticAddition * pulseProgress
+            additionalWidth = min(heavyHapticAddition * pulseProgress, heavyHapticAddition)
         case .light:
-            additionalWidth = lightHapticAddition * pulseProgress
+            additionalWidth = min(lightHapticAddition * pulseProgress, lightHapticAddition)
         }
 
         return baseBorderWidth + additionalWidth
