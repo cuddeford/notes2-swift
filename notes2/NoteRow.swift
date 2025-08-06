@@ -6,7 +6,7 @@ struct NoteRow: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text(note.firstLine.isEmpty ? "untitled" : note.firstLine)
+            Text(note.firstLine.isEmpty ? "empty" : note.firstLine)
                 .font(.headline)
                 .italic(note.firstLine.isEmpty)
                 .opacity(note.firstLine.isEmpty ? 0.5 : 1)

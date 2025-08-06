@@ -193,7 +193,7 @@ struct ContentView: View {
         .overlay {
             if isListDragging {
                 let isUntitled = recentNotes.first?.firstLine.isEmpty ?? true
-                LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: isUntitled ? "untitled" : recentNotes.first!.firstLine, isUntitled: isUntitled)
+                LastNoteIndicatorView(translation: listDragOffset, location: listDragLocation, noteFirstLine: isUntitled ? "empty" : recentNotes.first!.firstLine, isUntitled: isUntitled)
             }
         }
         .gesture(
