@@ -49,7 +49,7 @@ class AppSettings: ObservableObject {
             "pinnedVisible": true,
             "newNoteWithBigFont": true,
             "magneticScrollingEnabled": false,
-            "dragToReorderParagraphEnabled": false,
+            "dragToReorderParagraphEnabled": true,
             "paragraphOverlaysEnabled": true,
             "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
