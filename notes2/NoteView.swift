@@ -133,6 +133,13 @@ struct NoteView: View {
                 // print("Paragraphs changed: \(newParagraphs?.count ?? 0) paragraphs")
                 // You can now access newParagraphs[i].height, newParagraphs[i].screenPosition, etc.
             }
+            // .onTapGesture(count: 3) {
+            //     let rtfdData = note.content
+            //     let base64String = rtfdData.base64EncodedString()
+            //     print("--- RTFD Base64 Start ---")
+            //     print(base64String)
+            //     print("--- RTFD Base64 End ---")
+            // }
 
             if isDragging {
                 NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
