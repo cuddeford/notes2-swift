@@ -10,6 +10,8 @@ struct NoteRow: View {
                 .font(.headline)
                 .italic(note.firstLine.isEmpty)
                 .opacity(note.firstLine.isEmpty ? 0.5 : 1)
+                .padding(.bottom, 4)
+
             HStack(spacing: 5) {
                 if note.isPinned {
                     Image(systemName: "pin.fill")
