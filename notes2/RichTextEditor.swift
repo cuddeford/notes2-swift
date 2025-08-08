@@ -196,9 +196,18 @@ struct RichTextEditor: UIViewRepresentable {
 
         // Activation thresholds for gesture priming
         private let activationThreshold: CGFloat = 30
+        private let spacingTolerance: CGFloat = 0.1
         private var relatedActivationThreshold: CGFloat { AppSettings.relatedParagraphSpacing + activationThreshold }
         private var unrelatedActivationThreshold: CGFloat { AppSettings.unrelatedParagraphSpacing - activationThreshold }
-        private var lastCrossedThreshold: String? = nil
+        
+        private enum ThresholdType {
+            case relatedAbove
+            case unrelatedBelow
+            case middleRelated
+            case middleUnrelated
+        }
+        
+        private var lastCrossedThreshold: ThresholdType? = nil
         var gesturePrimed: Bool = false
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
         private var lastParagraphCount: Int = 0
@@ -725,7 +734,7 @@ struct RichTextEditor: UIViewRepresentable {
             return mutableAttributedText
         }
 
-        private func startSpacingAnimation(from: CGFloat, to: CGFloat, range: NSRange, actionState: Bool = false) {
+        private func startSpacingAnimation(from: CGFloat, to: CGFloat, range: NSRange, actionState: Bool) {
             let startTime = CACurrentMediaTime()
 
             let displayLink = CADisplayLink(target: self, selector: #selector(self.updateSpacingAnimation(_:)))
@@ -818,7 +827,7 @@ struct RichTextEditor: UIViewRepresentable {
 
                 // Set the initial detent for color and haptics
                 self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
-                self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < 0.1 }
+                self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < spacingTolerance }
 
                 // Track if we started at a limit for direction-based haptic
                 self.startedAtLimit = self.wasAtLimit
@@ -862,81 +871,31 @@ struct RichTextEditor: UIViewRepresentable {
             // Clamp the spacing to the defined detents
             targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
 
-            // Bidirectional activation threshold crossing detection
             let direction = currentDistance - initialPinchDistance
-            let wasInitiallyRelated = abs(initialSpacing - AppSettings.relatedParagraphSpacing) < 0.1
-            let wasInitiallyUnrelated = abs(initialSpacing - AppSettings.unrelatedParagraphSpacing) < 0.1
+            let crossingResult = checkThresholdCrossing(
+                currentSpacing: targetSpacing,
+                initialSpacing: initialSpacing,
+                relatedThreshold: relatedActivationThreshold,
+                unrelatedThreshold: unrelatedActivationThreshold
+            )
 
-            // Track actual crossing events
-            var crossingOccurred = false
-            var newPrimedState = false
-
-            if wasInitiallyRelated {
-                // Started at related, check for crossing related + activationThreshold in either direction
-                let wasAbove = lastCrossedThreshold == "related-above"
-                let isAbove = targetSpacing >= relatedActivationThreshold
-
-                if wasAbove != isAbove {
-                    crossingOccurred = true
-                    newPrimedState = isAbove
-                    lastCrossedThreshold = isAbove ? "related-above" : nil
-                }
-            } else if wasInitiallyUnrelated {
-                // Started at unrelated, check for crossing unrelated - activationThreshold in either direction
-                let wasBelow = lastCrossedThreshold == "unrelated-below"
-                let isBelow = targetSpacing <= unrelatedActivationThreshold
-
-                if wasBelow != isBelow {
-                    crossingOccurred = true
-                    newPrimedState = isBelow
-                    lastCrossedThreshold = isBelow ? "unrelated-below" : nil
-                }
-            } else {
-                // Started in middle, use both thresholds
-                let relatedCrossed = targetSpacing >= relatedActivationThreshold
-                let unrelatedCrossed = targetSpacing <= unrelatedActivationThreshold
-
-                // Determine which threshold is closer and use it for crossing
-                let relatedDist = abs(targetSpacing - relatedActivationThreshold)
-                let unrelatedDist = abs(targetSpacing - unrelatedActivationThreshold)
-
-                if relatedDist < unrelatedDist {
-                    // Related threshold is closer
-                    let wasAbove = lastCrossedThreshold == "middle-related"
-                    if relatedCrossed != wasAbove {
-                        crossingOccurred = true
-                        newPrimedState = relatedCrossed
-                        lastCrossedThreshold = relatedCrossed ? "middle-related" : nil
-                    }
-                } else {
-                    // Unrelated threshold is closer
-                    let wasBelow = lastCrossedThreshold == "middle-unrelated"
-                    if unrelatedCrossed != wasBelow {
-                        crossingOccurred = true
-                        newPrimedState = unrelatedCrossed
-                        lastCrossedThreshold = unrelatedCrossed ? "middle-unrelated" : nil
-                    }
-                }
-            }
-
-            // Trigger haptic and update state on threshold crossing
-            if crossingOccurred {
+            if crossingResult.crossed {
                 hapticGenerator.impactOccurred()
                 hapticGenerator.prepare()
-
-                gesturePrimed = newPrimedState
-
+                
+                gesturePrimed = crossingResult.newState
+                lastCrossedThreshold = crossingResult.thresholdType
+                
                 if let range = affectedParagraphRange {
                     ruledView?.triggerHapticFeedback(for: range, type: .heavy)
                 }
             } else if lastCrossedThreshold == nil {
-                // Ensure gesturePrimed is false at start
                 gesturePrimed = false
             }
 
             // Restore light haptic for physical limits
             let isAtLimit = spacingDetents.contains { detent in
-                abs(detent - targetSpacing) < 0.1
+                abs(detent - targetSpacing) < spacingTolerance
             }
 
             if isAtLimit {
@@ -964,9 +923,6 @@ struct RichTextEditor: UIViewRepresentable {
                         ruledView?.triggerHapticFeedback(for: range, type: .light)
                     }
                 }
-            } else {
-                // Reset trigger state when moving away from limit
-                hasTriggeredLightHaptic = false
             }
 
             // Update limit state tracking
@@ -981,7 +937,6 @@ struct RichTextEditor: UIViewRepresentable {
             if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                 paragraphs[index].paragraphStyle = newParagraphStyle
             }
-            currentDetent = targetSpacing
 
             textView.layoutIfNeeded()
             ruledView?.updateAllParagraphOverlays(
@@ -990,8 +945,69 @@ struct RichTextEditor: UIViewRepresentable {
                 activePinchedPairs: activePinchedPairs,
                 currentGestureDetent: self.currentDetent,
                 currentGestureRange: range,
+                actionState: false
             )
             ruledView?.setNeedsDisplay()
+
+            currentDetent = targetSpacing
+        }
+        
+        private func checkThresholdCrossing(
+            currentSpacing: CGFloat,
+            initialSpacing: CGFloat,
+            relatedThreshold: CGFloat,
+            unrelatedThreshold: CGFloat
+        ) -> (crossed: Bool, newState: Bool, thresholdType: ThresholdType?) {
+            let wasInitiallyRelated = abs(initialSpacing - AppSettings.relatedParagraphSpacing) < spacingTolerance
+            let wasInitiallyUnrelated = abs(initialSpacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
+            
+            var crossingOccurred = false
+            var newPrimedState = false
+            var thresholdType: ThresholdType? = nil
+            
+            if wasInitiallyRelated {
+                let wasAbove = lastCrossedThreshold == .relatedAbove
+                let isAbove = currentSpacing >= relatedThreshold
+                
+                if wasAbove != isAbove {
+                    crossingOccurred = true
+                    newPrimedState = isAbove
+                    thresholdType = isAbove ? .relatedAbove : nil
+                }
+            } else if wasInitiallyUnrelated {
+                let wasBelow = lastCrossedThreshold == .unrelatedBelow
+                let isBelow = currentSpacing <= unrelatedThreshold
+                
+                if wasBelow != isBelow {
+                    crossingOccurred = true
+                    newPrimedState = isBelow
+                    thresholdType = isBelow ? .unrelatedBelow : nil
+                }
+            } else {
+                let relatedCrossed = currentSpacing >= relatedThreshold
+                let unrelatedCrossed = currentSpacing <= unrelatedThreshold
+                
+                let relatedDist = abs(currentSpacing - relatedThreshold)
+                let unrelatedDist = abs(currentSpacing - unrelatedThreshold)
+                
+                if relatedDist < unrelatedDist {
+                    let wasAbove = lastCrossedThreshold == .middleRelated
+                    if relatedCrossed != wasAbove {
+                        crossingOccurred = true
+                        newPrimedState = relatedCrossed
+                        thresholdType = relatedCrossed ? .middleRelated : nil
+                    }
+                } else {
+                    let wasBelow = lastCrossedThreshold == .middleUnrelated
+                    if unrelatedCrossed != wasBelow {
+                        crossingOccurred = true
+                        newPrimedState = unrelatedCrossed
+                        thresholdType = unrelatedCrossed ? .middleUnrelated : nil
+                    }
+                }
+            }
+            
+            return (crossed: crossingOccurred, newState: newPrimedState, thresholdType: thresholdType)
         }
 
         private func handlePinchEnded(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
@@ -999,8 +1015,8 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Determine target spacing based on activation thresholds
             let targetSpacing: CGFloat
-            let wasInitiallyRelated = abs(initialSpacing ?? 0 - AppSettings.relatedParagraphSpacing) < 0.1
-            let wasInitiallyUnrelated = abs(initialSpacing ?? 0 - AppSettings.unrelatedParagraphSpacing) < 0.1
+            let wasInitiallyRelated = abs(initialSpacing ?? 0 - AppSettings.relatedParagraphSpacing) < spacingTolerance
+            let wasInitiallyUnrelated = abs(initialSpacing ?? 0 - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
 
             if wasInitiallyRelated {
                 // Started at related, use activation threshold
@@ -1948,7 +1964,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Determine spacing based on original paragraph spacing
             let originalSpacing = originalParagraph.paragraphStyle.paragraphSpacing
-            let isOriginallyUnrelated = abs(originalSpacing - AppSettings.unrelatedParagraphSpacing) < 0.1
+            let isOriginallyUnrelated = abs(originalSpacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
 
             // Create new paragraph style - use unrelated if original was unrelated, otherwise related
             let newParagraphStyle = NSMutableParagraphStyle()

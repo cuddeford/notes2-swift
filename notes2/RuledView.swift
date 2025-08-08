@@ -281,7 +281,6 @@ class RuledView: UIView {
         }
     }
 
-
     func triggerHapticFeedback(for range: NSRange, type: HapticType) {
         // Apply haptic state to this paragraph
         hapticBorderStates[range] = HapticBorderState(timestamp: CACurrentMediaTime(), type: type)
@@ -408,39 +407,50 @@ class RuledView: UIView {
             return (UIColor.clear, UIColor.clear)
         }
 
-        // Generic color configuration
-        let primaryStateColor = UIColor.green
-        let secondaryStateColor = UIColor.yellow
-        
-        // Determine state and opacity based on gesture progress and position
-        let usePrimaryState: Bool
-        let isAtExtreme: Bool
-        
-        if actionState {
-            // During animation, use the stored action state
-            usePrimaryState = true
-            isAtExtreme = true // Animation targets are always extremes
-        } else if isPinched {
-            // During active gesture
-            usePrimaryState = coordinator.gesturePrimed
-            
-            // Check if we're at the physical limits (extremes)
-            let spacing = detent ?? 0
-            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < 0.1 || 
-                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < 0.1
-        } else {
-            // Static state - use actual paragraph spacing
-            let spacing = detent ?? 0
-            usePrimaryState = abs(spacing - AppSettings.relatedParagraphSpacing) < 0.1
-            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < 0.1 || 
-                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < 0.1
-        }
+        let spacingState = determineSpacingState(
+            detent: detent,
+            actionState: actionState,
+            isPinched: isPinched,
+            coordinator: coordinator
+        )
 
         // Apply appropriate opacity based on whether we're at extremes
-        let opacity: CGFloat = isAtExtreme ? 0.25 : 0.15
-        let color = usePrimaryState ? primaryStateColor : secondaryStateColor
-        
+        let color = spacingState.isRelated ? UIColor.systemGreen : UIColor.systemBlue
+        let opacity: CGFloat = spacingState.isAtExtreme ? 0.25 : 0.15
+
         return (color.withAlphaComponent(opacity), color)
+    }
+
+    private func determineSpacingState(
+        detent: CGFloat?,
+        actionState: Bool,
+        isPinched: Bool,
+        coordinator: RichTextEditor.Coordinator
+    ) -> (isRelated: Bool, isAtExtreme: Bool) {
+        let spacingTolerance: CGFloat = 0.1
+
+        if actionState {
+            // During animation, treat as related (animation targets extremes)
+            return (true, true)
+        }
+
+        let spacing = detent ?? 0
+        let isRelated: Bool
+        let isAtExtreme: Bool
+
+        if isPinched {
+            // During active gesture
+            isRelated = coordinator.gesturePrimed
+            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < spacingTolerance ||
+                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
+        } else {
+            // Static state
+            isRelated = abs(spacing - AppSettings.relatedParagraphSpacing) < spacingTolerance
+            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < spacingTolerance ||
+                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
+        }
+
+        return (isRelated, isAtExtreme)
     }
 
     override func draw(_ rect: CGRect) {
