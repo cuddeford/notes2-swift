@@ -408,38 +408,39 @@ class RuledView: UIView {
             return (UIColor.clear, UIColor.clear)
         }
 
-        // Determine the actual state to display
-        let shouldShowGreen: Bool
-
+        // Generic color configuration
+        let primaryStateColor = UIColor.green
+        let secondaryStateColor = UIColor.yellow
+        
+        // Determine state and opacity based on gesture progress and position
+        let usePrimaryState: Bool
+        let isAtExtreme: Bool
+        
         if actionState {
             // During animation, use the stored action state
-            shouldShowGreen = true
+            usePrimaryState = true
+            isAtExtreme = true // Animation targets are always extremes
         } else if isPinched {
-            // During active gesture, use live gesturePrimed state
-            shouldShowGreen = coordinator.gesturePrimed
+            // During active gesture
+            usePrimaryState = coordinator.gesturePrimed
+            
+            // Check if we're at the physical limits (extremes)
+            let spacing = detent ?? 0
+            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < 0.1 || 
+                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < 0.1
         } else {
             // Static state - use actual paragraph spacing
-            shouldShowGreen = false
+            let spacing = detent ?? 0
+            usePrimaryState = abs(spacing - AppSettings.relatedParagraphSpacing) < 0.1
+            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < 0.1 || 
+                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < 0.1
         }
 
-        if shouldShowGreen {
-            return (UIColor.green.withAlphaComponent(0.25), .green)
-        } else if isPinched {
-            return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
-        }
-
-        // Static colors for completed states
-        switch detent {
-        case AppSettings.relatedParagraphSpacing:
-            return (UIColor.green.withAlphaComponent(0.25), .green)
-        case AppSettings.unrelatedParagraphSpacing:
-            return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
-        default:
-            let isRelated = (detent ?? 0) < (AppSettings.relatedParagraphSpacing + AppSettings.unrelatedParagraphSpacing) / 2
-            return isRelated
-                ? (UIColor.green.withAlphaComponent(0.15), UIColor.green.withAlphaComponent(0.8))
-                : (UIColor.yellow.withAlphaComponent(0.15), UIColor.yellow.withAlphaComponent(0.8))
-        }
+        // Apply appropriate opacity based on whether we're at extremes
+        let opacity: CGFloat = isAtExtreme ? 0.25 : 0.15
+        let color = usePrimaryState ? primaryStateColor : secondaryStateColor
+        
+        return (color.withAlphaComponent(opacity), color)
     }
 
     override func draw(_ rect: CGRect) {
