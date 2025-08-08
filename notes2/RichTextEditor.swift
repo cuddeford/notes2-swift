@@ -199,14 +199,14 @@ struct RichTextEditor: UIViewRepresentable {
         private let spacingTolerance: CGFloat = 0.1
         private var relatedActivationThreshold: CGFloat { AppSettings.relatedParagraphSpacing + activationThreshold }
         private var unrelatedActivationThreshold: CGFloat { AppSettings.unrelatedParagraphSpacing - activationThreshold }
-        
+
         private enum ThresholdType {
             case relatedAbove
             case unrelatedBelow
             case middleRelated
             case middleUnrelated
         }
-        
+
         private var lastCrossedThreshold: ThresholdType? = nil
         var gesturePrimed: Bool = false
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
@@ -882,10 +882,10 @@ struct RichTextEditor: UIViewRepresentable {
             if crossingResult.crossed {
                 hapticGenerator.impactOccurred()
                 hapticGenerator.prepare()
-                
+
                 gesturePrimed = crossingResult.newState
                 lastCrossedThreshold = crossingResult.thresholdType
-                
+
                 if let range = affectedParagraphRange {
                     ruledView?.triggerHapticFeedback(for: range, type: .heavy)
                 }
@@ -951,7 +951,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             currentDetent = targetSpacing
         }
-        
+
         private func checkThresholdCrossing(
             currentSpacing: CGFloat,
             initialSpacing: CGFloat,
@@ -960,15 +960,15 @@ struct RichTextEditor: UIViewRepresentable {
         ) -> (crossed: Bool, newState: Bool, thresholdType: ThresholdType?) {
             let wasInitiallyRelated = abs(initialSpacing - AppSettings.relatedParagraphSpacing) < spacingTolerance
             let wasInitiallyUnrelated = abs(initialSpacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
-            
+
             var crossingOccurred = false
             var newPrimedState = false
             var thresholdType: ThresholdType? = nil
-            
+
             if wasInitiallyRelated {
                 let wasAbove = lastCrossedThreshold == .relatedAbove
                 let isAbove = currentSpacing >= relatedThreshold
-                
+
                 if wasAbove != isAbove {
                     crossingOccurred = true
                     newPrimedState = isAbove
@@ -977,7 +977,7 @@ struct RichTextEditor: UIViewRepresentable {
             } else if wasInitiallyUnrelated {
                 let wasBelow = lastCrossedThreshold == .unrelatedBelow
                 let isBelow = currentSpacing <= unrelatedThreshold
-                
+
                 if wasBelow != isBelow {
                     crossingOccurred = true
                     newPrimedState = isBelow
@@ -986,10 +986,10 @@ struct RichTextEditor: UIViewRepresentable {
             } else {
                 let relatedCrossed = currentSpacing >= relatedThreshold
                 let unrelatedCrossed = currentSpacing <= unrelatedThreshold
-                
+
                 let relatedDist = abs(currentSpacing - relatedThreshold)
                 let unrelatedDist = abs(currentSpacing - unrelatedThreshold)
-                
+
                 if relatedDist < unrelatedDist {
                     let wasAbove = lastCrossedThreshold == .middleRelated
                     if relatedCrossed != wasAbove {
@@ -1006,7 +1006,7 @@ struct RichTextEditor: UIViewRepresentable {
                     }
                 }
             }
-            
+
             return (crossed: crossingOccurred, newState: newPrimedState, thresholdType: thresholdType)
         }
 
@@ -1896,7 +1896,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Use systemBackground to ensure it's opaque and covers the text
             overlayView.backgroundColor = .systemBackground
             overlayView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
-            overlayView.layer.masksToBounds = true
+            overlayView.layer.masksToBounds = false
 
             // Determine icon and position based on swipe direction
             let iconName: String
