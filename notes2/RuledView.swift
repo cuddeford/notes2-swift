@@ -99,11 +99,12 @@ class RuledView: UIView {
         updateAllParagraphOverlays(
             paragraphs: coordinator.paragraphs,
             textView: textView,
-            activePinchedPairs: coordinator.activePinchedPairs
+            activePinchedPairs: coordinator.activePinchedPairs,
+            actionState: false
         )
     }
 
-    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
+    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil, actionState: Bool = false) {
         let inset = textView.textContainerInset
 
         // Remove excess layers
@@ -212,7 +213,7 @@ class RuledView: UIView {
                 detent = paragraph.paragraphStyle.paragraphSpacing
             }
 
-            let (fill, stroke) = colors(for: detent, isPinched: isPinched, isDraggingSource: index == draggingSourceIndex)
+            let (fill, stroke) = colors(for: detent, isPinched: isPinched, isDraggingSource: index == draggingSourceIndex, actionState: actionState)
             let borderWidth = self.borderWidth(for: paragraphs[index].range)
 
             if index < paragraphOverlays.count {
@@ -384,7 +385,7 @@ class RuledView: UIView {
         return baseBorderWidth + additionalWidth
     }
 
-    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false, isDraggingSource: Bool = false) -> (fill: UIColor, stroke: UIColor) {
+    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false, isDraggingSource: Bool = false, actionState: Bool = false) -> (fill: UIColor, stroke: UIColor) {
         if isDraggingSource {
             return (UIColor.systemBlue.withAlphaComponent(0.3), .systemBlue)
         }
@@ -402,15 +403,38 @@ class RuledView: UIView {
             return (UIColor.label.withAlphaComponent(0.07), UIColor.clear)
         }
 
-        // Dynamic colors for pinched paragraphs based on their relationship
-        // Both paragraphs in the pair should show the same color
+        // Check if we're in a pinch gesture context
+        guard let coordinator = textView?.delegate as? RichTextEditor.Coordinator else {
+            return (UIColor.clear, UIColor.clear)
+        }
+
+        // Determine the actual state to display
+        let shouldShowGreen: Bool
+
+        if actionState {
+            // During animation, use the stored action state
+            shouldShowGreen = true
+        } else if isPinched {
+            // During active gesture, use live gesturePrimed state
+            shouldShowGreen = coordinator.gesturePrimed
+        } else {
+            // Static state - use actual paragraph spacing
+            shouldShowGreen = false
+        }
+
+        if shouldShowGreen {
+            return (UIColor.green.withAlphaComponent(0.25), .green)
+        } else if isPinched {
+            return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
+        }
+
+        // Static colors for completed states
         switch detent {
         case AppSettings.relatedParagraphSpacing:
             return (UIColor.green.withAlphaComponent(0.25), .green)
         case AppSettings.unrelatedParagraphSpacing:
             return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
         default:
-            // Intermediate spacing during gesture
             let isRelated = (detent ?? 0) < (AppSettings.relatedParagraphSpacing + AppSettings.unrelatedParagraphSpacing) / 2
             return isRelated
                 ? (UIColor.green.withAlphaComponent(0.15), UIColor.green.withAlphaComponent(0.8))
