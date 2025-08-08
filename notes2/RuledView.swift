@@ -99,11 +99,12 @@ class RuledView: UIView {
         updateAllParagraphOverlays(
             paragraphs: coordinator.paragraphs,
             textView: textView,
-            activePinchedPairs: coordinator.activePinchedPairs
+            activePinchedPairs: coordinator.activePinchedPairs,
+            actionState: false
         )
     }
 
-    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil) {
+    func updateAllParagraphOverlays(paragraphs: [Paragraph], textView: UITextView, activePinchedPairs: [NSRange: (indices: [Int], timestamp: CFTimeInterval)] = [:], currentGestureDetent: CGFloat? = nil, currentGestureRange: NSRange? = nil, actionState: Bool = false) {
         let inset = textView.textContainerInset
 
         // Remove excess layers
@@ -212,7 +213,7 @@ class RuledView: UIView {
                 detent = paragraph.paragraphStyle.paragraphSpacing
             }
 
-            let (fill, stroke) = colors(for: detent, isPinched: isPinched, isDraggingSource: index == draggingSourceIndex)
+            let (fill, stroke) = colors(for: detent, isPinched: isPinched, isDraggingSource: index == draggingSourceIndex, actionState: actionState)
             let borderWidth = self.borderWidth(for: paragraphs[index].range)
 
             if index < paragraphOverlays.count {
@@ -279,7 +280,6 @@ class RuledView: UIView {
             )
         }
     }
-
 
     func triggerHapticFeedback(for range: NSRange, type: HapticType) {
         // Apply haptic state to this paragraph
@@ -384,7 +384,7 @@ class RuledView: UIView {
         return baseBorderWidth + additionalWidth
     }
 
-    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false, isDraggingSource: Bool = false) -> (fill: UIColor, stroke: UIColor) {
+    private func colors(for detent: CGFloat? = nil, isPinched: Bool = false, isDraggingSource: Bool = false, actionState: Bool = false) -> (fill: UIColor, stroke: UIColor) {
         if isDraggingSource {
             return (UIColor.systemBlue.withAlphaComponent(0.3), .systemBlue)
         }
@@ -402,20 +402,55 @@ class RuledView: UIView {
             return (UIColor.label.withAlphaComponent(0.07), UIColor.clear)
         }
 
-        // Dynamic colors for pinched paragraphs based on their relationship
-        // Both paragraphs in the pair should show the same color
-        switch detent {
-        case AppSettings.relatedParagraphSpacing:
-            return (UIColor.green.withAlphaComponent(0.25), .green)
-        case AppSettings.unrelatedParagraphSpacing:
-            return (UIColor.yellow.withAlphaComponent(0.25), .yellow)
-        default:
-            // Intermediate spacing during gesture
-            let isRelated = (detent ?? 0) < (AppSettings.relatedParagraphSpacing + AppSettings.unrelatedParagraphSpacing) / 2
-            return isRelated
-                ? (UIColor.green.withAlphaComponent(0.15), UIColor.green.withAlphaComponent(0.8))
-                : (UIColor.yellow.withAlphaComponent(0.15), UIColor.yellow.withAlphaComponent(0.8))
+        // Check if we're in a pinch gesture context
+        guard let coordinator = textView?.delegate as? RichTextEditor.Coordinator else {
+            return (UIColor.clear, UIColor.clear)
         }
+
+        let spacingState = determineSpacingState(
+            detent: detent,
+            actionState: actionState,
+            isPinched: isPinched,
+            coordinator: coordinator
+        )
+
+        // Apply appropriate opacity based on whether we're at extremes
+        let color = spacingState.isRelated ? UIColor.systemGreen : UIColor.systemBlue
+        let opacity: CGFloat = spacingState.isAtExtreme ? 0.25 : 0.15
+
+        return (color.withAlphaComponent(opacity), color)
+    }
+
+    private func determineSpacingState(
+        detent: CGFloat?,
+        actionState: Bool,
+        isPinched: Bool,
+        coordinator: RichTextEditor.Coordinator
+    ) -> (isRelated: Bool, isAtExtreme: Bool) {
+        let spacingTolerance: CGFloat = 0.1
+
+        if actionState {
+            // During animation, treat as related (animation targets extremes)
+            return (true, true)
+        }
+
+        let spacing = detent ?? 0
+        let isRelated: Bool
+        let isAtExtreme: Bool
+
+        if isPinched {
+            // During active gesture
+            isRelated = coordinator.gesturePrimed
+            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < spacingTolerance ||
+                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
+        } else {
+            // Static state
+            isRelated = abs(spacing - AppSettings.relatedParagraphSpacing) < spacingTolerance
+            isAtExtreme = abs(spacing - AppSettings.relatedParagraphSpacing) < spacingTolerance ||
+                         abs(spacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
+        }
+
+        return (isRelated, isAtExtreme)
     }
 
     override func draw(_ rect: CGRect) {

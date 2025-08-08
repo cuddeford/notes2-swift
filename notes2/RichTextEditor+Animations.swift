@@ -7,4 +7,5 @@ struct ActiveAnimation {
     let startSpacing: CGFloat
     let targetSpacing: CGFloat
     let range: NSRange
+    let actionState: Bool
 }
