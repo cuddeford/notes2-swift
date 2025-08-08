@@ -44,6 +44,11 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
 - `NoteRow.swift`: Single note display in lists with relative date formatting
 - `Paragraph.swift`: Lightweight struct for paragraph-level operations with spatial properties
 - `RuledView.swift`: Real-time paragraph visualization with semi-transparent overlays
+- `LastNoteIndicatorView.swift`: A view that indicates the last note that was opened.
+- `NewNoteIndicatorView.swift`: A view that indicates that a new note will be created.
+- `ScrollToBottomButton.swift`: A button that scrolls to the bottom of the note.
+- `ScrollToTopButton.swift`: A button that scrolls to the top of the note.
+- `SettingsView.swift`: A view that allows the user to configure the app's settings.
 
 **Animation & Utilities:**
 - `EasingFunctions.swift`: Comprehensive easing library (cubic, quadratic, sine, exponential, back)
@@ -51,13 +56,29 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
 - `Date+Helpers.swift`: Relative date strings with ordinal suffixes ("1st", "2nd", "3rd")
 - `Config.swift`: App-wide settings with @AppStorage persistence
 - `URL+Helpers.swift`: SwiftData store URL construction with security-scoped URLs
+- `View+onFirstAppear.swift`: A view modifier that executes an action only once when the view appears.
+- `TextUtilities.swift`: A set of utilities for working with text.
+- `TextViewExtensions.swift`: A set of extensions for UITextView.
+- `UINavigationController+SwipeBack.swift`: An extension for UINavigationController that enables the swipe back gesture.
+- `CoordinatorHolder.swift`: A class that holds a reference to the RichTextEditor's coordinator.
+- `RichTextEditor+Animations.swift`: An extension for RichTextEditor that handles animations.
+- `RichTexitEditor+TextProcessing.swift`: An extension for RichTextEditor that handles text processing.
+- `RichTextEditor+UIUpdates.swift`: An extension for RichTextEditor that handles UI updates.
+- `RuledView+Haptics.swift`: An extension for RuledView that handles haptic feedback.
 
 **Gestures & Interactions:**
-- **Pinch gesture**: Adjust paragraph spacing between adjacent paragraphs
-- **Swipe right-to-left on NoteView**: Create new note
-- **Swipe right-to-left on ContentView**: Navigate to last edited note
-- **Swipe actions**: Pin/unpin and delete notes
-- **Drag-to-Reorder**: Long-press to drag paragraphs.
+- **Pinch gesture**: Adjust paragraph spacing between adjacent paragraphs.
+  - `RichTextEditor.swift`: `Coordinator.handlePinchGesture(_:)`
+- **Paragraph Swipes**: Swipe left-to-right on a paragraph to "reply" (insert below), or right-to-left to delete.
+  - `RichTextEditor.swift`: `Coordinator.handleSwipeToReplyGesture(_:)`
+- **Drag-to-Reorder**: Long-press to drag and reorder paragraphs.
+  - `RichTextEditor.swift`: `Coordinator.handleLongPressGesture(_:)`
+- **Swipe right-to-left on NoteView**: Create new note.
+  - `NoteView.swift`: Implemented as a `DragGesture` on the main `ZStack`.
+- **Swipe right-to-left on ContentView**: Navigate to last edited note.
+  - `ContentView.swift`: Implemented as a `DragGesture` on the main `NavigationView`.
+- **Swipe actions on NoteRow**: Pin/unpin and delete notes.
+  - `NoteRow.swift`: Implemented using `.swipeActions` modifier.
 
 **Utilities:**
 - `KeyboardObserver.swift`: Keyboard visibility and height changes
@@ -187,4 +208,4 @@ Whenever I tell you to build, run, or compile the project I expect you to use th
 ### Last Updated
 When generating this timestamp be sure to run `date "+%Y-%m-%d %H:%M:%S"` to get the actual date.
 
-2025-07-25 22:51:18
+2025-08-08 15:48:42
