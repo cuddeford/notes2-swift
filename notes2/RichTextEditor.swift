@@ -121,8 +121,14 @@ struct RichTextEditor: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: CustomTextView, context: Context) {
+        // Skip updates during active gestures to prevent infinite loops
+        guard !context.coordinator.isGestureActive else {
+            return
+        }
+
         // Only update if the attributed text has actually changed to avoid infinite loops
-        if uiView.attributedText != text {
+        let shouldUpdate = shouldUpdateTextView(uiView.attributedText, newText: text)
+        if shouldUpdate {
             uiView.attributedText = text
             context.coordinator.parseAttributedText(text)
         }
@@ -165,6 +171,66 @@ struct RichTextEditor: UIViewRepresentable {
             }
         }
         context.coordinator.textViewWidth = uiView.bounds.width
+    }
+
+    private func shouldUpdateTextView(_ currentText: NSAttributedString, newText: NSAttributedString) -> Bool {
+        // Quick length check first
+        if currentText.length != newText.length {
+            return true
+        }
+
+        // Compare string content directly
+        if currentText.string != newText.string {
+            return true
+        }
+
+        // Compare attributes for the entire range
+        let fullRange = NSRange(location: 0, length: currentText.length)
+        var attributesAreEqual = true
+
+        currentText.enumerateAttributes(in: fullRange, options: []) { (currentAttrs, range, _) in
+            newText.enumerateAttributes(in: range, options: []) { (newAttrs, _, _) in
+                if currentAttrs.count != newAttrs.count {
+                    attributesAreEqual = false
+                    return
+                }
+
+                for (key, currentValue) in currentAttrs {
+                    if let newValue = newAttrs[key] {
+                        // Handle special cases for attributed string equality
+                        if key == .paragraphStyle {
+                            if let currentStyle = currentValue as? NSParagraphStyle,
+                               let newStyle = newValue as? NSParagraphStyle {
+                                if abs(currentStyle.paragraphSpacing - newStyle.paragraphSpacing) > 0.001 {
+                                    attributesAreEqual = false
+                                    return
+                                }
+                                if currentStyle.alignment != newStyle.alignment {
+                                    attributesAreEqual = false
+                                    return
+                                }
+                            }
+                        } else if key == .font {
+                            if let currentFont = currentValue as? UIFont,
+                               let newFont = newValue as? UIFont {
+                                if currentFont.fontName != newFont.fontName || abs(currentFont.pointSize - newFont.pointSize) > 0.001 {
+                                    attributesAreEqual = false
+                                    return
+                                }
+                            }
+                        } else if String(describing: currentValue) != String(describing: newValue) {
+                            attributesAreEqual = false
+                            return
+                        }
+                    } else {
+                        attributesAreEqual = false
+                        return
+                    }
+                }
+            }
+        }
+
+        return !attributesAreEqual
     }
 
     func makeCoordinator() -> Coordinator {
@@ -258,6 +324,9 @@ struct RichTextEditor: UIViewRepresentable {
         private let holdHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var holdProgressView: UIView?
         private var holdDisplayLink: CADisplayLink?
+
+        // Gesture state tracking to prevent update loops
+        var isGestureActive = false
 
         enum SwipeDirection {
             case none
@@ -769,6 +838,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
             self.isPinching = true
+            self.isGestureActive = true
 
             guard gesture.numberOfTouches >= 2 else {
                 gesture.state = .cancelled
@@ -1103,6 +1173,7 @@ struct RichTextEditor: UIViewRepresentable {
                         self.lastClosestDetent = nil
                         self.isPinching = false
                         self.gesturePrimed = false  // Reset gesturePrimed after animation completes
+                        self.isGestureActive = false
                     }
                 } else {
                     let progress = CGFloat(elapsed / duration)
@@ -1243,6 +1314,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Highlight the source paragraph
             setDraggingSource(index)
             isDragging = true
+            isGestureActive = true
         }
 
         private func handleDragChanged(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
@@ -1375,7 +1447,7 @@ struct RichTextEditor: UIViewRepresentable {
                     return index
                 }
             }
-            
+
             // If no paragraph contains this location, return the last paragraph
             // or 0 if there are no paragraphs
             return max(0, paragraphs.count - 1)
@@ -1571,6 +1643,7 @@ struct RichTextEditor: UIViewRepresentable {
             draggedParagraphID = nil
             initialTouchCount = 1
             isMultitouchDrag = false
+            isGestureActive = false
         }
 
         // MARK: - Auto-Scrolling for Drag-to-Reorder
@@ -1696,6 +1769,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             replyGestureParagraphIndex = index
             replyGestureInitialLocation = location
+            isGestureActive = true
 
             // Create the ghost view from a snapshot of the original text
             guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
@@ -1976,7 +2050,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         func triggerReplyAction(for index: Int? = nil) {
             guard let textView = textView else { return }
-            
+
             let targetParagraphIndex: Int
             if let providedIndex = index {
                 targetParagraphIndex = providedIndex
@@ -1984,7 +2058,7 @@ struct RichTextEditor: UIViewRepresentable {
                 // Determine paragraph index based on caret position
                 targetParagraphIndex = paragraphIndex(at: textView.selectedRange.location, in: textView)
             }
-            
+
             guard targetParagraphIndex < paragraphs.count else { return }
 
             replyGestureHapticGenerator.impactOccurred()
@@ -2123,6 +2197,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.hasTriggeredReplyHaptic = false
                 self.isHorizontalSwipe = false
                 self.swipeDirection = .none
+                self.isGestureActive = false
 
                 // Reset hold-to-confirm state
                 self.isHolding = false
