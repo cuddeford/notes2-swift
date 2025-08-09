@@ -231,10 +231,8 @@ struct NoteView: View {
                 onDismiss: {
                     dismiss()
                 },
-                onNewNote: {
-                    let newNote = Note()
-                    context.insert(newNote)
-                    selectedNoteID = newNote.id
+                onAddParagraph: {
+                    coordinatorHolder.coordinator?.triggerReplyAction()
                 },
                 hideKeyboard: {
                     coordinatorHolder.coordinator?.hideKeyboard()

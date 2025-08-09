@@ -15,7 +15,7 @@ struct EditorToolbar: View {
     var onTitle2: () -> Void
     var onBody: () -> Void
     var onDismiss: () -> Void
-    var onNewNote: () -> Void
+    var onAddParagraph: () -> Void
     var isAtTop: Bool
     var hideKeyboard: () -> Void
     @ObservedObject var settings: AppSettings
@@ -67,7 +67,7 @@ struct EditorToolbar: View {
                         Button(action: {
                             let generator = UIImpactFeedbackGenerator(style: .light)
                             generator.impactOccurred()
-                            onNewNote()
+                            onAddParagraph()
                         }) {
                             Image(systemName: "plus")
                                 .font(.title)

@@ -1363,6 +1363,24 @@ struct RichTextEditor: UIViewRepresentable {
             return nil
         }
 
+        private func paragraphIndex(at textLocation: Int, in textView: UITextView) -> Int {
+            // Find which paragraph contains the given text location
+            for (index, paragraph) in paragraphs.enumerated() {
+                if NSLocationInRange(textLocation, paragraph.range) {
+                    return index
+                }
+                // If the text location is exactly at the end of a paragraph,
+                // we want to add the new paragraph after that one
+                if textLocation == paragraph.range.location + paragraph.range.length {
+                    return index
+                }
+            }
+            
+            // If no paragraph contains this location, return the last paragraph
+            // or 0 if there are no paragraphs
+            return max(0, paragraphs.count - 1)
+        }
+
         private func createDragGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) {
             // Use the RuledView to get the exact frame of the overlay
             guard let snapshotRect = ruledView?.getOverlayFrame(forParagraphAtIndex: index) else {
@@ -1835,7 +1853,7 @@ struct RichTextEditor: UIViewRepresentable {
                 if swipeDirection == .right {
                     // Reply uses immediate confirmation
                     if abs(horizontalTranslation) >= replyGestureThreshold {
-                        triggerReplyAction()
+                        triggerReplyAction(for: replyGestureParagraphIndex)
                     }
                 } else if swipeDirection == .left {
                     // Delete uses hold-to-confirm
@@ -1956,14 +1974,22 @@ struct RichTextEditor: UIViewRepresentable {
             replyOverlayView = overlayView
         }
 
-        private func triggerReplyAction() {
-            guard let textView = textView,
-                  let paragraphIndex = replyGestureParagraphIndex,
-                  paragraphIndex < paragraphs.count else { return }
+        func triggerReplyAction(for index: Int? = nil) {
+            guard let textView = textView else { return }
+            
+            let targetParagraphIndex: Int
+            if let providedIndex = index {
+                targetParagraphIndex = providedIndex
+            } else {
+                // Determine paragraph index based on caret position
+                targetParagraphIndex = paragraphIndex(at: textView.selectedRange.location, in: textView)
+            }
+            
+            guard targetParagraphIndex < paragraphs.count else { return }
 
             replyGestureHapticGenerator.impactOccurred()
 
-            let originalParagraph = paragraphs[paragraphIndex]
+            let originalParagraph = paragraphs[targetParagraphIndex]
             let insertLocation = originalParagraph.range.location + originalParagraph.range.length
 
             // Determine spacing based on original paragraph spacing
@@ -2019,7 +2045,7 @@ struct RichTextEditor: UIViewRepresentable {
             parent.text = mutableText
 
             // Handle cursor positioning for edge case of last paragraph
-            let isLastParagraph = paragraphIndex == paragraphs.count - 1
+            let isLastParagraph = targetParagraphIndex == paragraphs.count - 1
             let cursorPosition = isLastParagraph ? insertLocation + 1 : insertLocation
             textView.selectedRange = NSRange(location: cursorPosition, length: 0)
             parent.selectedRange = textView.selectedRange

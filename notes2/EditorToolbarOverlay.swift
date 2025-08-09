@@ -21,7 +21,7 @@ struct EditorToolbarOverlay: View {
     var canScroll: Bool
     var isAtTop: Bool
     var onDismiss: () -> Void
-    var onNewNote: () -> Void
+    var onAddParagraph: () -> Void
     var hideKeyboard: () -> Void
 
     private var isLandscape: Bool {
@@ -65,7 +65,7 @@ struct EditorToolbarOverlay: View {
                         onTitle2: onTitle2,
                         onBody: onBody,
                         onDismiss: onDismiss,
-                        onNewNote: onNewNote,
+                        onAddParagraph: onAddParagraph,
                         isAtTop: isAtTop,
                         hideKeyboard: hideKeyboard,
                         settings: settings,
