@@ -26,6 +26,11 @@ struct NoteView: View {
     @State private var dragLocation: CGPoint = .zero
     @State private var dragActivationPoint: Double = 75
     @State private var isDragging = false
+    
+    @State private var dismissDragOffset: CGSize = .zero
+    @State private var dismissDragLocation: CGPoint = .zero
+    @State private var isDismissing = false
+    
     @State private var isAtBottom = true
     @State private var canScroll = false
     @State private var isAtTop = true
@@ -121,6 +126,7 @@ struct NoteView: View {
                 canScroll: $canScroll,
                 isAtTop: $isAtTop,
                 isNewNoteSwipeGesture: $isDragging,
+                isDismissSwipeGesture: $isDismissing,
             )
             .onChange(of: noteText) { oldValue, newValue in
                 if let data = try? newValue.data(
@@ -151,6 +157,15 @@ struct NoteView: View {
                     translation: dragOffset,
                     location: dragLocation,
                     isDragging: isDragging,
+                    dragActivationPoint: dragActivationPoint,
+                )
+            }
+
+            if settings.dismissNoteGestureEnabled {
+                DismissNoteIndicatorView(
+                    translation: dismissDragOffset,
+                    location: dismissDragLocation,
+                    isDragging: isDismissing,
                     dragActivationPoint: dragActivationPoint,
                 )
             }
@@ -187,32 +202,47 @@ struct NoteView: View {
         .gesture(
             DragGesture(minimumDistance: 25, coordinateSpace: .global)
                 .onChanged { value in
-                    guard settings.newNoteIndicatorGestureEnabled else { return }
-
-                    // Only activate if the drag starts from the right edge of the screen and gesture is enabled
-                    if value.startLocation.x > UIScreen.main.bounds.width - 25 {
-                        // Set the location first
+                    let rightEdgeActive = settings.newNoteIndicatorGestureEnabled && value.startLocation.x > UIScreen.main.bounds.width - 25
+                    let leftEdgeActive = settings.dismissNoteGestureEnabled && value.startLocation.x < 25
+                    
+                    // Handle right edge gesture (new note)
+                    if rightEdgeActive {
                         dragOffset = value.translation
                         dragLocation = value.location
-
                         if !isDragging {
                             isDragging = true
                         }
                     }
+                    
+                    // Handle left edge gesture (dismiss note)
+                    if leftEdgeActive {
+                        dismissDragOffset = value.translation
+                        dismissDragLocation = value.location
+                        if !isDismissing {
+                            isDismissing = true
+                        }
+                    }
                 }
                 .onEnded { value in
-                    guard settings.newNoteIndicatorGestureEnabled else { return }
-
-                    if isDragging, value.translation.width < -dragActivationPoint { // Swipe left
+                    // Handle right edge gesture
+                    if isDragging, value.translation.width < -dragActivationPoint {
                         let newNote = Note()
                         context.insert(newNote)
                         selectedNoteID = newNote.id
                     }
+                    
+                    // Handle left edge gesture
+                    if isDismissing, value.translation.width > dragActivationPoint {
+                        dismiss()
+                    }
 
-                    // Reset drag state
+                    // Reset all drag states
                     isDragging = false
                     dragOffset = .zero
                     dragLocation = .zero
+                    isDismissing = false
+                    dismissDragOffset = .zero
+                    dismissDragLocation = .zero
                 }
         )
         .toolbar(.hidden, for: .navigationBar)

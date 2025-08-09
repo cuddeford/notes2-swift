@@ -68,6 +68,14 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Dismiss note", isOn: $settings.dismissNoteGestureEnabled)
+            } footer: {
+                Text("Swipe from left edge of screen inside a note to dismiss.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
+            Section {
                 Toggle("Open last note", isOn: $settings.lastNoteIndicatorGestureEnabled)
             } footer: {
                 Text("Swipe from right edge of screen on notes list to open most recent note.")

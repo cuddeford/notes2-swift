@@ -35,6 +35,7 @@ struct RichTextEditor: UIViewRepresentable {
     @Binding var canScroll: Bool
     @Binding var isAtTop: Bool
     @Binding var isNewNoteSwipeGesture: Bool
+    @Binding var isDismissSwipeGesture: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
         let textView = CustomTextView()
@@ -1807,7 +1808,7 @@ struct RichTextEditor: UIViewRepresentable {
         // MARK: - Reply Gesture Handling
 
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
-            guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture else { return }
+            guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture, !parent.isDismissSwipeGesture else { return }
             let location = gesture.location(in: textView)
 
             switch gesture.state {

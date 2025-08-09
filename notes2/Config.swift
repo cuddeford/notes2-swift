@@ -50,6 +50,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(lastNoteIndicatorGestureEnabled, forKey: "lastNoteIndicatorGestureEnabled") }
     }
 
+    @Published var dismissNoteGestureEnabled: Bool {
+        didSet { UserDefaults.standard.set(dismissNoteGestureEnabled, forKey: "dismissNoteGestureEnabled") }
+    }
+
     static func registerDefaults() {
         let defaults: [String: Any] = [
             "recentsVisible": true,
@@ -61,6 +65,7 @@ class AppSettings: ObservableObject {
             "paragraphOverlaysEnabled": true,
             "newNoteIndicatorGestureEnabled": true,
             "lastNoteIndicatorGestureEnabled": false,
+            "dismissNoteGestureEnabled": true,
             "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
             "padding": 20.0
@@ -83,5 +88,6 @@ class AppSettings: ObservableObject {
         self.paragraphOverlaysEnabled = UserDefaults.standard.object(forKey: "paragraphOverlaysEnabled") as? Bool ?? true
         self.newNoteIndicatorGestureEnabled = UserDefaults.standard.object(forKey: "newNoteIndicatorGestureEnabled") as? Bool ?? true
         self.lastNoteIndicatorGestureEnabled = UserDefaults.standard.object(forKey: "lastNoteIndicatorGestureEnabled") as? Bool ?? true
+        self.dismissNoteGestureEnabled = UserDefaults.standard.object(forKey: "dismissNoteGestureEnabled") as? Bool ?? true
     }
 }
