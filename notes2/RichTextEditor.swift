@@ -2324,7 +2324,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             var rangesToRemove: [NSRange] = []
 
-            for (range, animation) in activeAnimations {
+            for (range, _) in activeAnimations {
                 if !isValidRange(range, in: textView.textStorage) {
                     rangesToRemove.append(range)
                 }
