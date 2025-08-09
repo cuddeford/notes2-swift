@@ -59,7 +59,7 @@ class AppSettings: ObservableObject {
             "magneticScrollingEnabled": false,
             "dragToReorderParagraphEnabled": true,
             "paragraphOverlaysEnabled": true,
-            "newNoteIndicatorGestureEnabled": false,
+            "newNoteIndicatorGestureEnabled": true,
             "lastNoteIndicatorGestureEnabled": false,
             "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
