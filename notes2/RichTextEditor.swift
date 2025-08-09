@@ -644,10 +644,17 @@ struct RichTextEditor: UIViewRepresentable {
                     let oldParagraphs = self.paragraphs
                     self.parseAttributedText(textView.attributedText)
                     let newParagraphs = self.paragraphs
+                    
+                    // Clean up stale animations when text changes
+                    self.cleanupStaleAnimations()
 
                     // Check if new paragraphs were added by comparing counts
                     if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
                         self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
+                    }
+                    // Also clean up animations if paragraphs were deleted
+                    else if newParagraphs.count < oldParagraphs.count {
+                        self.cleanupStaleAnimations()
                     }
                     self.lastParagraphCount = newParagraphs.count
                 }
@@ -1006,6 +1013,11 @@ struct RichTextEditor: UIViewRepresentable {
             newParagraphStyle.setParagraphStyle(currentStyle)
             newParagraphStyle.paragraphSpacing = targetSpacing
 
+            // Validate range before applying
+            guard range.location >= 0 && range.length >= 0 && range.location + range.length <= textView.textStorage.length else {
+                return
+            }
+            
             textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
             if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                 paragraphs[index].paragraphStyle = newParagraphStyle
@@ -1131,60 +1143,56 @@ struct RichTextEditor: UIViewRepresentable {
         @objc private func updateSpacingAnimation(_ displayLink: CADisplayLink) {
             guard let textView = textView else { return }
 
+            var rangesToRemove: [NSRange] = []
+            
             for (range, animation) in activeAnimations {
+                // Validate range before proceeding
+                guard range.location >= 0 && range.length >= 0 && range.location + range.length <= textView.textStorage.length else {
+                    // Invalid range - mark for cleanup
+                    rangesToRemove.append(range)
+                    continue
+                }
+                
                 let elapsed = CACurrentMediaTime() - animation.startTime
                 let duration = self.animationDuration
 
                 if elapsed >= duration {
                     // Animation complete
                     animation.displayLink.invalidate()
-                    activeAnimations.removeValue(forKey: range)
+                    rangesToRemove.append(range)
 
-                    // Final update
+                    // Final update - validate range again
+                    guard range.location < textView.textStorage.length else { continue }
+                    let validRange = NSRange(location: range.location, length: min(range.length, textView.textStorage.length - range.location))
+                    
                     let finalParagraphStyle = NSMutableParagraphStyle()
-                    finalParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
+                    finalParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: validRange.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     finalParagraphStyle.paragraphSpacing = animation.targetSpacing
 
-                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
+                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: validRange)
                     if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                         paragraphs[index].paragraphStyle = finalParagraphStyle
                     }
 
-                    // Clean up active pinched pairs
-                    activePinchedPairs.removeValue(forKey: range)
-
-                    textView.layoutIfNeeded()
-                    ruledView?.updateAllParagraphOverlays(
-                        paragraphs: self.paragraphs,
-                        textView: textView,
-                        activePinchedPairs: activePinchedPairs,
-                        currentGestureDetent: nil,
-                        currentGestureRange: nil,
-                        actionState: false
-                    )
-
                     // Completion haptic
                     completionHapticGenerator.impactOccurred()
-                    if activeAnimations.isEmpty {
-                        self.parent.text = self.reconstructAttributedText()
-                        self.initialSpacing = nil
-                        self.affectedParagraphRange = nil
-                        self.currentDetent = nil
-                        self.lastClosestDetent = nil
-                        self.isPinching = false
-                        self.gesturePrimed = false  // Reset gesturePrimed after animation completes
-                        self.isGestureActive = false
-                    }
                 } else {
                     let progress = CGFloat(elapsed / duration)
                     let easedProgress = EasingFunctions.easeOutBack(progress)
                     let currentSpacing = animation.startSpacing + (animation.targetSpacing - animation.startSpacing) * easedProgress
 
+                    // Validate range for current frame
+                    guard range.location < textView.textStorage.length else {
+                        rangesToRemove.append(range)
+                        continue
+                    }
+                    let validRange = NSRange(location: range.location, length: min(range.length, textView.textStorage.length - range.location))
+                    
                     let currentParagraphStyle = NSMutableParagraphStyle()
-                    currentParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
+                    currentParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: validRange.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     currentParagraphStyle.paragraphSpacing = currentSpacing
 
-                    textView.textStorage.addAttribute(.paragraphStyle, value: currentParagraphStyle, range: range)
+                    textView.textStorage.addAttribute(.paragraphStyle, value: currentParagraphStyle, range: validRange)
                     if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                         paragraphs[index].paragraphStyle = currentParagraphStyle
                     }
@@ -1199,6 +1207,27 @@ struct RichTextEditor: UIViewRepresentable {
                         actionState: animation.actionState
                     )
                 }
+            }
+            
+            // Clean up invalid animations after iteration
+            for range in rangesToRemove {
+                if let animation = activeAnimations[range] {
+                    animation.displayLink.invalidate()
+                }
+                activeAnimations.removeValue(forKey: range)
+                activePinchedPairs.removeValue(forKey: range)
+            }
+            
+            // Check if all animations are complete
+            if activeAnimations.isEmpty {
+                self.parent.text = self.reconstructAttributedText()
+                self.initialSpacing = nil
+                self.affectedParagraphRange = nil
+                self.currentDetent = nil
+                self.lastClosestDetent = nil
+                self.isPinching = false
+                self.gesturePrimed = false
+                self.isGestureActive = false
             }
         }
 
@@ -1246,6 +1275,21 @@ struct RichTextEditor: UIViewRepresentable {
             let currentSpacing = animateParagraph.paragraphStyle.paragraphSpacing
 
             let animateRange = animateParagraph.range
+            
+            // Validate range before starting animation
+            guard animateRange.location >= 0 && animateRange.length >= 0 && animateRange.location + animateRange.length <= textView.textStorage.length else {
+                return
+            }
+
+            // Ensure range is still valid in current text storage
+            guard animateRange.location + animateRange.length <= textView.textStorage.length else {
+                return
+            }
+
+            // Check if this range already has an active animation
+            if activeAnimations[animateRange] != nil {
+                return
+            }
 
             // Animate to unrelated spacing
             let startSpacing = 0.0
@@ -2248,6 +2292,38 @@ struct RichTextEditor: UIViewRepresentable {
                     cleanup()
                 }
             )
+        }
+
+        private func cleanupStaleAnimations() {
+            guard let textView = textView else { return }
+            
+            var rangesToRemove: [NSRange] = []
+            
+            for (range, animation) in activeAnimations {
+                if !isValidRange(range, in: textView.textStorage) {
+                    rangesToRemove.append(range)
+                }
+            }
+            
+            for range in rangesToRemove {
+                if let animation = activeAnimations[range] {
+                    animation.displayLink.invalidate()
+                }
+                activeAnimations.removeValue(forKey: range)
+                activePinchedPairs.removeValue(forKey: range)
+            }
+        }
+
+        private func isValidRange(_ range: NSRange, in textStorage: NSTextStorage) -> Bool {
+            return range.location >= 0 && range.length >= 0 && range.location + range.length <= textStorage.length
+        }
+
+        private func safeRange(_ range: NSRange, in textStorage: NSTextStorage) -> NSRange {
+            guard range.location >= 0 else { return NSRange(location: 0, length: 0) }
+            guard range.length >= 0 else { return NSRange(location: range.location, length: 0) }
+            let endLocation = min(range.location + range.length, textStorage.length)
+            let adjustedLength = max(0, endLocation - range.location)
+            return NSRange(location: range.location, length: adjustedLength)
         }
     }
 }
