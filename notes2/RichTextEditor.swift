@@ -1228,6 +1228,16 @@ struct RichTextEditor: UIViewRepresentable {
                 self.isPinching = false
                 self.gesturePrimed = false
                 self.isGestureActive = false
+                
+                // Reset overlay state when all animations complete
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: nil,
+                    currentGestureRange: nil,
+                    actionState: false
+                )
             }
         }
 
