@@ -115,7 +115,8 @@ struct NoteView: View {
                 },
                 isAtBottom: $isAtBottom,
                 canScroll: $canScroll,
-                isAtTop: $isAtTop
+                isAtTop: $isAtTop,
+                isNewNoteSwipeGesture: $isDragging,
             )
             .onChange(of: noteText) { oldValue, newValue in
                 if let data = try? newValue.data(

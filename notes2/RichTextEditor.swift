@@ -33,6 +33,7 @@ struct RichTextEditor: UIViewRepresentable {
     @Binding var isAtBottom: Bool
     @Binding var canScroll: Bool
     @Binding var isAtTop: Bool
+    @Binding var isNewNoteSwipeGesture: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
         let textView = CustomTextView()
@@ -1194,7 +1195,7 @@ struct RichTextEditor: UIViewRepresentable {
             if let index = paragraphs.firstIndex(where: { $0.range == animateRange }) {
                 paragraphs[index].paragraphStyle = initialParagraphStyle
             }
-}
+        }
 
         // MARK: - Drag-to-Reorder Gesture Handling
 
@@ -1657,7 +1658,7 @@ struct RichTextEditor: UIViewRepresentable {
         // MARK: - Reply Gesture Handling
 
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
-            guard let textView = textView, !isDragging, !isPinching else { return }
+            guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture else { return }
             let location = gesture.location(in: textView)
 
             switch gesture.state {
