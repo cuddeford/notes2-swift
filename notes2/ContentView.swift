@@ -94,7 +94,7 @@ struct ContentView: View {
             return note.firstLine.lowercased().localizedCaseInsensitiveContains(searchLower) ||
                    note.plain.lowercased().localizedCaseInsensitiveContains(searchLower)
         }
-        let recentNotes = filteredNotes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(2)
+        let recentNotes = filteredNotes.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(settings.recentsCount)
 
         return NavigationView {
             let groupedNotes = Dictionary(grouping: filteredNotes) { note in

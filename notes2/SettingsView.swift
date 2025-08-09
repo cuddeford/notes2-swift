@@ -91,6 +91,16 @@ struct SettingsView: View {
                     .foregroundColor(.gray)
             }
 
+            Section {
+                Stepper("Recent notes: \(settings.recentsCount)", value: $settings.recentsCount, in: 1...10)
+            } header: {
+                Text("Recents")
+            } footer: {
+                Text("How many recent notes to display in the Recents section.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
             Section(header: Text("Show Sections")) {
                 Toggle("Pinned", isOn: $pinnedVisible)
                 Toggle("Recents", isOn: $recentsVisible)
