@@ -1011,33 +1011,34 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handlePinchEnded(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
-            guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
+            guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange, let initial = initialSpacing else {
+                // If we don't have the necessary info, reset and do nothing.
+                self.isPinching = false
+                self.gesturePrimed = false
+                activePinchedPairs.removeAll()
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: nil,
+                    currentGestureRange: nil,
+                    actionState: false
+                )
+                return
+            }
 
-            // Determine target spacing based on activation thresholds
             let targetSpacing: CGFloat
-            let wasInitiallyRelated = abs(initialSpacing ?? 0 - AppSettings.relatedParagraphSpacing) < spacingTolerance
-            let wasInitiallyUnrelated = abs(initialSpacing ?? 0 - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
-
-            if wasInitiallyRelated {
-                // Started at related, use activation threshold
-                targetSpacing = currentSpacing >= relatedActivationThreshold ? AppSettings.unrelatedParagraphSpacing : AppSettings.relatedParagraphSpacing
-            } else if wasInitiallyUnrelated {
-                // Started at unrelated, use activation threshold
-                targetSpacing = currentSpacing <= unrelatedActivationThreshold ? AppSettings.relatedParagraphSpacing : AppSettings.unrelatedParagraphSpacing
-            } else {
-                // Started in middle, use activation thresholds
-                // Determine which activation threshold is closer
-                let relatedDist = abs(currentSpacing - relatedActivationThreshold)
-                let unrelatedDist = abs(currentSpacing - unrelatedActivationThreshold)
-
-                // Use the closer threshold to determine snap direction
-                if relatedDist < unrelatedDist {
-                    // Related threshold (82) is closer, use it for snapping
-                    targetSpacing = currentSpacing >= relatedActivationThreshold ? AppSettings.unrelatedParagraphSpacing : AppSettings.relatedParagraphSpacing
+            if gesturePrimed {
+                // If the gesture is primed, the target is the opposite of the initial state.
+                let wasInitiallyRelated = abs(initial - AppSettings.relatedParagraphSpacing) < spacingTolerance
+                if wasInitiallyRelated {
+                    targetSpacing = AppSettings.unrelatedParagraphSpacing
                 } else {
-                    // Unrelated threshold (200) is closer, use it for snapping
-                    targetSpacing = currentSpacing <= unrelatedActivationThreshold ? AppSettings.relatedParagraphSpacing : AppSettings.unrelatedParagraphSpacing
+                    targetSpacing = AppSettings.relatedParagraphSpacing
                 }
+            } else {
+                // If not primed, snap back to the original spacing.
+                targetSpacing = initial
             }
 
             // Store the current action state for animation (preserve gesturePrimed across animation)
