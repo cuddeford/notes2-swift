@@ -21,6 +21,7 @@ enum NoteTextAttribute {
 
 struct RichTextEditor: UIViewRepresentable {
     typealias UIViewType = CustomTextView
+    var isPreview: Bool = false
     @Binding var text: NSAttributedString
     @Binding var selectedRange: NSRange
     var note: Note
@@ -105,7 +106,10 @@ struct RichTextEditor: UIViewRepresentable {
         context.coordinator.parseAttributedText(textView.attributedText)
 
         DispatchQueue.main.async { // Ensure UI updates happen on the main thread
-            textView.becomeFirstResponder()
+            if !isPreview {
+                textView.becomeFirstResponder()
+            }
+
             context.coordinator.parseAttributedText(textView.attributedText)
         }
 
@@ -644,7 +648,7 @@ struct RichTextEditor: UIViewRepresentable {
                     let oldParagraphs = self.paragraphs
                     self.parseAttributedText(textView.attributedText)
                     let newParagraphs = self.paragraphs
-                    
+
                     // Clean up stale animations when text changes
                     self.cleanupStaleAnimations()
 
@@ -1017,7 +1021,7 @@ struct RichTextEditor: UIViewRepresentable {
             guard range.location >= 0 && range.length >= 0 && range.location + range.length <= textView.textStorage.length else {
                 return
             }
-            
+
             textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
             if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                 paragraphs[index].paragraphStyle = newParagraphStyle
@@ -1144,7 +1148,7 @@ struct RichTextEditor: UIViewRepresentable {
             guard let textView = textView else { return }
 
             var rangesToRemove: [NSRange] = []
-            
+
             for (range, animation) in activeAnimations {
                 // Validate range before proceeding
                 guard range.location >= 0 && range.length >= 0 && range.location + range.length <= textView.textStorage.length else {
@@ -1152,7 +1156,7 @@ struct RichTextEditor: UIViewRepresentable {
                     rangesToRemove.append(range)
                     continue
                 }
-                
+
                 let elapsed = CACurrentMediaTime() - animation.startTime
                 let duration = self.animationDuration
 
@@ -1164,7 +1168,7 @@ struct RichTextEditor: UIViewRepresentable {
                     // Final update - validate range again
                     guard range.location < textView.textStorage.length else { continue }
                     let validRange = NSRange(location: range.location, length: min(range.length, textView.textStorage.length - range.location))
-                    
+
                     let finalParagraphStyle = NSMutableParagraphStyle()
                     finalParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: validRange.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     finalParagraphStyle.paragraphSpacing = animation.targetSpacing
@@ -1187,7 +1191,7 @@ struct RichTextEditor: UIViewRepresentable {
                         continue
                     }
                     let validRange = NSRange(location: range.location, length: min(range.length, textView.textStorage.length - range.location))
-                    
+
                     let currentParagraphStyle = NSMutableParagraphStyle()
                     currentParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: validRange.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     currentParagraphStyle.paragraphSpacing = currentSpacing
@@ -1208,7 +1212,7 @@ struct RichTextEditor: UIViewRepresentable {
                     )
                 }
             }
-            
+
             // Clean up invalid animations after iteration
             for range in rangesToRemove {
                 if let animation = activeAnimations[range] {
@@ -1217,7 +1221,7 @@ struct RichTextEditor: UIViewRepresentable {
                 activeAnimations.removeValue(forKey: range)
                 activePinchedPairs.removeValue(forKey: range)
             }
-            
+
             // Check if all animations are complete
             if activeAnimations.isEmpty {
                 self.parent.text = self.reconstructAttributedText()
@@ -1228,7 +1232,7 @@ struct RichTextEditor: UIViewRepresentable {
                 self.isPinching = false
                 self.gesturePrimed = false
                 self.isGestureActive = false
-                
+
                 // Reset overlay state when all animations complete
                 ruledView?.updateAllParagraphOverlays(
                     paragraphs: self.paragraphs,
@@ -1285,7 +1289,7 @@ struct RichTextEditor: UIViewRepresentable {
             let currentSpacing = animateParagraph.paragraphStyle.paragraphSpacing
 
             let animateRange = animateParagraph.range
-            
+
             // Validate range before starting animation
             guard animateRange.location >= 0 && animateRange.length >= 0 && animateRange.location + animateRange.length <= textView.textStorage.length else {
                 return
@@ -2306,15 +2310,15 @@ struct RichTextEditor: UIViewRepresentable {
 
         private func cleanupStaleAnimations() {
             guard let textView = textView else { return }
-            
+
             var rangesToRemove: [NSRange] = []
-            
+
             for (range, animation) in activeAnimations {
                 if !isValidRange(range, in: textView.textStorage) {
                     rangesToRemove.append(range)
                 }
             }
-            
+
             for range in rangesToRemove {
                 if let animation = activeAnimations[range] {
                     animation.displayLink.invalidate()

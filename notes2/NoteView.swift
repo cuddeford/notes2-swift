@@ -11,6 +11,7 @@ import UIKit
 
 struct NoteView: View {
     @Bindable var note: Note
+    var isPreview: Bool? = false
     @Binding var selectedNoteID: UUID?
     @Environment(\.modelContext) private var context: ModelContext
     @Environment(\.dismiss) private var dismiss
@@ -45,9 +46,10 @@ struct NoteView: View {
         }
     }
 
-    init(note: Note, selectedNoteID: Binding<UUID?>) {
+    init(note: Note, selectedNoteID: Binding<UUID?>, isPreview: Bool? = false) {
         self._selectedNoteID = selectedNoteID
         self._note = Bindable(wrappedValue: note)
+        self.isPreview = isPreview
 
         var loadedText: NSAttributedString
         // Attempt to load attributed string from note data
@@ -107,6 +109,7 @@ struct NoteView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             RichTextEditor(
+                isPreview: isPreview == true,
                 text: $noteText,
                 selectedRange: $selectedRange,
                 note: note,
@@ -152,31 +155,33 @@ struct NoteView: View {
                 )
             }
 
-            VStack {
-                HStack {
-                    ScrollToTopButton(
-                        action: { coordinatorHolder.coordinator?.scrollToTop() },
-                        isAtTop: isAtTop,
-                        canScroll: canScroll,
-                    )
-                    .padding(16)
+            if isPreview != true {
+                VStack {
+                    HStack {
+                        ScrollToTopButton(
+                            action: { coordinatorHolder.coordinator?.scrollToTop() },
+                            isAtTop: isAtTop,
+                            canScroll: canScroll,
+                        )
+                        .padding(16)
 
-                    Spacer()
+                        Spacer()
 
-                    Button(action: {
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.title)
-                            .foregroundColor(.gray)
-                            .padding()
-                            .opacity(0.5)
+                        Button(action: {
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                            dismiss()
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.title)
+                                .foregroundColor(.gray)
+                                .padding()
+                                .opacity(0.5)
+                        }
+                        .padding(16)
                     }
-                    .padding(16)
+                    Spacer()
                 }
-                Spacer()
             }
         }
         .gesture(
@@ -214,6 +219,7 @@ struct NoteView: View {
         .ignoresSafeArea()
         .overlay(
             EditorToolbarOverlay(
+                isPreview: isPreview == true,
                 keyboard: keyboard,
                 settings: settings,
                 onBold: { coordinatorHolder.coordinator?.toggleAttribute(.bold) },

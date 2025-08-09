@@ -1,10 +1,61 @@
-
-
 import SwiftUI
 import SwiftData
 import Foundation
 import UIKit
 import Combine
+
+struct NoteContextMenuModifier: ViewModifier {
+    let note: Note
+    @Binding var selectedNoteID: UUID?
+    @Environment(\.modelContext) private var context
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu(
+                menuItems: {
+                    Button {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                        selectedNoteID = note.id
+                    } label: {
+                        Label("Open", systemImage: "long.text.page.and.pencil")
+                    }
+
+                    Button {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                        note.isPinned.toggle()
+                        if note.isPinned {
+                            note.pinnedAt = Date()
+                        } else {
+                            note.pinnedAt = nil
+                        }
+                    } label: {
+                        Label(note.isPinned ? "Unpin" : "Pin", systemImage: note.isPinned ? "pin.slash.fill" : "pin.fill")
+                    }
+
+                    Button(role: .destructive) {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                        context.delete(note)
+                    } label: {
+                        Label("Delete", systemImage: "trash.fill")
+                    }
+                },
+                preview: {
+                    NavigationStack {
+                        NoteView(note: note, selectedNoteID: .constant(nil), isPreview: true)
+                    }
+                }
+            )
+    }
+}
+
+extension View {
+    func noteContextMenu(for note: Note, selectedNoteID: Binding<UUID?>) -> some View {
+        modifier(NoteContextMenuModifier(note: note, selectedNoteID: selectedNoteID))
+    }
+}
 
 struct ContentView: View {
     @Query(sort: \Note.createdAt, order: .reverse) var notes: [Note]
@@ -70,6 +121,7 @@ struct ContentView: View {
                                         generator.impactOccurred()
                                         self.selectedNoteID = note.id
                                     }
+                                    .noteContextMenu(for: note, selectedNoteID: $selectedNoteID)
                             }
                         }
                     }
@@ -83,6 +135,7 @@ struct ContentView: View {
                                         generator.impactOccurred()
                                         self.selectedNoteID = note.id
                                     }
+                                    .noteContextMenu(for: note, selectedNoteID: $selectedNoteID)
                             }
                         } header: {
                             Label("Pinned", systemImage: "pin.fill")
@@ -98,6 +151,7 @@ struct ContentView: View {
                                         generator.impactOccurred()
                                         self.selectedNoteID = note.id
                                     }
+                                    .noteContextMenu(for: note, selectedNoteID: $selectedNoteID)
                             }
                         } header: {
                             Label("Recents", systemImage: "clock.fill")
@@ -113,6 +167,7 @@ struct ContentView: View {
                                             .onTapGesture {
                                                 self.selectedNoteID = note.id
                                             }
+                                            .noteContextMenu(for: note, selectedNoteID: $selectedNoteID)
                                     }
                                 } header: {
                                     HStack {
