@@ -2048,7 +2048,7 @@ struct RichTextEditor: UIViewRepresentable {
             replyOverlayView = overlayView
         }
 
-        func triggerReplyAction(for index: Int? = nil) {
+        func triggerReplyAction(for index: Int? = nil, fromButton: Bool = false) {
             guard let textView = textView else { return }
 
             let targetParagraphIndex: Int
@@ -2118,10 +2118,22 @@ struct RichTextEditor: UIViewRepresentable {
             textView.attributedText = mutableText
             parent.text = mutableText
 
-            // Handle cursor positioning for edge case of last paragraph
+            // Handle cursor positioning with special case for + button on empty paragraphs
+            let targetParagraph = paragraphs[targetParagraphIndex]
+            let isEmptyParagraph = targetParagraph.content.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             let isLastParagraph = targetParagraphIndex == paragraphs.count - 1
-            let cursorPosition = isLastParagraph ? insertLocation + 1 : insertLocation
-            textView.selectedRange = NSRange(location: cursorPosition, length: 0)
+
+            let cursorPosition: Int
+            if fromButton && isEmptyParagraph {
+                // Special case: + button on empty paragraph - position at start of new paragraph
+                cursorPosition = insertLocation + 1
+            } else {
+                // Original logic for swipe gestures and non-empty paragraphs
+                cursorPosition = isLastParagraph ? insertLocation + 1 : insertLocation
+            }
+
+            let finalCursorPosition = max(0, min(cursorPosition, mutableText.length))
+            textView.selectedRange = NSRange(location: finalCursorPosition, length: 0)
             parent.selectedRange = textView.selectedRange
 
             // Update paragraphs and ensure cursor is visible

@@ -232,7 +232,7 @@ struct NoteView: View {
                     dismiss()
                 },
                 onAddParagraph: {
-                    coordinatorHolder.coordinator?.triggerReplyAction()
+                    coordinatorHolder.coordinator?.triggerReplyAction(fromButton: true)
                 },
                 hideKeyboard: {
                     coordinatorHolder.coordinator?.hideKeyboard()
