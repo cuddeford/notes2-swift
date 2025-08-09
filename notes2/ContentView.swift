@@ -217,8 +217,8 @@ struct ContentView: View {
                     }
                 }
                 .onEnded { value in
-                     guard settings.lastNoteIndicatorGestureEnabled else { return }
-                    
+                    guard settings.lastNoteIndicatorGestureEnabled else { return }
+
                     if isListDragging, value.translation.width < -100 { // Swipe left
                         if let lastEdited = recentNotes.first {
                             selectedNoteID = lastEdited.id
