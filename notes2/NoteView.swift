@@ -23,7 +23,7 @@ struct NoteView: View {
 
     @State private var dragOffset: CGSize = .zero
     @State private var dragLocation: CGPoint = .zero
-    @State private var dragActivationPoint: Double = 100
+    @State private var dragActivationPoint: Double = 75
     @State private var isDragging = false
     @State private var isAtBottom = true
     @State private var canScroll = false
