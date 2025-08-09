@@ -437,10 +437,12 @@ struct RichTextEditor: UIViewRepresentable {
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
             let isAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 60.0
 
-            if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
-                self.parent.canScroll = canScroll
-                self.parent.isAtBottom = isAtBottom
-                self.parent.isAtTop = isAtTop
+            DispatchQueue.main.async {
+                if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
+                    self.parent.canScroll = canScroll
+                    self.parent.isAtBottom = isAtBottom
+                    self.parent.isAtTop = isAtTop
+                }
             }
 
             // Check for magnetic zone transitions during scrolling, but only when user is dragging
