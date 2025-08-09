@@ -147,8 +147,7 @@ struct ContentView: View {
                         selectedNoteID = newNote.id
                     } label: {
                         HStack {
-                            Image(systemName: "plus")
-                            Text("New note")
+                            Image(systemName: "square.and.pencil")
                         }
                     }
                 }
