@@ -200,27 +200,41 @@ struct NoteView: View {
             }
         }
         .gesture(
-            DragGesture(minimumDistance: 25, coordinateSpace: .global)
+            DragGesture(minimumDistance: 15, coordinateSpace: .global)
                 .onChanged { value in
-                    let rightEdgeActive = settings.newNoteIndicatorGestureEnabled && value.startLocation.x > UIScreen.main.bounds.width - 25
-                    let leftEdgeActive = settings.dismissNoteGestureEnabled && value.startLocation.x < 25
+                    let screenWidth = UIScreen.main.bounds.width
+                    let startX = value.startLocation.x
                     
-                    // Handle right edge gesture (new note)
-                    if rightEdgeActive {
+                    // Edge detection: within 15pt from edges
+                    let rightEdgeActive = settings.newNoteIndicatorGestureEnabled && 
+                                        startX > screenWidth - 15
+                    
+                    let leftEdgeActive = settings.dismissNoteGestureEnabled && 
+                                       startX < 15
+                    
+                    // Ensure mutual exclusivity - only one gesture at a time
+                    if rightEdgeActive && !isDismissing {
                         dragOffset = value.translation
                         dragLocation = value.location
                         if !isDragging {
                             isDragging = true
                         }
+                    } else if !isDragging {
+                        isDragging = false
+                        dragOffset = .zero
+                        dragLocation = .zero
                     }
                     
-                    // Handle left edge gesture (dismiss note)
-                    if leftEdgeActive {
+                    if leftEdgeActive && !isDragging {
                         dismissDragOffset = value.translation
                         dismissDragLocation = value.location
                         if !isDismissing {
                             isDismissing = true
                         }
+                    } else if !isDismissing {
+                        isDismissing = false
+                        dismissDragOffset = .zero
+                        dismissDragLocation = .zero
                     }
                 }
                 .onEnded { value in

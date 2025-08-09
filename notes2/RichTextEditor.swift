@@ -1809,7 +1809,17 @@ struct RichTextEditor: UIViewRepresentable {
 
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
             guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture, !parent.isDismissSwipeGesture else { return }
+
             let location = gesture.location(in: textView)
+            let globalLocation = gesture.location(in: textView.window)
+
+            // Prevent reply gesture from activating near edges where dismiss/new gestures work
+            let screenWidth = UIScreen.main.bounds.width
+            let edgeBuffer: CGFloat = 50 // Don't allow reply gesture within 15pt of edges
+
+            if globalLocation.x < edgeBuffer || globalLocation.x > screenWidth - edgeBuffer {
+                return
+            }
 
             switch gesture.state {
             case .began:
