@@ -185,7 +185,7 @@ struct NoteView: View {
                     guard settings.newNoteIndicatorGestureEnabled else { return }
 
                     // Only activate if the drag starts from the right edge of the screen and gesture is enabled
-                    if value.startLocation.x > UIScreen.main.bounds.width - 50 {
+                    if value.startLocation.x > UIScreen.main.bounds.width - 25 {
                         // Set the location first
                         dragOffset = value.translation
                         dragLocation = value.location
