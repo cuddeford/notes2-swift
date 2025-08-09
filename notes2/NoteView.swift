@@ -23,6 +23,7 @@ struct NoteView: View {
 
     @State private var dragOffset: CGSize = .zero
     @State private var dragLocation: CGPoint = .zero
+    @State private var dragActivationPoint: Double = 100
     @State private var isDragging = false
     @State private var isAtBottom = true
     @State private var canScroll = false
@@ -142,8 +143,13 @@ struct NoteView: View {
             //     print("--- RTFD Base64 End ---")
             // }
 
-            if isDragging && settings.newNoteIndicatorGestureEnabled {
-                NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
+            if settings.newNoteIndicatorGestureEnabled {
+                NewNoteIndicatorView(
+                    translation: dragOffset,
+                    location: dragLocation,
+                    isDragging: isDragging,
+                    dragActivationPoint: dragActivationPoint,
+                )
             }
 
             VStack {
@@ -182,24 +188,20 @@ struct NoteView: View {
                         dragOffset = value.translation
                         dragLocation = value.location
 
-                        // Then animate the appearance if it's not already visible
                         if !isDragging {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isDragging = true
-                            }
+                            isDragging = true
                         }
                     }
                 }
                 .onEnded { value in
-                    if isDragging, value.translation.width < -100 { // Swipe left
+                    if isDragging, value.translation.width < -dragActivationPoint { // Swipe left
                         let newNote = Note()
                         context.insert(newNote)
                         selectedNoteID = newNote.id
                     }
+
                     // Reset drag state
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isDragging = false
-                    }
+                    isDragging = false
                     dragOffset = .zero
                     dragLocation = .zero
                 }
