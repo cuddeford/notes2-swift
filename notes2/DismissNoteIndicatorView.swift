@@ -18,7 +18,7 @@ struct DismissNoteIndicatorView: View {
                 Image(systemName: "xmark")
                     .font(.largeTitle)
                     .padding()
-                    .foregroundColor(willDismissNote ? .white : .black)
+                    .foregroundColor(willDismissNote ? .white : Color(.label))
                     .onChange(of: willDismissNote) { oldValue, newValue in
                         if oldValue != newValue {
                             let generator = UIImpactFeedbackGenerator(style: .light)

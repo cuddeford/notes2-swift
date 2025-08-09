@@ -25,7 +25,7 @@ struct NewNoteIndicatorView: View {
                 Image(systemName: "square.and.pencil")
                     .font(.largeTitle)
                     .padding()
-                    .foregroundColor(willCreateNote ? .white : .black)
+                    .foregroundColor(willCreateNote ? .white : Color(.label))
                     .onChange(of: willCreateNote) { oldValue, newValue in
                         if oldValue != newValue {
                             let generator = UIImpactFeedbackGenerator(style: .light)
