@@ -200,6 +200,8 @@ struct ContentView: View {
         .gesture(
             DragGesture(minimumDistance: 25, coordinateSpace: .global)
                 .onChanged { value in
+                    guard settings.lastNoteIndicatorGestureEnabled else { return }
+
                     // Only activate if the drag starts from the right edge of the screen
                     if value.startLocation.x > UIScreen.main.bounds.width - 50 {
                         // Set the location first
@@ -215,6 +217,8 @@ struct ContentView: View {
                     }
                 }
                 .onEnded { value in
+                     guard settings.lastNoteIndicatorGestureEnabled else { return }
+                    
                     if isListDragging, value.translation.width < -100 { // Swipe left
                         if let lastEdited = recentNotes.first {
                             selectedNoteID = lastEdited.id

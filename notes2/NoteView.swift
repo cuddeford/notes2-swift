@@ -182,8 +182,10 @@ struct NoteView: View {
         .gesture(
             DragGesture(minimumDistance: 25, coordinateSpace: .global)
                 .onChanged { value in
+                    guard settings.newNoteIndicatorGestureEnabled else { return }
+
                     // Only activate if the drag starts from the right edge of the screen and gesture is enabled
-                    if value.startLocation.x > UIScreen.main.bounds.width - 50 && settings.newNoteIndicatorGestureEnabled {
+                    if value.startLocation.x > UIScreen.main.bounds.width - 50 {
                         // Set the location first
                         dragOffset = value.translation
                         dragLocation = value.location
@@ -194,6 +196,8 @@ struct NoteView: View {
                     }
                 }
                 .onEnded { value in
+                    guard settings.newNoteIndicatorGestureEnabled else { return }
+
                     if isDragging, value.translation.width < -dragActivationPoint { // Swipe left
                         let newNote = Note()
                         context.insert(newNote)
