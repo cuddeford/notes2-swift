@@ -26,11 +26,11 @@ struct NoteView: View {
     @State private var dragLocation: CGPoint = .zero
     @State private var dragActivationPoint: Double = 75
     @State private var isDragging = false
-    
+
     @State private var dismissDragOffset: CGSize = .zero
     @State private var dismissDragLocation: CGPoint = .zero
     @State private var isDismissing = false
-    
+
     @State private var isAtBottom = true
     @State private var canScroll = false
     @State private var isAtTop = true
@@ -204,14 +204,14 @@ struct NoteView: View {
                 .onChanged { value in
                     let screenWidth = UIScreen.main.bounds.width
                     let startX = value.startLocation.x
-                    
+
                     // Edge detection: within 15pt from edges
-                    let rightEdgeActive = settings.newNoteIndicatorGestureEnabled && 
+                    let rightEdgeActive = settings.newNoteIndicatorGestureEnabled &&
                                         startX > screenWidth - 15
-                    
-                    let leftEdgeActive = settings.dismissNoteGestureEnabled && 
+
+                    let leftEdgeActive = settings.dismissNoteGestureEnabled &&
                                        startX < 15
-                    
+
                     // Ensure mutual exclusivity - only one gesture at a time
                     if rightEdgeActive && !isDismissing {
                         dragOffset = value.translation
@@ -224,7 +224,7 @@ struct NoteView: View {
                         dragOffset = .zero
                         dragLocation = .zero
                     }
-                    
+
                     if leftEdgeActive && !isDragging {
                         dismissDragOffset = value.translation
                         dismissDragLocation = value.location
@@ -244,7 +244,7 @@ struct NoteView: View {
                         context.insert(newNote)
                         selectedNoteID = newNote.id
                     }
-                    
+
                     // Handle left edge gesture
                     if isDismissing, value.translation.width > dragActivationPoint {
                         dismiss()
