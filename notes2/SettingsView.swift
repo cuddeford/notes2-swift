@@ -31,6 +31,16 @@ struct SettingsView: View {
                     .foregroundColor(.gray)
             }
 
+            Section(header: Text("Appearance")) {
+                Picker("Accent Color", selection: $settings.accentColor) {
+                    ForEach(AppSettings.availableColors.keys.sorted(), id: \.self) { colorName in
+                        Text(colorName).tag(colorName)
+                    }
+                }
+                .tint(color(from: settings.accentColor))
+                .id(settings.accentColor)
+            }
+
             Section {
                 Toggle(isOn: isDefaultSpacingRelated) {
                     Text("Thoughts start: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)

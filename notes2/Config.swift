@@ -58,6 +58,21 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(recentsCount, forKey: "recentsCount") }
     }
 
+    @Published var accentColor: String {
+        didSet { UserDefaults.standard.set(accentColor, forKey: "accentColor") }
+    }
+
+    static let availableColors: [String: Color] = [
+        "Default": Color.accentColor,
+        "Blue": .blue,
+        "Green": .green,
+        "Orange": .orange,
+        "Pink": .pink,
+        "Purple": .purple,
+        "Red": .red,
+        "Yellow": .yellow
+    ]
+
     static func registerDefaults() {
         let defaults: [String: Any] = [
             "recentsVisible": true,
@@ -73,7 +88,8 @@ class AppSettings: ObservableObject {
             "recentsCount": 2,
             "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
-            "padding": 20.0
+            "padding": 20.0,
+            "accentColor": "Default",
         ]
         UserDefaults.standard.register(defaults: defaults)
     }
@@ -95,5 +111,10 @@ class AppSettings: ObservableObject {
         self.lastNoteIndicatorGestureEnabled = UserDefaults.standard.object(forKey: "lastNoteIndicatorGestureEnabled") as? Bool ?? true
         self.dismissNoteGestureEnabled = UserDefaults.standard.object(forKey: "dismissNoteGestureEnabled") as? Bool ?? true
         self.recentsCount = UserDefaults.standard.object(forKey: "recentsCount") as? Int ?? 2
+        self.accentColor = UserDefaults.standard.string(forKey: "accentColor") ?? "Default"
     }
+}
+
+func color(from string: String) -> Color {
+    return AppSettings.availableColors[string] ?? .accentColor
 }

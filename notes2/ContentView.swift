@@ -286,6 +286,7 @@ struct ContentView: View {
                     listDragLocation = .zero
                 }
         )
+        .tint(color(from: settings.accentColor))
     }
 }
 
