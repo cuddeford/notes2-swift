@@ -19,18 +19,6 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle(isOn: $newNoteWithBigFont) {
-                    Text("Text size defaults to: ") + Text(newNoteWithBigFont ? "Big" : "Normal").fontWeight(.bold)
-                }
-            } header: {
-               Text("Editor")
-            } footer: {
-                Text("When enabled, new notes will begin with a larger default font size. This can help to make your thoughts feel more immediate.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-
             Section(header: Text("Appearance")) {
                 Picker("Accent Color", selection: $settings.accentColor) {
                     ForEach(AppSettings.availableColors.keys.sorted(), id: \.self) { colorName in
@@ -39,6 +27,20 @@ struct SettingsView: View {
                 }
                 .tint(color(from: settings.accentColor))
                 .id(settings.accentColor)
+
+                Stepper("Recent notes: \(settings.recentsCount)", value: $settings.recentsCount, in: 1...10)
+            }
+
+            Section {
+                Toggle(isOn: $newNoteWithBigFont) {
+                    Text("Text size defaults to: ") + Text(newNoteWithBigFont ? "Big" : "Normal").fontWeight(.bold)
+                }
+            } header: {
+               Text("Notepad")
+            } footer: {
+                Text("When enabled, new notes will begin with a larger default font size. This can help to make your thoughts feel more immediate.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
             }
 
             Section {
@@ -97,16 +99,6 @@ struct SettingsView: View {
                 Toggle("Drag to reorder thoughts", isOn: $settings.dragToReorderParagraphEnabled)
             } footer: {
                 Text("Reorder thoughts by long-pressing and dragging them.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-
-            Section {
-                Stepper("Recent notes: \(settings.recentsCount)", value: $settings.recentsCount, in: 1...10)
-            } header: {
-                Text("Recents")
-            } footer: {
-                Text("How many recent notes to display in the Recents section.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
