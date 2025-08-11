@@ -21,6 +21,7 @@ enum NoteTextAttribute {
 
 struct RichTextEditor: UIViewRepresentable {
     typealias UIViewType = CustomTextView
+    var isPreview: Bool = false
     @Binding var text: NSAttributedString
     @Binding var selectedRange: NSRange
     var note: Note
@@ -33,6 +34,8 @@ struct RichTextEditor: UIViewRepresentable {
     @Binding var isAtBottom: Bool
     @Binding var canScroll: Bool
     @Binding var isAtTop: Bool
+    @Binding var isNewNoteSwipeGesture: Bool
+    @Binding var isDismissSwipeGesture: Bool
 
     func makeUIView(context: Context) -> CustomTextView {
         let textView = CustomTextView()
@@ -100,16 +103,37 @@ struct RichTextEditor: UIViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.textContainerInset = textView.textContainerInset
         context.coordinator.textViewWidth = textView.bounds.width
+
+        context.coordinator.parseAttributedText(textView.attributedText)
+
         DispatchQueue.main.async { // Ensure UI updates happen on the main thread
-            textView.becomeFirstResponder()
+            if !isPreview {
+                textView.becomeFirstResponder()
+            }
+
             context.coordinator.parseAttributedText(textView.attributedText)
         }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            context.coordinator.parseAttributedText(textView.attributedText)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            context.coordinator.parseAttributedText(textView.attributedText)
+        }
+
         return textView
     }
 
     func updateUIView(_ uiView: CustomTextView, context: Context) {
+        // Skip updates during active gestures to prevent infinite loops
+        guard !context.coordinator.isGestureActive else {
+            return
+        }
+
         // Only update if the attributed text has actually changed to avoid infinite loops
-        if uiView.attributedText != text {
+        let shouldUpdate = shouldUpdateTextView(uiView.attributedText, newText: text)
+        if shouldUpdate {
             uiView.attributedText = text
             context.coordinator.parseAttributedText(text)
         }
@@ -154,6 +178,66 @@ struct RichTextEditor: UIViewRepresentable {
         context.coordinator.textViewWidth = uiView.bounds.width
     }
 
+    private func shouldUpdateTextView(_ currentText: NSAttributedString, newText: NSAttributedString) -> Bool {
+        // Quick length check first
+        if currentText.length != newText.length {
+            return true
+        }
+
+        // Compare string content directly
+        if currentText.string != newText.string {
+            return true
+        }
+
+        // Compare attributes for the entire range
+        let fullRange = NSRange(location: 0, length: currentText.length)
+        var attributesAreEqual = true
+
+        currentText.enumerateAttributes(in: fullRange, options: []) { (currentAttrs, range, _) in
+            newText.enumerateAttributes(in: range, options: []) { (newAttrs, _, _) in
+                if currentAttrs.count != newAttrs.count {
+                    attributesAreEqual = false
+                    return
+                }
+
+                for (key, currentValue) in currentAttrs {
+                    if let newValue = newAttrs[key] {
+                        // Handle special cases for attributed string equality
+                        if key == .paragraphStyle {
+                            if let currentStyle = currentValue as? NSParagraphStyle,
+                               let newStyle = newValue as? NSParagraphStyle {
+                                if abs(currentStyle.paragraphSpacing - newStyle.paragraphSpacing) > 0.001 {
+                                    attributesAreEqual = false
+                                    return
+                                }
+                                if currentStyle.alignment != newStyle.alignment {
+                                    attributesAreEqual = false
+                                    return
+                                }
+                            }
+                        } else if key == .font {
+                            if let currentFont = currentValue as? UIFont,
+                               let newFont = newValue as? UIFont {
+                                if currentFont.fontName != newFont.fontName || abs(currentFont.pointSize - newFont.pointSize) > 0.001 {
+                                    attributesAreEqual = false
+                                    return
+                                }
+                            }
+                        } else if String(describing: currentValue) != String(describing: newValue) {
+                            attributesAreEqual = false
+                            return
+                        }
+                    } else {
+                        attributesAreEqual = false
+                        return
+                    }
+                }
+            }
+        }
+
+        return !attributesAreEqual
+    }
+
     func makeCoordinator() -> Coordinator {
         let coordinator = Coordinator(self)
         onCoordinatorReady?(coordinator)
@@ -181,6 +265,22 @@ struct RichTextEditor: UIViewRepresentable {
         private var startedAtLimit: Bool = false
         private var initialLimitValue: CGFloat?
         private var hasTriggeredLightHaptic: Bool = false
+
+        // Activation thresholds for gesture priming
+        private let activationThreshold: CGFloat = 30
+        private let spacingTolerance: CGFloat = 0.1
+        private var relatedActivationThreshold: CGFloat { AppSettings.relatedParagraphSpacing + activationThreshold }
+        private var unrelatedActivationThreshold: CGFloat { AppSettings.unrelatedParagraphSpacing - activationThreshold }
+
+        private enum ThresholdType {
+            case relatedAbove
+            case unrelatedBelow
+            case middleRelated
+            case middleUnrelated
+        }
+
+        private var lastCrossedThreshold: ThresholdType? = nil
+        var gesturePrimed: Bool = false
         private var activeAnimations: [NSRange: ActiveAnimation] = [:]
         private var lastParagraphCount: Int = 0
         private var initialPinchDistance: CGFloat?
@@ -229,6 +329,9 @@ struct RichTextEditor: UIViewRepresentable {
         private let holdHapticGenerator = UIImpactFeedbackGenerator(style: .light)
         private var holdProgressView: UIView?
         private var holdDisplayLink: CADisplayLink?
+
+        // Gesture state tracking to prevent update loops
+        var isGestureActive = false
 
         enum SwipeDirection {
             case none
@@ -409,10 +512,12 @@ struct RichTextEditor: UIViewRepresentable {
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
             let isAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 60.0
 
-            if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
-                self.parent.canScroll = canScroll
-                self.parent.isAtBottom = isAtBottom
-                self.parent.isAtTop = isAtTop
+            DispatchQueue.main.async {
+                if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
+                    self.parent.canScroll = canScroll
+                    self.parent.isAtBottom = isAtBottom
+                    self.parent.isAtTop = isAtTop
+                }
             }
 
             // Check for magnetic zone transitions during scrolling, but only when user is dragging
@@ -545,9 +650,16 @@ struct RichTextEditor: UIViewRepresentable {
                     self.parseAttributedText(textView.attributedText)
                     let newParagraphs = self.paragraphs
 
+                    // Clean up stale animations when text changes
+                    self.cleanupStaleAnimations()
+
                     // Check if new paragraphs were added by comparing counts
                     if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
                         self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
+                    }
+                    // Also clean up animations if paragraphs were deleted
+                    else if newParagraphs.count < oldParagraphs.count {
+                        self.cleanupStaleAnimations()
                     }
                     self.lastParagraphCount = newParagraphs.count
                 }
@@ -706,7 +818,7 @@ struct RichTextEditor: UIViewRepresentable {
             return mutableAttributedText
         }
 
-        private func startSpacingAnimation(from: CGFloat, to: CGFloat, range: NSRange) {
+        private func startSpacingAnimation(from: CGFloat, to: CGFloat, range: NSRange, actionState: Bool) {
             let startTime = CACurrentMediaTime()
 
             let displayLink = CADisplayLink(target: self, selector: #selector(self.updateSpacingAnimation(_:)))
@@ -717,7 +829,8 @@ struct RichTextEditor: UIViewRepresentable {
                 startTime: startTime,
                 startSpacing: from,
                 targetSpacing: to,
-                range: range
+                range: range,
+                actionState: actionState
             )
 
             activeAnimations[range] = animation
@@ -737,6 +850,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         private func handlePinchBegan(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
             self.isPinching = true
+            self.isGestureActive = true
 
             guard gesture.numberOfTouches >= 2 else {
                 gesture.state = .cancelled
@@ -798,11 +912,15 @@ struct RichTextEditor: UIViewRepresentable {
 
                 // Set the initial detent for color and haptics
                 self.lastClosestDetent = spacingDetents.min(by: { abs($0 - (self.initialSpacing ?? 0)) < abs($1 - (self.initialSpacing ?? 0)) })
-                self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < 0.1 }
+                self.wasAtLimit = spacingDetents.contains { abs($0 - (self.initialSpacing ?? 0)) < spacingTolerance }
 
                 // Track if we started at a limit for direction-based haptic
                 self.startedAtLimit = self.wasAtLimit
                 self.initialLimitValue = self.wasAtLimit ? self.lastClosestDetent : nil
+
+                // Reset threshold tracking for bidirectional crossing
+                self.lastCrossedThreshold = nil
+                self.gesturePrimed = false
 
                 // Track this pinched pair like we track animations
                 activePinchedPairs[topRange] = (indices: [index1, index2], timestamp: CACurrentMediaTime())
@@ -838,23 +956,34 @@ struct RichTextEditor: UIViewRepresentable {
             // Clamp the spacing to the defined detents
             targetSpacing = max(AppSettings.relatedParagraphSpacing, min(targetSpacing, AppSettings.unrelatedParagraphSpacing))
 
-            let closestDetentForColor = spacingDetents.min(by: { abs($0 - targetSpacing) < abs($1 - targetSpacing) }) ?? targetSpacing
+            let direction = currentDistance - initialPinchDistance
+            let crossingResult = checkThresholdCrossing(
+                currentSpacing: targetSpacing,
+                initialSpacing: initialSpacing,
+                relatedThreshold: relatedActivationThreshold,
+                unrelatedThreshold: unrelatedActivationThreshold
+            )
 
-            // Check if we're at full extension or contraction (matching a detent exactly)
-            let isFullyExtendedOrContracted = spacingDetents.contains { detent in
-                abs(detent - targetSpacing) < 0.1
-            }
-
-            if closestDetentForColor != lastClosestDetent {
+            if crossingResult.crossed {
                 hapticGenerator.impactOccurred()
                 hapticGenerator.prepare()
-                lastClosestDetent = closestDetentForColor
 
-                // Trigger heavy haptic border effect once using the primary paragraph
+                gesturePrimed = crossingResult.newState
+                lastCrossedThreshold = crossingResult.thresholdType
+
                 if let range = affectedParagraphRange {
                     ruledView?.triggerHapticFeedback(for: range, type: .heavy)
                 }
-            } else if isFullyExtendedOrContracted {
+            } else if lastCrossedThreshold == nil {
+                gesturePrimed = false
+            }
+
+            // Restore light haptic for physical limits
+            let isAtLimit = spacingDetents.contains { detent in
+                abs(detent - targetSpacing) < spacingTolerance
+            }
+
+            if isAtLimit {
                 var shouldTriggerLight = false
 
                 if !wasAtLimit {
@@ -862,7 +991,6 @@ struct RichTextEditor: UIViewRepresentable {
                     shouldTriggerLight = true
                 } else if startedAtLimit && initialLimitValue == targetSpacing {
                     // Started at this limit - check direction and if already triggered
-                    let direction = currentDistance - initialPinchDistance
                     let isMovingTowardLimit = (initialLimitValue == AppSettings.relatedParagraphSpacing && direction < 0) ||
                                             (initialLimitValue == AppSettings.unrelatedParagraphSpacing && direction > 0)
 
@@ -875,29 +1003,30 @@ struct RichTextEditor: UIViewRepresentable {
                     lightHapticGenerator.prepare()
                     hasTriggeredLightHaptic = true
 
-                    // Trigger light haptic border effect once using the primary paragraph
+                    // Trigger light haptic border effect
                     if let range = affectedParagraphRange {
                         ruledView?.triggerHapticFeedback(for: range, type: .light)
                     }
                 }
-            } else {
-                // Reset trigger state when moving away from limit
-                hasTriggeredLightHaptic = false
             }
 
             // Update limit state tracking
-            wasAtLimit = isFullyExtendedOrContracted
+            wasAtLimit = isAtLimit
 
             let currentStyle = paragraphs.first(where: { $0.range == range })?.paragraphStyle ?? NSParagraphStyle.default
             let newParagraphStyle = NSMutableParagraphStyle()
             newParagraphStyle.setParagraphStyle(currentStyle)
             newParagraphStyle.paragraphSpacing = targetSpacing
 
+            // Validate range before applying
+            guard range.location >= 0 && range.length >= 0 && range.location + range.length <= textView.textStorage.length else {
+                return
+            }
+
             textView.textStorage.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
             if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                 paragraphs[index].paragraphStyle = newParagraphStyle
             }
-            currentDetent = targetSpacing
 
             textView.layoutIfNeeded()
             ruledView?.updateAllParagraphOverlays(
@@ -906,78 +1035,169 @@ struct RichTextEditor: UIViewRepresentable {
                 activePinchedPairs: activePinchedPairs,
                 currentGestureDetent: self.currentDetent,
                 currentGestureRange: range,
+                actionState: false
             )
             ruledView?.setNeedsDisplay()
+
+            currentDetent = targetSpacing
+        }
+
+        private func checkThresholdCrossing(
+            currentSpacing: CGFloat,
+            initialSpacing: CGFloat,
+            relatedThreshold: CGFloat,
+            unrelatedThreshold: CGFloat
+        ) -> (crossed: Bool, newState: Bool, thresholdType: ThresholdType?) {
+            let wasInitiallyRelated = abs(initialSpacing - AppSettings.relatedParagraphSpacing) < spacingTolerance
+            let wasInitiallyUnrelated = abs(initialSpacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
+
+            var crossingOccurred = false
+            var newPrimedState = false
+            var thresholdType: ThresholdType? = nil
+
+            if wasInitiallyRelated {
+                let wasAbove = lastCrossedThreshold == .relatedAbove
+                let isAbove = currentSpacing >= relatedThreshold
+
+                if wasAbove != isAbove {
+                    crossingOccurred = true
+                    newPrimedState = isAbove
+                    thresholdType = isAbove ? .relatedAbove : nil
+                }
+            } else if wasInitiallyUnrelated {
+                let wasBelow = lastCrossedThreshold == .unrelatedBelow
+                let isBelow = currentSpacing <= unrelatedThreshold
+
+                if wasBelow != isBelow {
+                    crossingOccurred = true
+                    newPrimedState = isBelow
+                    thresholdType = isBelow ? .unrelatedBelow : nil
+                }
+            } else {
+                let relatedCrossed = currentSpacing >= relatedThreshold
+                let unrelatedCrossed = currentSpacing <= unrelatedThreshold
+
+                let relatedDist = abs(currentSpacing - relatedThreshold)
+                let unrelatedDist = abs(currentSpacing - unrelatedThreshold)
+
+                if relatedDist < unrelatedDist {
+                    let wasAbove = lastCrossedThreshold == .middleRelated
+                    if relatedCrossed != wasAbove {
+                        crossingOccurred = true
+                        newPrimedState = relatedCrossed
+                        thresholdType = relatedCrossed ? .middleRelated : nil
+                    }
+                } else {
+                    let wasBelow = lastCrossedThreshold == .middleUnrelated
+                    if unrelatedCrossed != wasBelow {
+                        crossingOccurred = true
+                        newPrimedState = unrelatedCrossed
+                        thresholdType = unrelatedCrossed ? .middleUnrelated : nil
+                    }
+                }
+            }
+
+            return (crossed: crossingOccurred, newState: newPrimedState, thresholdType: thresholdType)
         }
 
         private func handlePinchEnded(_ gesture: UIPinchGestureRecognizer, textView: UITextView) {
-            guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange else { return }
+            guard let currentSpacing = self.currentDetent, let range = affectedParagraphRange, let initial = initialSpacing else {
+                // If we don't have the necessary info, reset and do nothing.
+                self.isPinching = false
+                self.gesturePrimed = false
+                activePinchedPairs.removeAll()
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: nil,
+                    currentGestureRange: nil,
+                    actionState: false
+                )
+                return
+            }
 
-            let closestDetent = spacingDetents.min(by: { abs($0 - currentSpacing) < abs($1 - currentSpacing) }) ?? self.parent.settings.defaultParagraphSpacing
+            let targetSpacing: CGFloat
+            if gesturePrimed {
+                // If the gesture is primed, the target is the opposite of the initial state.
+                let wasInitiallyRelated = abs(initial - AppSettings.relatedParagraphSpacing) < spacingTolerance
+                if wasInitiallyRelated {
+                    targetSpacing = AppSettings.unrelatedParagraphSpacing
+                } else {
+                    targetSpacing = AppSettings.relatedParagraphSpacing
+                }
+            } else {
+                // If not primed, snap back to the original spacing.
+                targetSpacing = initial
+            }
 
-            // Reset tracking variables
+            // Store the current action state for animation (preserve gesturePrimed across animation)
+            let finalActionState = gesturePrimed
+
+            // Reset tracking variables but preserve gesturePrimed for animation
             self.startedAtLimit = false
             self.initialLimitValue = nil
             self.hasTriggeredLightHaptic = false
+            self.lastCrossedThreshold = nil
+            // Keep gesturePrimed true during animation, reset after animation completes
 
-            // Start smooth animation from current spacing to target
-            startSpacingAnimation(from: currentSpacing, to: closestDetent ?? self.parent.settings.defaultParagraphSpacing, range: range)
+            // Start smooth animation from current spacing to target, preserving action state
+            startSpacingAnimation(from: currentSpacing, to: targetSpacing, range: range, actionState: finalActionState)
         }
 
         @objc private func updateSpacingAnimation(_ displayLink: CADisplayLink) {
             guard let textView = textView else { return }
 
+            var rangesToRemove: [NSRange] = []
+
             for (range, animation) in activeAnimations {
+                // Validate range before proceeding
+                guard range.location >= 0 && range.length >= 0 && range.location + range.length <= textView.textStorage.length else {
+                    // Invalid range - mark for cleanup
+                    rangesToRemove.append(range)
+                    continue
+                }
+
                 let elapsed = CACurrentMediaTime() - animation.startTime
                 let duration = self.animationDuration
 
                 if elapsed >= duration {
                     // Animation complete
                     animation.displayLink.invalidate()
-                    activeAnimations.removeValue(forKey: range)
+                    rangesToRemove.append(range)
 
-                    // Final update
+                    // Final update - validate range again
+                    guard range.location < textView.textStorage.length else { continue }
+                    let validRange = NSRange(location: range.location, length: min(range.length, textView.textStorage.length - range.location))
+
                     let finalParagraphStyle = NSMutableParagraphStyle()
-                    finalParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
+                    finalParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: validRange.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     finalParagraphStyle.paragraphSpacing = animation.targetSpacing
 
-                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: range)
+                    textView.textStorage.addAttribute(.paragraphStyle, value: finalParagraphStyle, range: validRange)
                     if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                         paragraphs[index].paragraphStyle = finalParagraphStyle
                     }
 
-                    // Clean up active pinched pairs
-                    activePinchedPairs.removeValue(forKey: range)
-
-                    textView.layoutIfNeeded()
-                    ruledView?.updateAllParagraphOverlays(
-                        paragraphs: self.paragraphs,
-                        textView: textView,
-                        activePinchedPairs: activePinchedPairs,
-                        currentGestureDetent: nil,
-                        currentGestureRange: nil
-                    )
-
                     // Completion haptic
                     completionHapticGenerator.impactOccurred()
-                    if activeAnimations.isEmpty {
-                        self.parent.text = self.reconstructAttributedText()
-                        self.initialSpacing = nil
-                        self.affectedParagraphRange = nil
-                        self.currentDetent = nil
-                        self.lastClosestDetent = nil
-                        self.isPinching = false
-                    }
                 } else {
                     let progress = CGFloat(elapsed / duration)
                     let easedProgress = EasingFunctions.easeOutBack(progress)
                     let currentSpacing = animation.startSpacing + (animation.targetSpacing - animation.startSpacing) * easedProgress
 
+                    // Validate range for current frame
+                    guard range.location < textView.textStorage.length else {
+                        rangesToRemove.append(range)
+                        continue
+                    }
+                    let validRange = NSRange(location: range.location, length: min(range.length, textView.textStorage.length - range.location))
+
                     let currentParagraphStyle = NSMutableParagraphStyle()
-                    currentParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
+                    currentParagraphStyle.setParagraphStyle(textView.attributedText.attribute(.paragraphStyle, at: validRange.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle.default)
                     currentParagraphStyle.paragraphSpacing = currentSpacing
 
-                    textView.textStorage.addAttribute(.paragraphStyle, value: currentParagraphStyle, range: range)
+                    textView.textStorage.addAttribute(.paragraphStyle, value: currentParagraphStyle, range: validRange)
                     if let index = paragraphs.firstIndex(where: { $0.range == range }) {
                         paragraphs[index].paragraphStyle = currentParagraphStyle
                     }
@@ -988,9 +1208,41 @@ struct RichTextEditor: UIViewRepresentable {
                         textView: textView,
                         activePinchedPairs: activePinchedPairs,
                         currentGestureDetent: nil,
-                        currentGestureRange: nil
+                        currentGestureRange: nil,
+                        actionState: animation.actionState
                     )
                 }
+            }
+
+            // Clean up invalid animations after iteration
+            for range in rangesToRemove {
+                if let animation = activeAnimations[range] {
+                    animation.displayLink.invalidate()
+                }
+                activeAnimations.removeValue(forKey: range)
+                activePinchedPairs.removeValue(forKey: range)
+            }
+
+            // Check if all animations are complete
+            if activeAnimations.isEmpty {
+                self.parent.text = self.reconstructAttributedText()
+                self.initialSpacing = nil
+                self.affectedParagraphRange = nil
+                self.currentDetent = nil
+                self.lastClosestDetent = nil
+                self.isPinching = false
+                self.gesturePrimed = false
+                self.isGestureActive = false
+
+                // Reset overlay state when all animations complete
+                ruledView?.updateAllParagraphOverlays(
+                    paragraphs: self.paragraphs,
+                    textView: textView,
+                    activePinchedPairs: activePinchedPairs,
+                    currentGestureDetent: nil,
+                    currentGestureRange: nil,
+                    actionState: false
+                )
             }
         }
 
@@ -1039,6 +1291,21 @@ struct RichTextEditor: UIViewRepresentable {
 
             let animateRange = animateParagraph.range
 
+            // Validate range before starting animation
+            guard animateRange.location >= 0 && animateRange.length >= 0 && animateRange.location + animateRange.length <= textView.textStorage.length else {
+                return
+            }
+
+            // Ensure range is still valid in current text storage
+            guard animateRange.location + animateRange.length <= textView.textStorage.length else {
+                return
+            }
+
+            // Check if this range already has an active animation
+            if activeAnimations[animateRange] != nil {
+                return
+            }
+
             // Animate to unrelated spacing
             let startSpacing = 0.0
             let targetSpacing = currentSpacing
@@ -1046,7 +1313,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Create animation state
             let displayLink = CADisplayLink(target: self, selector: #selector(updateSpacingAnimation(_:)))
             displayLink.add(to: .main, forMode: .common)
-            let animation = ActiveAnimation(displayLink: displayLink, startTime: CACurrentMediaTime(), startSpacing: startSpacing, targetSpacing: targetSpacing, range: animateRange)
+            let animation = ActiveAnimation(displayLink: displayLink, startTime: CACurrentMediaTime(), startSpacing: startSpacing, targetSpacing: targetSpacing, range: animateRange, actionState: false)
             activeAnimations[animateRange] = animation
 
             // Set initial spacing immediately
@@ -1058,7 +1325,7 @@ struct RichTextEditor: UIViewRepresentable {
             if let index = paragraphs.firstIndex(where: { $0.range == animateRange }) {
                 paragraphs[index].paragraphStyle = initialParagraphStyle
             }
-}
+        }
 
         // MARK: - Drag-to-Reorder Gesture Handling
 
@@ -1106,6 +1373,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Highlight the source paragraph
             setDraggingSource(index)
             isDragging = true
+            isGestureActive = true
         }
 
         private func handleDragChanged(location: CGPoint, textView: UITextView, gesture: UILongPressGestureRecognizer) {
@@ -1224,6 +1492,24 @@ struct RichTextEditor: UIViewRepresentable {
                 }
             }
             return nil
+        }
+
+        private func paragraphIndex(at textLocation: Int, in textView: UITextView) -> Int {
+            // Find which paragraph contains the given text location
+            for (index, paragraph) in paragraphs.enumerated() {
+                if NSLocationInRange(textLocation, paragraph.range) {
+                    return index
+                }
+                // If the text location is exactly at the end of a paragraph,
+                // we want to add the new paragraph after that one
+                if textLocation == paragraph.range.location + paragraph.range.length {
+                    return index
+                }
+            }
+
+            // If no paragraph contains this location, return the last paragraph
+            // or 0 if there are no paragraphs
+            return max(0, paragraphs.count - 1)
         }
 
         private func createDragGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) {
@@ -1416,6 +1702,7 @@ struct RichTextEditor: UIViewRepresentable {
             draggedParagraphID = nil
             initialTouchCount = 1
             isMultitouchDrag = false
+            isGestureActive = false
         }
 
         // MARK: - Auto-Scrolling for Drag-to-Reorder
@@ -1521,17 +1808,32 @@ struct RichTextEditor: UIViewRepresentable {
         // MARK: - Reply Gesture Handling
 
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
-            guard let textView = textView, !isDragging, !isPinching else { return }
+            guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture, !parent.isDismissSwipeGesture else {
+                cleanupReplyGesture()
+                return 
+            }
+
             let location = gesture.location(in: textView)
+            let globalLocation = gesture.location(in: textView.window)
+
+            // Prevent reply gesture from activating near edges where dismiss/new gestures work
+            let screenWidth = UIScreen.main.bounds.width
+            let edgeBuffer: CGFloat = 50 // Don't allow reply gesture within 15pt of edges
+
+            if globalLocation.x < edgeBuffer || globalLocation.x > screenWidth - edgeBuffer {
+                cleanupReplyGesture()
+                return
+            }
 
             switch gesture.state {
             case .began:
                 handleReplyGestureBegan(location: location, textView: textView)
             case .changed:
                 handleReplyGestureChanged(gesture: gesture, textView: textView)
-            case .ended, .cancelled:
+            case .ended, .cancelled, .failed:
                 handleReplyGestureEnded(gesture: gesture, textView: textView)
             default:
+                cleanupReplyGesture()
                 break
             }
         }
@@ -1541,6 +1843,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             replyGestureParagraphIndex = index
             replyGestureInitialLocation = location
+            isGestureActive = true
 
             // Create the ghost view from a snapshot of the original text
             guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
@@ -1572,7 +1875,10 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { return }
+            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { 
+                cleanupReplyGesture()
+                return 
+            }
 
             let translation = gesture.translation(in: textView)
 
@@ -1687,29 +1993,40 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard replyGhostView != nil else { return }
+            guard replyGhostView != nil else { 
+                cleanupReplyGesture()
+                return 
+            }
+            
             let translation = gesture.translation(in: textView)
             let horizontalTranslation = swipeDirection == .right
                 ? min(max(0, translation.x), replyGestureThreshold)
                 : max(min(0, translation.x), -replyGestureThreshold)
 
             // Check hold-to-confirm completion for delete
+            var shouldAnimateCleanup = true
             if isHorizontalSwipe {
                 if swipeDirection == .right {
                     // Reply uses immediate confirmation
                     if abs(horizontalTranslation) >= replyGestureThreshold {
-                        triggerReplyAction()
+                        triggerReplyAction(for: replyGestureParagraphIndex)
+                        shouldAnimateCleanup = false // Don't animate when action is triggered
                     }
                 } else if swipeDirection == .left {
                     // Delete uses hold-to-confirm
                     if holdProgress >= 1.0 {
                         triggerDeleteAction()
+                        shouldAnimateCleanup = false // Don't animate when action is triggered
                     }
                 }
             }
 
-            // Cleanup
-            cleanupReplyGesture()
+            // Cleanup with animation only if no action was triggered
+            if shouldAnimateCleanup {
+                animateReplyGestureCleanup()
+            } else {
+                cleanupReplyGesture()
+            }
         }
 
         private func createReplyGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) -> UIView? {
@@ -1763,7 +2080,7 @@ struct RichTextEditor: UIViewRepresentable {
             // Use systemBackground to ensure it's opaque and covers the text
             overlayView.backgroundColor = .systemBackground
             overlayView.layer.cornerRadius = ruledView?.overlayCornerRadius ?? 20.0
-            overlayView.layer.masksToBounds = true
+            overlayView.layer.masksToBounds = false
 
             // Determine icon and position based on swipe direction
             let iconName: String
@@ -1819,19 +2136,27 @@ struct RichTextEditor: UIViewRepresentable {
             replyOverlayView = overlayView
         }
 
-        private func triggerReplyAction() {
-            guard let textView = textView,
-                  let paragraphIndex = replyGestureParagraphIndex,
-                  paragraphIndex < paragraphs.count else { return }
+        func triggerReplyAction(for index: Int? = nil, fromButton: Bool = false) {
+            guard let textView = textView else { return }
+
+            let targetParagraphIndex: Int
+            if let providedIndex = index {
+                targetParagraphIndex = providedIndex
+            } else {
+                // Determine paragraph index based on caret position
+                targetParagraphIndex = paragraphIndex(at: textView.selectedRange.location, in: textView)
+            }
+
+            guard targetParagraphIndex < paragraphs.count else { return }
 
             replyGestureHapticGenerator.impactOccurred()
 
-            let originalParagraph = paragraphs[paragraphIndex]
+            let originalParagraph = paragraphs[targetParagraphIndex]
             let insertLocation = originalParagraph.range.location + originalParagraph.range.length
 
             // Determine spacing based on original paragraph spacing
             let originalSpacing = originalParagraph.paragraphStyle.paragraphSpacing
-            let isOriginallyUnrelated = abs(originalSpacing - AppSettings.unrelatedParagraphSpacing) < 0.1
+            let isOriginallyUnrelated = abs(originalSpacing - AppSettings.unrelatedParagraphSpacing) < spacingTolerance
 
             // Create new paragraph style - use unrelated if original was unrelated, otherwise related
             let newParagraphStyle = NSMutableParagraphStyle()
@@ -1881,10 +2206,22 @@ struct RichTextEditor: UIViewRepresentable {
             textView.attributedText = mutableText
             parent.text = mutableText
 
-            // Handle cursor positioning for edge case of last paragraph
-            let isLastParagraph = paragraphIndex == paragraphs.count - 1
-            let cursorPosition = isLastParagraph ? insertLocation + 1 : insertLocation
-            textView.selectedRange = NSRange(location: cursorPosition, length: 0)
+            // Handle cursor positioning with special case for + button on empty paragraphs
+            let targetParagraph = paragraphs[targetParagraphIndex]
+            let isEmptyParagraph = targetParagraph.content.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let isLastParagraph = targetParagraphIndex == paragraphs.count - 1
+
+            let cursorPosition: Int
+            if fromButton && isEmptyParagraph {
+                // Special case: + button on empty paragraph - position at start of new paragraph
+                cursorPosition = insertLocation + 1
+            } else {
+                // Original logic for swipe gestures and non-empty paragraphs
+                cursorPosition = isLastParagraph ? insertLocation + 1 : insertLocation
+            }
+
+            let finalCursorPosition = max(0, min(cursorPosition, mutableText.length))
+            textView.selectedRange = NSRange(location: finalCursorPosition, length: 0)
             parent.selectedRange = textView.selectedRange
 
             // Update paragraphs and ensure cursor is visible
@@ -1950,31 +2287,32 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func cleanupReplyGesture() {
-            func cleanup() {
-                self.replyGhostView?.removeFromSuperview()
-                self.replyOverlayView?.removeFromSuperview()
-                self.replyGhostView = nil
-                self.replyOverlayView = nil
-                self.replyGestureParagraphIndex = nil
-                self.replyGestureInitialLocation = nil
-                self.hasTriggeredReplyHaptic = false
-                self.isHorizontalSwipe = false
-                self.swipeDirection = .none
+            // Immediate cleanup - always ensure views are removed
+            replyGhostView?.removeFromSuperview()
+            replyOverlayView?.removeFromSuperview()
+            replyGhostView = nil
+            replyOverlayView = nil
+            replyGestureParagraphIndex = nil
+            replyGestureInitialLocation = nil
+            hasTriggeredReplyHaptic = false
+            isHorizontalSwipe = false
+            swipeDirection = .none
+            isGestureActive = false
 
-                // Reset hold-to-confirm state
-                self.isHolding = false
-                self.holdStartTime = nil
-                self.holdProgress = 0.0
-                self.holdProgressView = nil
+            // Reset hold-to-confirm state
+            isHolding = false
+            holdStartTime = nil
+            holdProgress = 0.0
+            holdProgressView = nil
 
-                // Stop display link
-                self.holdDisplayLink?.invalidate()
-                self.holdDisplayLink = nil
-            }
+            // Stop display link
+            holdDisplayLink?.invalidate()
+            holdDisplayLink = nil
+        }
 
+        private func animateReplyGestureCleanup() {
             guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
-                // Fallback to immediate cleanup if views don't exist
-                cleanup()
+                cleanupReplyGesture()
                 return
             }
 
@@ -1995,15 +2333,61 @@ struct RichTextEditor: UIViewRepresentable {
                     }
                 },
                 completion: { _ in
-                    cleanup()
+                    self.cleanupReplyGesture()
                 }
             )
+        }
+
+        private func cleanupStaleAnimations() {
+            guard let textView = textView else { return }
+
+            var rangesToRemove: [NSRange] = []
+
+            for (range, _) in activeAnimations {
+                if !isValidRange(range, in: textView.textStorage) {
+                    rangesToRemove.append(range)
+                }
+            }
+
+            for range in rangesToRemove {
+                if let animation = activeAnimations[range] {
+                    animation.displayLink.invalidate()
+                }
+                activeAnimations.removeValue(forKey: range)
+                activePinchedPairs.removeValue(forKey: range)
+            }
+        }
+
+        private func isValidRange(_ range: NSRange, in textStorage: NSTextStorage) -> Bool {
+            return range.location >= 0 && range.length >= 0 && range.location + range.length <= textStorage.length
+        }
+
+        private func safeRange(_ range: NSRange, in textStorage: NSTextStorage) -> NSRange {
+            guard range.location >= 0 else { return NSRange(location: 0, length: 0) }
+            guard range.length >= 0 else { return NSRange(location: range.location, length: 0) }
+            let endLocation = min(range.location + range.length, textStorage.length)
+            let adjustedLength = max(0, endLocation - range.location)
+            return NSRange(location: range.location, length: adjustedLength)
         }
     }
 }
 
 extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldFailSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Ensure cleanup happens when gesture fails
+        cleanupReplyGesture()
+        return false
+    }
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        // Clean up any existing gesture state when a new touch begins
+        if gestureRecognizer is UIPanGestureRecognizer {
+            cleanupReplyGesture()
+        }
         return true
     }
 }

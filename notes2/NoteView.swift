@@ -11,6 +11,7 @@ import UIKit
 
 struct NoteView: View {
     @Bindable var note: Note
+    var isPreview: Bool? = false
     @Binding var selectedNoteID: UUID?
     @Environment(\.modelContext) private var context: ModelContext
     @Environment(\.dismiss) private var dismiss
@@ -23,7 +24,13 @@ struct NoteView: View {
 
     @State private var dragOffset: CGSize = .zero
     @State private var dragLocation: CGPoint = .zero
+    @State private var dragActivationPoint: Double = 75
     @State private var isDragging = false
+
+    @State private var dismissDragOffset: CGSize = .zero
+    @State private var dismissDragLocation: CGPoint = .zero
+    @State private var isDismissing = false
+
     @State private var isAtBottom = true
     @State private var canScroll = false
     @State private var isAtTop = true
@@ -44,9 +51,10 @@ struct NoteView: View {
         }
     }
 
-    init(note: Note, selectedNoteID: Binding<UUID?>) {
+    init(note: Note, selectedNoteID: Binding<UUID?>, isPreview: Bool? = false) {
         self._selectedNoteID = selectedNoteID
         self._note = Bindable(wrappedValue: note)
+        self.isPreview = isPreview
 
         var loadedText: NSAttributedString
         // Attempt to load attributed string from note data
@@ -106,6 +114,7 @@ struct NoteView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             RichTextEditor(
+                isPreview: isPreview == true,
                 text: $noteText,
                 selectedRange: $selectedRange,
                 note: note,
@@ -115,7 +124,9 @@ struct NoteView: View {
                 },
                 isAtBottom: $isAtBottom,
                 canScroll: $canScroll,
-                isAtTop: $isAtTop
+                isAtTop: $isAtTop,
+                isNewNoteSwipeGesture: $isDragging,
+                isDismissSwipeGesture: $isDismissing,
             )
             .onChange(of: noteText) { oldValue, newValue in
                 if let data = try? newValue.data(
@@ -133,73 +144,126 @@ struct NoteView: View {
                 // print("Paragraphs changed: \(newParagraphs?.count ?? 0) paragraphs")
                 // You can now access newParagraphs[i].height, newParagraphs[i].screenPosition, etc.
             }
+            // .onTapGesture(count: 3) {
+            //     let rtfdData = note.content
+            //     let base64String = rtfdData.base64EncodedString()
+            //     print("--- RTFD Base64 Start ---")
+            //     print(base64String)
+            //     print("--- RTFD Base64 End ---")
+            // }
 
-            if isDragging {
-                NewNoteIndicatorView(translation: dragOffset, location: dragLocation)
+            if settings.newNoteIndicatorGestureEnabled {
+                NewNoteIndicatorView(
+                    translation: dragOffset,
+                    location: dragLocation,
+                    isDragging: isDragging,
+                    dragActivationPoint: dragActivationPoint,
+                )
             }
 
-            VStack {
-                HStack {
-                    ScrollToTopButton(
-                        action: { coordinatorHolder.coordinator?.scrollToTop() },
-                        isAtTop: isAtTop,
-                        canScroll: canScroll,
-                    )
-                    .padding(16)
+            if settings.dismissNoteGestureEnabled {
+                DismissNoteIndicatorView(
+                    translation: dismissDragOffset,
+                    location: dismissDragLocation,
+                    isDragging: isDismissing,
+                    dragActivationPoint: dragActivationPoint,
+                )
+            }
 
-                    Spacer()
+            if isPreview != true {
+                VStack {
+                    HStack {
+                        ScrollToTopButton(
+                            action: { coordinatorHolder.coordinator?.scrollToTop() },
+                            isAtTop: isAtTop,
+                            canScroll: canScroll,
+                        )
+                        .padding(16)
 
-                    Button(action: {
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.title)
-                            .foregroundColor(.gray)
-                            .padding()
-                            .opacity(0.5)
+                        Spacer()
+
+                        Button(action: {
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                            dismiss()
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.title)
+                                .foregroundColor(.gray)
+                                .padding()
+                                .opacity(0.5)
+                        }
+                        .padding(16)
                     }
-                    .padding(16)
+                    Spacer()
                 }
-                Spacer()
             }
         }
         .gesture(
-            DragGesture(minimumDistance: 25, coordinateSpace: .global)
+            DragGesture(minimumDistance: 15, coordinateSpace: .global)
                 .onChanged { value in
-                    // Only activate if the drag starts from the right edge of the screen
-                    if value.startLocation.x > UIScreen.main.bounds.width - 50 {
-                        // Set the location first
+                    let screenWidth = UIScreen.main.bounds.width
+                    let startX = value.startLocation.x
+
+                    // Edge detection: within 15pt from edges
+                    let rightEdgeActive = settings.newNoteIndicatorGestureEnabled &&
+                                        startX > screenWidth - 15
+
+                    let leftEdgeActive = settings.dismissNoteGestureEnabled &&
+                                       startX < 15
+
+                    // Ensure mutual exclusivity - only one gesture at a time
+                    if rightEdgeActive && !isDismissing {
                         dragOffset = value.translation
                         dragLocation = value.location
-
-                        // Then animate the appearance if it's not already visible
                         if !isDragging {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isDragging = true
-                            }
+                            isDragging = true
                         }
+                    } else if !isDragging {
+                        isDragging = false
+                        dragOffset = .zero
+                        dragLocation = .zero
+                    }
+
+                    if leftEdgeActive && !isDragging {
+                        dismissDragOffset = value.translation
+                        dismissDragLocation = value.location
+                        if !isDismissing {
+                            isDismissing = true
+                        }
+                    } else if !isDismissing {
+                        isDismissing = false
+                        dismissDragOffset = .zero
+                        dismissDragLocation = .zero
                     }
                 }
                 .onEnded { value in
-                    if isDragging, value.translation.width < -100 { // Swipe left
+                    // Handle right edge gesture
+                    if isDragging, value.translation.width < -dragActivationPoint {
                         let newNote = Note()
                         context.insert(newNote)
                         selectedNoteID = newNote.id
                     }
-                    // Reset drag state
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isDragging = false
+
+                    // Handle left edge gesture
+                    if isDismissing, value.translation.width > dragActivationPoint {
+                        dismiss()
                     }
+
+                    // Reset all drag states
+                    isDragging = false
                     dragOffset = .zero
                     dragLocation = .zero
+                    isDismissing = false
+                    dismissDragOffset = .zero
+                    dismissDragLocation = .zero
                 }
         )
         .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea()
         .overlay(
             EditorToolbarOverlay(
+                isPreview: isPreview == true,
                 keyboard: keyboard,
                 settings: settings,
                 onBold: { coordinatorHolder.coordinator?.toggleAttribute(.bold) },
@@ -217,10 +281,8 @@ struct NoteView: View {
                 onDismiss: {
                     dismiss()
                 },
-                onNewNote: {
-                    let newNote = Note()
-                    context.insert(newNote)
-                    selectedNoteID = newNote.id
+                onAddParagraph: {
+                    coordinatorHolder.coordinator?.triggerReplyAction(fromButton: true)
                 },
                 hideKeyboard: {
                     coordinatorHolder.coordinator?.hideKeyboard()

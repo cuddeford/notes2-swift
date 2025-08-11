@@ -19,12 +19,24 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section(header: Text("Appearance")) {
+                Picker("Accent Color", selection: $settings.accentColor) {
+                    ForEach(AppSettings.availableColors.keys.sorted(), id: \.self) { colorName in
+                        Text(colorName).tag(colorName)
+                    }
+                }
+                .tint(color(from: settings.accentColor))
+                .id(settings.accentColor)
+
+                Stepper("Recent notes: \(settings.recentsCount)", value: $settings.recentsCount, in: 1...10)
+            }
+
             Section {
                 Toggle(isOn: $newNoteWithBigFont) {
                     Text("Text size defaults to: ") + Text(newNoteWithBigFont ? "Big" : "Normal").fontWeight(.bold)
                 }
             } header: {
-               Text("Editor")
+               Text("Notepad")
             } footer: {
                 Text("When enabled, new notes will begin with a larger default font size. This can help to make your thoughts feel more immediate.")
                     .font(.caption)
@@ -33,34 +45,60 @@ struct SettingsView: View {
 
             Section {
                 Toggle(isOn: isDefaultSpacingRelated) {
-                    Text("Paragraphs default to: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)
+                    Text("Thoughts start: ") + Text(settings.defaultParagraphSpacing == AppSettings.relatedParagraphSpacing ? "Related" : "Unrelated").fontWeight(.bold)
                 }
             } footer: {
-                Text("Controls the default spacing between paragraphs when you create a new note. Pinch two paragraphs to mark them as related or unrelated.")
+                Text("Controls the default spacing between thoughts when you start a new note. Pinch two thoughts together or apart to mark them as related or unrelated.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
             Section {
-                Toggle("Enable paragraph overlays", isOn: $settings.paragraphOverlaysEnabled)
+                Toggle("Thought bubbles", isOn: $settings.paragraphOverlaysEnabled)
             } footer: {
-                Text("Shows visual boundaries around paragraphs, like thought bubbles.")
+                Text("Shows visual boundaries around thoughts.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
             Section {
-                Toggle("Magnetic Scrolling", isOn: $settings.magneticScrollingEnabled)
+                Toggle("Magnetic scrolling", isOn: $settings.magneticScrollingEnabled)
             } footer: {
-                Text("Snaps the current paragraph to the top of the screen when scrolling.")
+                Text("Snap a thought to the top of the screen when scrolling.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
             Section {
-                Toggle("Drag to Reorder Paragraphs", isOn: $settings.dragToReorderParagraphEnabled)
+                Toggle("Create new note", isOn: $settings.newNoteIndicatorGestureEnabled)
+            } header: {
+               Text("Gestures")
             } footer: {
-                Text("Reorder paragraphs by long-pressing and dragging them. (Work in Progress)")
+                Text("Swipe from right edge of screen inside a note to create a new note.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
+            Section {
+                Toggle("Dismiss note", isOn: $settings.dismissNoteGestureEnabled)
+            } footer: {
+                Text("Swipe from left edge of screen inside a note to dismiss.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
+            Section {
+                Toggle("Open last note", isOn: $settings.lastNoteIndicatorGestureEnabled)
+            } footer: {
+                Text("Swipe from right edge of screen on notes list to open most recent note.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
+            Section {
+                Toggle("Drag to reorder thoughts", isOn: $settings.dragToReorderParagraphEnabled)
+            } footer: {
+                Text("Reorder thoughts by long-pressing and dragging them.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }

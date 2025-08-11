@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct EditorToolbarOverlay: View {
+    var isPreview: Bool
     @ObservedObject var keyboard: KeyboardObserver
     @ObservedObject var settings: AppSettings
     var onBold: () -> Void
@@ -21,7 +22,7 @@ struct EditorToolbarOverlay: View {
     var canScroll: Bool
     var isAtTop: Bool
     var onDismiss: () -> Void
-    var onNewNote: () -> Void
+    var onAddParagraph: () -> Void
     var hideKeyboard: () -> Void
 
     private var isLandscape: Bool {
@@ -49,12 +50,14 @@ struct EditorToolbarOverlay: View {
         VStack {
             Spacer()
             VStack() {
-                HStack() {
-                    Spacer()
-                    ScrollToBottomButton(action: onScrollToBottom)
-                        .padding(16)
+                if !isPreview {
+                    HStack() {
+                        Spacer()
+                        ScrollToBottomButton(action: onScrollToBottom)
+                            .padding(16)
+                    }
+                    .opacity((isAtBottom || !canScroll) ? 0 : 1)
                 }
-                .opacity((isAtBottom || !canScroll) ? 0 : 1)
 
                 if keyboard.keyboardHeight > 0 {
                     EditorToolbar(
@@ -65,7 +68,7 @@ struct EditorToolbarOverlay: View {
                         onTitle2: onTitle2,
                         onBody: onBody,
                         onDismiss: onDismiss,
-                        onNewNote: onNewNote,
+                        onAddParagraph: onAddParagraph,
                         isAtTop: isAtTop,
                         hideKeyboard: hideKeyboard,
                         settings: settings,

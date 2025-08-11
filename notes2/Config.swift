@@ -42,6 +42,37 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(paragraphOverlaysEnabled, forKey: "paragraphOverlaysEnabled") }
     }
 
+    @Published var newNoteIndicatorGestureEnabled: Bool {
+        didSet { UserDefaults.standard.set(newNoteIndicatorGestureEnabled, forKey: "newNoteIndicatorGestureEnabled") }
+    }
+
+    @Published var lastNoteIndicatorGestureEnabled: Bool {
+        didSet { UserDefaults.standard.set(lastNoteIndicatorGestureEnabled, forKey: "lastNoteIndicatorGestureEnabled") }
+    }
+
+    @Published var dismissNoteGestureEnabled: Bool {
+        didSet { UserDefaults.standard.set(dismissNoteGestureEnabled, forKey: "dismissNoteGestureEnabled") }
+    }
+
+    @Published var recentsCount: Int {
+        didSet { UserDefaults.standard.set(recentsCount, forKey: "recentsCount") }
+    }
+
+    @Published var accentColor: String {
+        didSet { UserDefaults.standard.set(accentColor, forKey: "accentColor") }
+    }
+
+    static let availableColors: [String: Color] = [
+        "Default": Color.accentColor,
+        "Blue": .blue,
+        "Green": .green,
+        "Orange": .orange,
+        "Pink": .pink,
+        "Purple": .purple,
+        "Red": .red,
+        "Yellow": .yellow
+    ]
+
     static func registerDefaults() {
         let defaults: [String: Any] = [
             "recentsVisible": true,
@@ -49,11 +80,16 @@ class AppSettings: ObservableObject {
             "pinnedVisible": true,
             "newNoteWithBigFont": true,
             "magneticScrollingEnabled": false,
-            "dragToReorderParagraphEnabled": false,
+            "dragToReorderParagraphEnabled": true,
             "paragraphOverlaysEnabled": true,
-            "defaultParagraphSpacing": unrelatedParagraphSpacing,
+            "newNoteIndicatorGestureEnabled": true,
+            "lastNoteIndicatorGestureEnabled": false,
+            "dismissNoteGestureEnabled": true,
+            "recentsCount": 2,
+            "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
-            "padding": 20.0
+            "padding": 20.0,
+            "accentColor": "Default",
         ]
         UserDefaults.standard.register(defaults: defaults)
     }
@@ -71,5 +107,14 @@ class AppSettings: ObservableObject {
         self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? false
         self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false
         self.paragraphOverlaysEnabled = UserDefaults.standard.object(forKey: "paragraphOverlaysEnabled") as? Bool ?? true
+        self.newNoteIndicatorGestureEnabled = UserDefaults.standard.object(forKey: "newNoteIndicatorGestureEnabled") as? Bool ?? true
+        self.lastNoteIndicatorGestureEnabled = UserDefaults.standard.object(forKey: "lastNoteIndicatorGestureEnabled") as? Bool ?? true
+        self.dismissNoteGestureEnabled = UserDefaults.standard.object(forKey: "dismissNoteGestureEnabled") as? Bool ?? true
+        self.recentsCount = UserDefaults.standard.object(forKey: "recentsCount") as? Int ?? 2
+        self.accentColor = UserDefaults.standard.string(forKey: "accentColor") ?? "Default"
     }
+}
+
+func color(from string: String) -> Color {
+    return AppSettings.availableColors[string] ?? .accentColor
 }
