@@ -1808,7 +1808,10 @@ struct RichTextEditor: UIViewRepresentable {
         // MARK: - Reply Gesture Handling
 
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
-            guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture, !parent.isDismissSwipeGesture else { return }
+            guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture, !parent.isDismissSwipeGesture else {
+                cleanupReplyGesture()
+                return 
+            }
 
             let location = gesture.location(in: textView)
             let globalLocation = gesture.location(in: textView.window)
@@ -1818,6 +1821,7 @@ struct RichTextEditor: UIViewRepresentable {
             let edgeBuffer: CGFloat = 50 // Don't allow reply gesture within 15pt of edges
 
             if globalLocation.x < edgeBuffer || globalLocation.x > screenWidth - edgeBuffer {
+                cleanupReplyGesture()
                 return
             }
 
@@ -1826,9 +1830,10 @@ struct RichTextEditor: UIViewRepresentable {
                 handleReplyGestureBegan(location: location, textView: textView)
             case .changed:
                 handleReplyGestureChanged(gesture: gesture, textView: textView)
-            case .ended, .cancelled:
+            case .ended, .cancelled, .failed:
                 handleReplyGestureEnded(gesture: gesture, textView: textView)
             default:
+                cleanupReplyGesture()
                 break
             }
         }
@@ -1870,7 +1875,10 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { return }
+            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { 
+                cleanupReplyGesture()
+                return 
+            }
 
             let translation = gesture.translation(in: textView)
 
@@ -1985,29 +1993,40 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard replyGhostView != nil else { return }
+            guard replyGhostView != nil else { 
+                cleanupReplyGesture()
+                return 
+            }
+            
             let translation = gesture.translation(in: textView)
             let horizontalTranslation = swipeDirection == .right
                 ? min(max(0, translation.x), replyGestureThreshold)
                 : max(min(0, translation.x), -replyGestureThreshold)
 
             // Check hold-to-confirm completion for delete
+            var shouldAnimateCleanup = true
             if isHorizontalSwipe {
                 if swipeDirection == .right {
                     // Reply uses immediate confirmation
                     if abs(horizontalTranslation) >= replyGestureThreshold {
                         triggerReplyAction(for: replyGestureParagraphIndex)
+                        shouldAnimateCleanup = false // Don't animate when action is triggered
                     }
                 } else if swipeDirection == .left {
                     // Delete uses hold-to-confirm
                     if holdProgress >= 1.0 {
                         triggerDeleteAction()
+                        shouldAnimateCleanup = false // Don't animate when action is triggered
                     }
                 }
             }
 
-            // Cleanup
-            cleanupReplyGesture()
+            // Cleanup with animation only if no action was triggered
+            if shouldAnimateCleanup {
+                animateReplyGestureCleanup()
+            } else {
+                cleanupReplyGesture()
+            }
         }
 
         private func createReplyGhost(for paragraph: Paragraph, at index: Int, textView: UITextView) -> UIView? {
@@ -2268,32 +2287,32 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func cleanupReplyGesture() {
-            func cleanup() {
-                self.replyGhostView?.removeFromSuperview()
-                self.replyOverlayView?.removeFromSuperview()
-                self.replyGhostView = nil
-                self.replyOverlayView = nil
-                self.replyGestureParagraphIndex = nil
-                self.replyGestureInitialLocation = nil
-                self.hasTriggeredReplyHaptic = false
-                self.isHorizontalSwipe = false
-                self.swipeDirection = .none
-                self.isGestureActive = false
+            // Immediate cleanup - always ensure views are removed
+            replyGhostView?.removeFromSuperview()
+            replyOverlayView?.removeFromSuperview()
+            replyGhostView = nil
+            replyOverlayView = nil
+            replyGestureParagraphIndex = nil
+            replyGestureInitialLocation = nil
+            hasTriggeredReplyHaptic = false
+            isHorizontalSwipe = false
+            swipeDirection = .none
+            isGestureActive = false
 
-                // Reset hold-to-confirm state
-                self.isHolding = false
-                self.holdStartTime = nil
-                self.holdProgress = 0.0
-                self.holdProgressView = nil
+            // Reset hold-to-confirm state
+            isHolding = false
+            holdStartTime = nil
+            holdProgress = 0.0
+            holdProgressView = nil
 
-                // Stop display link
-                self.holdDisplayLink?.invalidate()
-                self.holdDisplayLink = nil
-            }
+            // Stop display link
+            holdDisplayLink?.invalidate()
+            holdDisplayLink = nil
+        }
 
+        private func animateReplyGestureCleanup() {
             guard let ghostView = replyGhostView, let overlayView = replyOverlayView else {
-                // Fallback to immediate cleanup if views don't exist
-                cleanup()
+                cleanupReplyGesture()
                 return
             }
 
@@ -2314,7 +2333,7 @@ struct RichTextEditor: UIViewRepresentable {
                     }
                 },
                 completion: { _ in
-                    cleanup()
+                    self.cleanupReplyGesture()
                 }
             )
         }
@@ -2355,6 +2374,20 @@ struct RichTextEditor: UIViewRepresentable {
 
 extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldFailSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Ensure cleanup happens when gesture fails
+        cleanupReplyGesture()
+        return false
+    }
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        // Clean up any existing gesture state when a new touch begins
+        if gestureRecognizer is UIPanGestureRecognizer {
+            cleanupReplyGesture()
+        }
         return true
     }
 }
