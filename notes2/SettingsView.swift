@@ -73,7 +73,11 @@ struct SettingsView: View {
                 Toggle("Create new note", isOn: $settings.newNoteIndicatorGestureEnabled)
                     .disabled(isIOS26)
             } header: {
-               Text("Gestures (need fixing on iOS 26)")
+                if isIOS26 {
+                    Text("Gestures (need fixing on iOS 26)")
+                } else {
+                    Text("Gestures")
+                }
             } footer: {
                 Text("Swipe from right edge of screen inside a note to create a new note.")
                     .font(.caption)
