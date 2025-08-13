@@ -22,5 +22,6 @@ struct ScrollToBottomButton: View {
                 .padding()
                 .opacity(0.5)
         }
+        .glassEffectIfAvailable()
     }
 }

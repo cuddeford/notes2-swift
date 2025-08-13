@@ -51,6 +51,7 @@ struct EditorToolbar: View {
                     .padding()
                     .opacity(0.5)
             }
+            .glassEffectIfAvailable()
 
             if isExpanded {
                 HStack {
@@ -63,6 +64,7 @@ struct EditorToolbar: View {
                                 .foregroundColor(.gray)
                                 .padding()
                         }
+                        .glassEffectIfAvailable()
 
                         Button(action: {
                             let generator = UIImpactFeedbackGenerator(style: .light)
@@ -74,6 +76,7 @@ struct EditorToolbar: View {
                                 .foregroundColor(.gray)
                                 .padding()
                         }
+                        .glassEffectIfAvailable()
                     }
                 }
                 .transition(
@@ -107,6 +110,7 @@ struct EditorToolbar: View {
                     .opacity(isExpanded ? 1 : 0.5)
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
             }
+            .glassEffectIfAvailable()
             .padding(.trailing, 4)
         }
         .padding(.horizontal)
