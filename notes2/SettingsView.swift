@@ -71,8 +71,9 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Create new note", isOn: $settings.newNoteIndicatorGestureEnabled)
+                    .disabled(isIOS26)
             } header: {
-               Text("Gestures")
+               Text("Gestures (need fixing on iOS 26)")
             } footer: {
                 Text("Swipe from right edge of screen inside a note to create a new note.")
                     .font(.caption)
@@ -81,6 +82,7 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Dismiss note", isOn: $settings.dismissNoteGestureEnabled)
+                    .disabled(isIOS26)
             } footer: {
                 Text("Swipe from left edge of screen inside a note to dismiss.")
                     .font(.caption)
@@ -89,6 +91,7 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Open last note", isOn: $settings.lastNoteIndicatorGestureEnabled)
+                    .disabled(isIOS26)
             } footer: {
                 Text("Swipe from right edge of screen on notes list to open most recent note.")
                     .font(.caption)
