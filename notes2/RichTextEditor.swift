@@ -98,6 +98,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         let swipeToReplyGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSwipeToReplyGesture(_:)))
         swipeToReplyGesture.delegate = context.coordinator
+        context.coordinator.replyPanGesture = swipeToReplyGesture
         textView.addGestureRecognizer(swipeToReplyGesture)
 
         context.coordinator.textView = textView
@@ -248,6 +249,7 @@ struct RichTextEditor: UIViewRepresentable {
         var parent: RichTextEditor
         weak var textView: UITextView?
         weak var ruledView: RuledView?
+        weak var replyPanGesture: UIPanGestureRecognizer?
         private var debounceWorkItem: DispatchWorkItem?
 
         private var initialSpacing: CGFloat?
@@ -1856,6 +1858,15 @@ struct RichTextEditor: UIViewRepresentable {
             replyGestureInitialLocation = location
             isGestureActive = true
 
+            // Temporarily disable scrolling during swipe gesture
+            guard Thread.isMainThread else {
+                DispatchQueue.main.async { [weak textView] in
+                    textView?.isScrollEnabled = false
+                    textView?.panGestureRecognizer.isEnabled = false
+                }
+                return
+            }
+
             // Create the ghost view from a snapshot of the original text
             guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
             self.replyGhostView = ghost
@@ -2311,6 +2322,12 @@ struct RichTextEditor: UIViewRepresentable {
             isGestureActive = false
             isReplyGestureValid = true
 
+            // Re-enable scrolling
+            if let tv = textView {
+                tv.isScrollEnabled = true
+                tv.panGestureRecognizer.isEnabled = true
+            }
+
             // Reset hold-to-confirm state
             isHolding = false
             holdStartTime = nil
@@ -2385,7 +2402,26 @@ struct RichTextEditor: UIViewRepresentable {
 }
 
 extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let reply = replyPanGesture, gestureRecognizer === reply, let pan = gestureRecognizer as? UIPanGestureRecognizer, let tv = textView {
+            // Allow reply pan unless it starts near vertical swipes or too close to edges
+            let translation = pan.translation(in: tv)
+            if abs(translation.y) > abs(translation.x) { return false }
+            let loc = pan.location(in: tv)
+            let edgeBuffer: CGFloat = 50
+            let screenWidth = UIScreen.main.bounds.width
+            if loc.x < edgeBuffer || loc.x > screenWidth - edgeBuffer { return false }
+            return true
+        }
+        return true
+    }
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let reply = replyPanGesture, let tv = textView {
+            if (gestureRecognizer === reply && otherGestureRecognizer === tv.panGestureRecognizer) || (otherGestureRecognizer === reply && gestureRecognizer === tv.panGestureRecognizer) {
+                return false
+            }
+        }
         return true
     }
 
