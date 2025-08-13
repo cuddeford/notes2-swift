@@ -18,12 +18,20 @@ struct ScrollToTopButton: View {
             generator.impactOccurred()
             action()
         }) {
-            Image(systemName: "arrow.right.to.line.compact")
+            if (isIOS26) {
+                Image(systemName: "arrow.up.to.line.compact")
                 .font(.title)
                 .foregroundColor(.gray)
                 .padding()
-                .rotationEffect(.degrees(-90))
                 .opacity(0.5)
+            } else {
+                Image(systemName: "arrow.right.to.line.compact")
+                    .font(.title)
+                    .foregroundColor(.gray)
+                    .padding()
+                    .rotationEffect(.degrees(-90))
+                    .opacity(0.5)
+            }
         }
         .glassEffectIfAvailable()
         .opacity((isAtTop || !canScroll) ? 0 : 1)
