@@ -35,14 +35,26 @@ struct EditorToolbarOverlay: View {
     private var toolbarBottomPadding: CGFloat {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
 
-        if isPad {
-            return isLandscape ?
-                max(keyboard.keyboardHeight - 120, 0) :
-                max(keyboard.keyboardHeight - 10, 70)
+        if isIOS26 {
+            if isPad {
+                return isLandscape ?
+                    max(keyboard.keyboardHeight - 120, 0) :
+                    max(keyboard.keyboardHeight - 10, 70)
+            } else {
+                return isLandscape ?
+                    max(keyboard.keyboardHeight - 100, 0) :
+                    max(keyboard.keyboardHeight - 20, 40)
+            }
         } else {
-            return isLandscape ?
-                max(keyboard.keyboardHeight - 100, 0) :
-                max(keyboard.keyboardHeight - 20, 40)
+            if isPad {
+                return isLandscape ?
+                    max(keyboard.keyboardHeight - 120, 0) :
+                    max(keyboard.keyboardHeight + 10, 80)
+            } else {
+                return isLandscape ?
+                    max(keyboard.keyboardHeight - 100, 0) :
+                    max(keyboard.keyboardHeight - 10, 60)
+            }
         }
     }
 
