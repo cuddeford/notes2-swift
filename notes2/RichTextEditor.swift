@@ -107,7 +107,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         context.coordinator.parseAttributedText(textView.attributedText)
 
-        DispatchQueue.main.async { // Ensure UI updates happen on the main thread
+        DispatchQueue.main.async { [self] in // Ensure UI updates happen on the main thread
             if !isPreview {
                 textView.becomeFirstResponder()
             }
@@ -515,7 +515,7 @@ struct RichTextEditor: UIViewRepresentable {
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
             let isAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 60.0
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
                     self.parent.canScroll = canScroll
                     self.parent.isAtBottom = isAtBottom
@@ -644,7 +644,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 let cursorLocation = textView.selectedRange.location
 
                 self.parent.text = textView.attributedText
@@ -658,6 +658,23 @@ struct RichTextEditor: UIViewRepresentable {
 
                     // Check if new paragraphs were added by comparing counts
                     if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
+                        // If a new paragraph was created at the very end, reset the previous (former last) paragraph's spacing to default
+                        if cursorLocation >= textView.text.count {
+                            let prevIndex = newParagraphs.count - 2
+                            if prevIndex >= 0 {
+                                let prevRange = newParagraphs[prevIndex].range
+                                if prevRange.location >= 0 && prevRange.length >= 0 && prevRange.location + prevRange.length <= textView.textStorage.length {
+                                    let newStyle = NSMutableParagraphStyle()
+                                    newStyle.setParagraphStyle(newParagraphs[prevIndex].paragraphStyle)
+                                    newStyle.paragraphSpacing = self.parent.settings.defaultParagraphSpacing
+                                    textView.textStorage.addAttribute(.paragraphStyle, value: newStyle, range: prevRange)
+                                    if let pIndex = paragraphs.firstIndex(where: { $0.range == prevRange }) {
+                                        paragraphs[pIndex].paragraphStyle = newStyle
+                                    }
+                                }
+                            }
+                        }
+
                         self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
                     }
                     // Also clean up animations if paragraphs were deleted
@@ -673,7 +690,7 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 self.parent.selectedRange = textView.selectedRange
                 self.updateTypingAttributes()
                 if textView.selectedRange.length == 0 {
@@ -1860,7 +1877,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Temporarily disable scrolling during swipe gesture
             guard Thread.isMainThread else {
-                DispatchQueue.main.async { [weak textView] in
+                DispatchQueue.main.async { [self, weak textView] in
                     textView?.isScrollEnabled = false
                     textView?.panGestureRecognizer.isEnabled = false
                 }
@@ -2248,7 +2265,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Update paragraphs and ensure cursor is visible
             self.parseAttributedText(mutableText)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 self.centerCursorInTextView()
                 // Show keyboard after caret is positioned
                 textView.becomeFirstResponder()
