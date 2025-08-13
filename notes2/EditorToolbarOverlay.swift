@@ -38,11 +38,11 @@ struct EditorToolbarOverlay: View {
         if isPad {
             return isLandscape ?
                 max(keyboard.keyboardHeight - 120, 0) :
-                max(keyboard.keyboardHeight + 10, 80)
+                max(keyboard.keyboardHeight - 10, 70)
         } else {
             return isLandscape ?
                 max(keyboard.keyboardHeight - 100, 0) :
-                max(keyboard.keyboardHeight - 10, 60)
+                max(keyboard.keyboardHeight - 20, 40)
         }
     }
 
