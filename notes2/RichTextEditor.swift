@@ -320,6 +320,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var hasTriggeredReplyHaptic = false
         private var isHorizontalSwipe = false
         private var swipeDirection: SwipeDirection = .none
+        private var isReplyGestureValid = true
 
         // Hold-to-confirm state
         private var holdStartTime: CFTimeInterval?
@@ -1816,21 +1817,31 @@ struct RichTextEditor: UIViewRepresentable {
             let location = gesture.location(in: textView)
             let globalLocation = gesture.location(in: textView.window)
 
-            // Prevent reply gesture from activating near edges where dismiss/new gestures work
-            let screenWidth = UIScreen.main.bounds.width
-            let edgeBuffer: CGFloat = 50 // Don't allow reply gesture within 15pt of edges
-
-            if globalLocation.x < edgeBuffer || globalLocation.x > screenWidth - edgeBuffer {
-                cleanupReplyGesture()
-                return
-            }
-
             switch gesture.state {
             case .began:
-                handleReplyGestureBegan(location: location, textView: textView)
+                // Prevent reply gesture from activating near edges where dismiss/new gestures work
+                let screenWidth = UIScreen.main.bounds.width
+                let edgeBuffer: CGFloat = 50 // Don't allow reply gesture within 50pt of edges
+                
+                if globalLocation.x < edgeBuffer || globalLocation.x > screenWidth - edgeBuffer {
+                    isReplyGestureValid = false
+                    cleanupReplyGesture()
+                    return
+                } else {
+                    isReplyGestureValid = true
+                    handleReplyGestureBegan(location: location, textView: textView)
+                }
             case .changed:
+                guard isReplyGestureValid else {
+                    cleanupReplyGesture()
+                    return
+                }
                 handleReplyGestureChanged(gesture: gesture, textView: textView)
             case .ended, .cancelled, .failed:
+                guard isReplyGestureValid else {
+                    cleanupReplyGesture()
+                    return
+                }
                 handleReplyGestureEnded(gesture: gesture, textView: textView)
             default:
                 cleanupReplyGesture()
@@ -2298,6 +2309,7 @@ struct RichTextEditor: UIViewRepresentable {
             isHorizontalSwipe = false
             swipeDirection = .none
             isGestureActive = false
+            isReplyGestureValid = true
 
             // Reset hold-to-confirm state
             isHolding = false
