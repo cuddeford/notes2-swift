@@ -1810,7 +1810,7 @@ struct RichTextEditor: UIViewRepresentable {
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
             guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture, !parent.isDismissSwipeGesture else {
                 cleanupReplyGesture()
-                return 
+                return
             }
 
             let location = gesture.location(in: textView)
@@ -1875,9 +1875,9 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { 
+            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else {
                 cleanupReplyGesture()
-                return 
+                return
             }
 
             let translation = gesture.translation(in: textView)
@@ -1993,11 +1993,11 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard replyGhostView != nil else { 
+            guard replyGhostView != nil else {
                 cleanupReplyGesture()
-                return 
+                return
             }
-            
+
             let translation = gesture.translation(in: textView)
             let horizontalTranslation = swipeDirection == .right
                 ? min(max(0, translation.x), replyGestureThreshold)
@@ -2376,13 +2376,13 @@ extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return true
     }
-    
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldFailSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         // Ensure cleanup happens when gesture fails
         cleanupReplyGesture()
         return false
     }
-    
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         // Clean up any existing gesture state when a new touch begins
         if gestureRecognizer is UIPanGestureRecognizer {
