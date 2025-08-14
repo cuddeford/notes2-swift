@@ -98,6 +98,7 @@ struct RichTextEditor: UIViewRepresentable {
 
         let swipeToReplyGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSwipeToReplyGesture(_:)))
         swipeToReplyGesture.delegate = context.coordinator
+        context.coordinator.replyPanGesture = swipeToReplyGesture
         textView.addGestureRecognizer(swipeToReplyGesture)
 
         context.coordinator.textView = textView
@@ -106,20 +107,25 @@ struct RichTextEditor: UIViewRepresentable {
 
         context.coordinator.parseAttributedText(textView.attributedText)
 
-        DispatchQueue.main.async { // Ensure UI updates happen on the main thread
+        let isPreview = self.isPreview
+        let coordinator = context.coordinator
+        DispatchQueue.main.async { [weak coordinator, weak textView] in
+            guard let coordinator = coordinator, let textView = textView else { return }
             if !isPreview {
                 textView.becomeFirstResponder()
             }
 
-            context.coordinator.parseAttributedText(textView.attributedText)
+            coordinator.parseAttributedText(textView.attributedText)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            context.coordinator.parseAttributedText(textView.attributedText)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak coordinator, weak textView] in
+            guard let coordinator = coordinator, let textView = textView else { return }
+            coordinator.parseAttributedText(textView.attributedText)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            context.coordinator.parseAttributedText(textView.attributedText)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak coordinator, weak textView] in
+            guard let coordinator = coordinator, let textView = textView else { return }
+            coordinator.parseAttributedText(textView.attributedText)
         }
 
         return textView
@@ -248,6 +254,7 @@ struct RichTextEditor: UIViewRepresentable {
         var parent: RichTextEditor
         weak var textView: UITextView?
         weak var ruledView: RuledView?
+        weak var replyPanGesture: UIPanGestureRecognizer?
         private var debounceWorkItem: DispatchWorkItem?
 
         private var initialSpacing: CGFloat?
@@ -320,6 +327,7 @@ struct RichTextEditor: UIViewRepresentable {
         private var hasTriggeredReplyHaptic = false
         private var isHorizontalSwipe = false
         private var swipeDirection: SwipeDirection = .none
+        private var isReplyGestureValid = true
 
         // Hold-to-confirm state
         private var holdStartTime: CFTimeInterval?
@@ -500,6 +508,11 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            // Allow scrolling during drag-to-reorder but prevent during reply gesture
+            if isGestureActive && !isDragging {
+                return
+            }
+            
             updateParagraphSpatialProperties()
             self.contentOffset = scrollView.contentOffset
             ruledView?.setNeedsDisplay()
@@ -512,7 +525,8 @@ struct RichTextEditor: UIViewRepresentable {
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
             let isAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 60.0
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
                 if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
                     self.parent.canScroll = canScroll
                     self.parent.isAtBottom = isAtBottom
@@ -620,6 +634,15 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            // Prevent scrolling if a reply gesture is active (but not drag-to-reorder)
+            if isGestureActive && !isDragging {
+                scrollView.panGestureRecognizer.isEnabled = false
+                DispatchQueue.main.async {
+                    scrollView.panGestureRecognizer.isEnabled = true
+                }
+                return
+            }
+            
             isUserDragging = true
         }
 
@@ -641,7 +664,8 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self = self, let textView = textView else { return }
                 let cursorLocation = textView.selectedRange.location
 
                 self.parent.text = textView.attributedText
@@ -655,6 +679,23 @@ struct RichTextEditor: UIViewRepresentable {
 
                     // Check if new paragraphs were added by comparing counts
                     if newParagraphs.count > oldParagraphs.count && oldParagraphs.count > 0 {
+                        // If a new paragraph was created at the very end, reset the previous (former last) paragraph's spacing to default
+                        if cursorLocation >= textView.text.count {
+                            let prevIndex = newParagraphs.count - 2
+                            if prevIndex >= 0 {
+                                let prevRange = newParagraphs[prevIndex].range
+                                if prevRange.location >= 0 && prevRange.length >= 0 && prevRange.location + prevRange.length <= textView.textStorage.length {
+                                    let newStyle = NSMutableParagraphStyle()
+                                    newStyle.setParagraphStyle(newParagraphs[prevIndex].paragraphStyle)
+                                    newStyle.paragraphSpacing = self.parent.settings.defaultParagraphSpacing
+                                    textView.textStorage.addAttribute(.paragraphStyle, value: newStyle, range: prevRange)
+                                    if let pIndex = self.paragraphs.firstIndex(where: { $0.range == prevRange }) {
+                                        self.paragraphs[pIndex].paragraphStyle = newStyle
+                                    }
+                                }
+                            }
+                        }
+
                         self.animateNewParagraphSpacing(cursorLocation: cursorLocation)
                     }
                     // Also clean up animations if paragraphs were deleted
@@ -670,7 +711,8 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self = self, let textView = textView else { return }
                 self.parent.selectedRange = textView.selectedRange
                 self.updateTypingAttributes()
                 if textView.selectedRange.length == 0 {
@@ -1810,27 +1852,37 @@ struct RichTextEditor: UIViewRepresentable {
         @objc func handleSwipeToReplyGesture(_ gesture: UIPanGestureRecognizer) {
             guard let textView = textView, !isDragging, !isPinching, !parent.isNewNoteSwipeGesture, !parent.isDismissSwipeGesture else {
                 cleanupReplyGesture()
-                return 
+                return
             }
 
             let location = gesture.location(in: textView)
             let globalLocation = gesture.location(in: textView.window)
 
-            // Prevent reply gesture from activating near edges where dismiss/new gestures work
-            let screenWidth = UIScreen.main.bounds.width
-            let edgeBuffer: CGFloat = 50 // Don't allow reply gesture within 15pt of edges
-
-            if globalLocation.x < edgeBuffer || globalLocation.x > screenWidth - edgeBuffer {
-                cleanupReplyGesture()
-                return
-            }
-
             switch gesture.state {
             case .began:
-                handleReplyGestureBegan(location: location, textView: textView)
+                // Prevent reply gesture from activating near edges where dismiss/new gestures work
+                let screenWidth = UIScreen.main.bounds.width
+                let edgeBuffer: CGFloat = 50 // Don't allow reply gesture within 50pt of edges
+                
+                if globalLocation.x < edgeBuffer || globalLocation.x > screenWidth - edgeBuffer {
+                    isReplyGestureValid = false
+                    cleanupReplyGesture()
+                    return
+                } else {
+                    isReplyGestureValid = true
+                    handleReplyGestureBegan(location: location, textView: textView)
+                }
             case .changed:
+                guard isReplyGestureValid else {
+                    cleanupReplyGesture()
+                    return
+                }
                 handleReplyGestureChanged(gesture: gesture, textView: textView)
             case .ended, .cancelled, .failed:
+                guard isReplyGestureValid else {
+                    cleanupReplyGesture()
+                    return
+                }
                 handleReplyGestureEnded(gesture: gesture, textView: textView)
             default:
                 cleanupReplyGesture()
@@ -1875,9 +1927,9 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureChanged(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else { 
+            guard let ghostView = replyGhostView, let paragraphIndex = replyGestureParagraphIndex else {
                 cleanupReplyGesture()
-                return 
+                return
             }
 
             let translation = gesture.translation(in: textView)
@@ -1993,11 +2045,11 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         private func handleReplyGestureEnded(gesture: UIPanGestureRecognizer, textView: UITextView) {
-            guard replyGhostView != nil else { 
+            guard replyGhostView != nil else {
                 cleanupReplyGesture()
-                return 
+                return
             }
-            
+
             let translation = gesture.translation(in: textView)
             let horizontalTranslation = swipeDirection == .right
                 ? min(max(0, translation.x), replyGestureThreshold)
@@ -2226,7 +2278,8 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Update paragraphs and ensure cursor is visible
             self.parseAttributedText(mutableText)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self = self, let textView = textView else { return }
                 self.centerCursorInTextView()
                 // Show keyboard after caret is positioned
                 textView.becomeFirstResponder()
@@ -2298,6 +2351,7 @@ struct RichTextEditor: UIViewRepresentable {
             isHorizontalSwipe = false
             swipeDirection = .none
             isGestureActive = false
+            isReplyGestureValid = true
 
             // Reset hold-to-confirm state
             isHolding = false
@@ -2373,21 +2427,89 @@ struct RichTextEditor: UIViewRepresentable {
 }
 
 extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let reply = replyPanGesture, gestureRecognizer === reply, let pan = gestureRecognizer as? UIPanGestureRecognizer, let tv = textView {
+            // Allow reply pan unless it starts near vertical swipes or too close to edges
+            let translation = pan.translation(in: tv)
+            if abs(translation.y) > abs(translation.x) { return false }
+            let loc = pan.location(in: tv)
+            let edgeBuffer: CGFloat = 50
+            let screenWidth = UIScreen.main.bounds.width
+            if loc.x < edgeBuffer || loc.x > screenWidth - edgeBuffer { return false }
+            return true
+        }
         return true
     }
-    
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let reply = replyPanGesture, let tv = textView {
+            // Prevent the scroll view's pan gesture from interfering with our reply gesture
+            if (gestureRecognizer === reply && otherGestureRecognizer === tv.panGestureRecognizer) || 
+               (otherGestureRecognizer === reply && gestureRecognizer === tv.panGestureRecognizer) {
+                return false
+            }
+        }
+        return true
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Our reply gesture should wait for text selection gestures to fail
+        if let reply = replyPanGesture, gestureRecognizer === reply {
+            // Check if the other gesture recognizer is a text selection gesture
+            // Text selection gestures are typically built-in UITextView gestures
+            let otherClass = NSStringFromClass(type(of: otherGestureRecognizer))
+            if otherClass.contains("UITextSelection") || otherClass.contains("UIKeyboard") {
+                return true
+            }
+        }
+        return false
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return false
+    }
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldFailSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         // Ensure cleanup happens when gesture fails
         cleanupReplyGesture()
         return false
     }
-    
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        // Clean up any existing gesture state when a new touch begins
-        if gestureRecognizer is UIPanGestureRecognizer {
+        // Prevent our reply gesture from interfering with text selection
+        if let reply = replyPanGesture, gestureRecognizer === reply {
+            // Check if the touch is on a caret or selection handle
+            let location = touch.location(in: textView)
+            
+            // Get the touch bounds for selection handles
+            if let tv = textView {
+                // Check if touch is near the caret or selection handles
+                let caretRect = tv.caretRect(for: tv.selectedTextRange?.end ?? tv.beginningOfDocument)
+                let expandedCaretRect = caretRect.insetBy(dx: -20, dy: -20)
+                
+                if expandedCaretRect.contains(location) {
+                    return false
+                }
+                
+                // Also check for selection handles if there's a selection
+                if let selectedRange = tv.selectedTextRange, !selectedRange.isEmpty {
+                    let startRect = tv.caretRect(for: selectedRange.start)
+                    let endRect = tv.caretRect(for: selectedRange.end)
+                    let expandedStartRect = startRect.insetBy(dx: -20, dy: -20)
+                    let expandedEndRect = endRect.insetBy(dx: -20, dy: -20)
+                    
+                    if expandedStartRect.contains(location) || expandedEndRect.contains(location) {
+                        return false
+                    }
+                }
+            }
+        }
+        
+        // Clean up any existing gesture state when a new touch begins (for other gestures)
+        if gestureRecognizer is UIPanGestureRecognizer && gestureRecognizer != replyPanGesture {
             cleanupReplyGesture()
         }
+        
         return true
     }
 }

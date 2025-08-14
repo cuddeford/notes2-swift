@@ -7,6 +7,19 @@ struct SettingsView: View {
     @AppStorage("historyVisible") private var historyVisible = true
     @AppStorage("pinnedVisible") private var pinnedVisible = true
     @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
+    @State private var customColor: Color
+
+    init() {
+        if let components = UserDefaults.standard.dictionary(forKey: "customAccentColor"),
+           let red = components["red"] as? Double,
+           let green = components["green"] as? Double,
+           let blue = components["blue"] as? Double,
+           let opacity = components["opacity"] as? Double {
+            self._customColor = State(initialValue: Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity))
+        } else {
+            self._customColor = State(initialValue: Color.accentColor)
+        }
+    }
 
     private var isDefaultSpacingRelated: Binding<Bool> {
         Binding<Bool>(
@@ -20,13 +33,32 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section(header: Text("Appearance")) {
-                Picker("Accent Color", selection: $settings.accentColor) {
-                    ForEach(AppSettings.availableColors.keys.sorted(), id: \.self) { colorName in
-                        Text(colorName).tag(colorName)
+                HStack {
+                    Text("Accent Color")
+                    Spacer()
+
+                    Picker("Accent Color", selection: $settings.accentColor) {
+                        Text("Default").tag("Default")
+                        Text("Custom").tag("Custom")
+                        Divider()
+                        ForEach(AppSettings.availableColors.keys.sorted().filter { $0 != "Default" && $0 != "Custom" }, id: \.self) { colorName in
+                            Text(colorName).tag(colorName)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                 }
-                .tint(color(from: settings.accentColor))
-                .id(settings.accentColor)
+
+                if settings.accentColor == "Custom" {
+                    ColorPicker("Custom Color", selection: $customColor)
+                        .onChange(of: customColor) { oldValue, newValue in
+                            if let components = newValue.cgColor?.components {
+                                let userDefaults = UserDefaults.standard
+                                userDefaults.set(["red": components[0], "green": components[1], "blue": components[2], "opacity": components[3]], forKey: "customAccentColor")
+                                settings.accentColor = "Custom"
+                            }
+                        }
+                }
 
                 Stepper("Recent notes: \(settings.recentsCount)", value: $settings.recentsCount, in: 1...10)
             }
@@ -55,6 +87,13 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Thought bubbles", isOn: $settings.paragraphOverlaysEnabled)
+                HStack {
+                    Text("Thought bubble corners")
+                    Spacer()
+                    Text("\(Int(settings.overlayCornerRadius))pt")
+                        .foregroundColor(.gray)
+                }
+                Slider(value: $settings.overlayCornerRadius, in: 0...30, step: 1)
             } footer: {
                 Text("Shows visual boundaries around thoughts.")
                     .font(.caption)
@@ -71,8 +110,13 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Create new note", isOn: $settings.newNoteIndicatorGestureEnabled)
+                    .disabled(isIOS26)
             } header: {
-               Text("Gestures")
+                if isIOS26 {
+                    Text("Gestures (need fixing on iOS 26)")
+                } else {
+                    Text("Gestures")
+                }
             } footer: {
                 Text("Swipe from right edge of screen inside a note to create a new note.")
                     .font(.caption)
@@ -81,6 +125,7 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Dismiss note", isOn: $settings.dismissNoteGestureEnabled)
+                    .disabled(isIOS26)
             } footer: {
                 Text("Swipe from left edge of screen inside a note to dismiss.")
                     .font(.caption)
@@ -89,6 +134,7 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Open last note", isOn: $settings.lastNoteIndicatorGestureEnabled)
+                    .disabled(isIOS26)
             } footer: {
                 Text("Swipe from right edge of screen on notes list to open most recent note.")
                     .font(.caption)

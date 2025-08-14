@@ -301,3 +301,24 @@ extension UUID: Identifiable {
 extension Notification.Name {
     static let sidebarStateChanged = Notification.Name("SidebarStateChangedNotification")
 }
+
+let isIOS26: Bool = {
+    if #available(iOS 26.0, *) {
+        return true
+    }
+    return false
+}()
+
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(
+        _ condition: Bool,
+        transform: (Self) -> Content
+    ) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+}

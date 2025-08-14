@@ -193,6 +193,7 @@ struct NoteView: View {
                                 .padding()
                                 .opacity(0.5)
                         }
+                        .glassEffectIfAvailable()
                         .padding(16)
                     }
                     Spacer()
