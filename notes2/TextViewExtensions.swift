@@ -65,6 +65,23 @@ class CustomTextView: UITextView {
 
         super.scrollRectToVisible(rect, animated: animated)
     }
+    
+    // Override setContentOffset to prevent programmatic scrolling during gestures
+    override var contentOffset: CGPoint {
+        get {
+            return super.contentOffset
+        }
+        set {
+            // Allow setting contentOffset normally unless a gesture is active
+            if coordinator?.isPinching == true || 
+               coordinator?.isDragging == true || 
+               coordinator?.isGestureActive == true {
+                // Don't allow content offset changes during active gestures
+                return
+            }
+            super.contentOffset = newValue
+        }
+    }
 }
 
 class CustomTextSelectionRect: UITextSelectionRect {

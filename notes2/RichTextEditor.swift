@@ -508,6 +508,11 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            // Prevent updates during active gestures to avoid interference with overlays
+            if isGestureActive {
+                return
+            }
+            
             updateParagraphSpatialProperties()
             self.contentOffset = scrollView.contentOffset
             ruledView?.setNeedsDisplay()
@@ -629,6 +634,15 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            // Prevent scrolling if a reply gesture is active
+            if isGestureActive {
+                scrollView.panGestureRecognizer.isEnabled = false
+                DispatchQueue.main.async {
+                    scrollView.panGestureRecognizer.isEnabled = true
+                }
+                return
+            }
+            
             isUserDragging = true
         }
 
@@ -1883,15 +1897,6 @@ struct RichTextEditor: UIViewRepresentable {
             replyGestureInitialLocation = location
             isGestureActive = true
 
-            // Temporarily disable scrolling during swipe gesture
-            guard Thread.isMainThread else {
-                DispatchQueue.main.async { [weak textView] in
-                    textView?.isScrollEnabled = false
-                    textView?.panGestureRecognizer.isEnabled = false
-                }
-                return
-            }
-
             // Create the ghost view from a snapshot of the original text
             guard let ghost = createReplyGhost(for: paragraphs[index], at: index, textView: textView) else { return }
             self.replyGhostView = ghost
@@ -2348,12 +2353,6 @@ struct RichTextEditor: UIViewRepresentable {
             isGestureActive = false
             isReplyGestureValid = true
 
-            // Re-enable scrolling
-            if let tv = textView {
-                tv.isScrollEnabled = true
-                tv.panGestureRecognizer.isEnabled = true
-            }
-
             // Reset hold-to-confirm state
             isHolding = false
             holdStartTime = nil
@@ -2444,11 +2443,30 @@ extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         if let reply = replyPanGesture, let tv = textView {
-            if (gestureRecognizer === reply && otherGestureRecognizer === tv.panGestureRecognizer) || (otherGestureRecognizer === reply && gestureRecognizer === tv.panGestureRecognizer) {
+            // Prevent the scroll view's pan gesture from interfering with our reply gesture
+            if (gestureRecognizer === reply && otherGestureRecognizer === tv.panGestureRecognizer) || 
+               (otherGestureRecognizer === reply && gestureRecognizer === tv.panGestureRecognizer) {
                 return false
             }
         }
         return true
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Our reply gesture should wait for text selection gestures to fail
+        if let reply = replyPanGesture, gestureRecognizer === reply {
+            // Check if the other gesture recognizer is a text selection gesture
+            // Text selection gestures are typically built-in UITextView gestures
+            let otherClass = NSStringFromClass(type(of: otherGestureRecognizer))
+            if otherClass.contains("UITextSelection") || otherClass.contains("UIKeyboard") {
+                return true
+            }
+        }
+        return false
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return false
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldFailSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -2458,10 +2476,40 @@ extension RichTextEditor.Coordinator: UIGestureRecognizerDelegate {
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        // Clean up any existing gesture state when a new touch begins
-        if gestureRecognizer is UIPanGestureRecognizer {
+        // Prevent our reply gesture from interfering with text selection
+        if let reply = replyPanGesture, gestureRecognizer === reply {
+            // Check if the touch is on a caret or selection handle
+            let location = touch.location(in: textView)
+            
+            // Get the touch bounds for selection handles
+            if let tv = textView {
+                // Check if touch is near the caret or selection handles
+                let caretRect = tv.caretRect(for: tv.selectedTextRange?.end ?? tv.beginningOfDocument)
+                let expandedCaretRect = caretRect.insetBy(dx: -20, dy: -20)
+                
+                if expandedCaretRect.contains(location) {
+                    return false
+                }
+                
+                // Also check for selection handles if there's a selection
+                if let selectedRange = tv.selectedTextRange, !selectedRange.isEmpty {
+                    let startRect = tv.caretRect(for: selectedRange.start)
+                    let endRect = tv.caretRect(for: selectedRange.end)
+                    let expandedStartRect = startRect.insetBy(dx: -20, dy: -20)
+                    let expandedEndRect = endRect.insetBy(dx: -20, dy: -20)
+                    
+                    if expandedStartRect.contains(location) || expandedEndRect.contains(location) {
+                        return false
+                    }
+                }
+            }
+        }
+        
+        // Clean up any existing gesture state when a new touch begins (for other gestures)
+        if gestureRecognizer is UIPanGestureRecognizer && gestureRecognizer != replyPanGesture {
             cleanupReplyGesture()
         }
+        
         return true
     }
 }
