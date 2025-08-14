@@ -107,20 +107,25 @@ struct RichTextEditor: UIViewRepresentable {
 
         context.coordinator.parseAttributedText(textView.attributedText)
 
-        DispatchQueue.main.async { [self] in // Ensure UI updates happen on the main thread
+        let isPreview = self.isPreview
+        let coordinator = context.coordinator
+        DispatchQueue.main.async { [weak coordinator, weak textView] in
+            guard let coordinator = coordinator, let textView = textView else { return }
             if !isPreview {
                 textView.becomeFirstResponder()
             }
 
-            context.coordinator.parseAttributedText(textView.attributedText)
+            coordinator.parseAttributedText(textView.attributedText)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            context.coordinator.parseAttributedText(textView.attributedText)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak coordinator, weak textView] in
+            guard let coordinator = coordinator, let textView = textView else { return }
+            coordinator.parseAttributedText(textView.attributedText)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            context.coordinator.parseAttributedText(textView.attributedText)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak coordinator, weak textView] in
+            guard let coordinator = coordinator, let textView = textView else { return }
+            coordinator.parseAttributedText(textView.attributedText)
         }
 
         return textView
@@ -515,7 +520,8 @@ struct RichTextEditor: UIViewRepresentable {
             let isAtBottom = scrollView.contentOffset.y >= (maxOffset - 60.0)
             let isAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 60.0
 
-            DispatchQueue.main.async { [self] in
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
                 if !self.isPinching && self.parent.isAtBottom != isAtBottom || self.parent.canScroll != canScroll || self.parent.isAtTop != isAtTop {
                     self.parent.canScroll = canScroll
                     self.parent.isAtBottom = isAtBottom
@@ -644,7 +650,8 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
-            DispatchQueue.main.async { [self] in
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self = self, let textView = textView else { return }
                 let cursorLocation = textView.selectedRange.location
 
                 self.parent.text = textView.attributedText
@@ -668,8 +675,8 @@ struct RichTextEditor: UIViewRepresentable {
                                     newStyle.setParagraphStyle(newParagraphs[prevIndex].paragraphStyle)
                                     newStyle.paragraphSpacing = self.parent.settings.defaultParagraphSpacing
                                     textView.textStorage.addAttribute(.paragraphStyle, value: newStyle, range: prevRange)
-                                    if let pIndex = paragraphs.firstIndex(where: { $0.range == prevRange }) {
-                                        paragraphs[pIndex].paragraphStyle = newStyle
+                                    if let pIndex = self.paragraphs.firstIndex(where: { $0.range == prevRange }) {
+                                        self.paragraphs[pIndex].paragraphStyle = newStyle
                                     }
                                 }
                             }
@@ -690,7 +697,8 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            DispatchQueue.main.async { [self] in
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self = self, let textView = textView else { return }
                 self.parent.selectedRange = textView.selectedRange
                 self.updateTypingAttributes()
                 if textView.selectedRange.length == 0 {
@@ -1877,7 +1885,7 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Temporarily disable scrolling during swipe gesture
             guard Thread.isMainThread else {
-                DispatchQueue.main.async { [self, weak textView] in
+                DispatchQueue.main.async { [weak textView] in
                     textView?.isScrollEnabled = false
                     textView?.panGestureRecognizer.isEnabled = false
                 }
@@ -2265,7 +2273,8 @@ struct RichTextEditor: UIViewRepresentable {
 
             // Update paragraphs and ensure cursor is visible
             self.parseAttributedText(mutableText)
-            DispatchQueue.main.async { [self] in
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self = self, let textView = textView else { return }
                 self.centerCursorInTextView()
                 // Show keyboard after caret is positioned
                 textView.becomeFirstResponder()
