@@ -5,7 +5,8 @@ class RuledView: UIView {
 
     private var paragraphOverlays: [CAShapeLayer] = []
     private var draggingSourceIndex: Int?
-    public let overlayCornerRadius: CGFloat = 16.0
+    private let settings = AppSettings.shared
+    var overlayCornerRadius: CGFloat { CGFloat(settings.overlayCornerRadius) }
 
     enum DragState {
         case none

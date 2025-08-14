@@ -30,6 +30,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(padding, forKey: "padding") }
     }
 
+    @Published var overlayCornerRadius: Double {
+        didSet { UserDefaults.standard.set(overlayCornerRadius, forKey: "overlayCornerRadius") }
+    }
+
     @Published var magneticScrollingEnabled: Bool {
         didSet { UserDefaults.standard.set(magneticScrollingEnabled, forKey: "magneticScrollingEnabled") }
     }
@@ -90,6 +94,7 @@ class AppSettings: ObservableObject {
             "defaultParagraphSpacing": relatedParagraphSpacing,
             "fontSize": 18.0,
             "padding": 20.0,
+            "overlayCornerRadius": 16.0,
             "accentColor": "Default",
         ]
         UserDefaults.standard.register(defaults: defaults)
@@ -104,6 +109,9 @@ class AppSettings: ObservableObject {
 
         let padding = UserDefaults.standard.double(forKey: "padding")
         self.padding = padding
+
+        let cornerRadius = UserDefaults.standard.double(forKey: "overlayCornerRadius")
+        self.overlayCornerRadius = cornerRadius
 
         self.magneticScrollingEnabled = UserDefaults.standard.object(forKey: "magneticScrollingEnabled") as? Bool ?? false
         self.dragToReorderParagraphEnabled = UserDefaults.standard.object(forKey: "dragToReorderParagraphEnabled") as? Bool ?? false

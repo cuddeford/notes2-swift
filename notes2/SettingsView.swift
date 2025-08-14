@@ -87,6 +87,13 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Thought bubbles", isOn: $settings.paragraphOverlaysEnabled)
+                HStack {
+                    Text("Thought bubble corners")
+                    Spacer()
+                    Text("\(Int(settings.overlayCornerRadius))pt")
+                        .foregroundColor(.gray)
+                }
+                Slider(value: $settings.overlayCornerRadius, in: 0...30, step: 1)
             } footer: {
                 Text("Shows visual boundaries around thoughts.")
                     .font(.caption)
