@@ -508,8 +508,8 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            // Prevent updates during active gestures to avoid interference with overlays
-            if isGestureActive {
+            // Allow scrolling during drag-to-reorder but prevent during reply gesture
+            if isGestureActive && !isDragging {
                 return
             }
             
@@ -634,8 +634,8 @@ struct RichTextEditor: UIViewRepresentable {
         }
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-            // Prevent scrolling if a reply gesture is active
-            if isGestureActive {
+            // Prevent scrolling if a reply gesture is active (but not drag-to-reorder)
+            if isGestureActive && !isDragging {
                 scrollView.panGestureRecognizer.isEnabled = false
                 DispatchQueue.main.async {
                     scrollView.panGestureRecognizer.isEnabled = true
