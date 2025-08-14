@@ -7,6 +7,19 @@ struct SettingsView: View {
     @AppStorage("historyVisible") private var historyVisible = true
     @AppStorage("pinnedVisible") private var pinnedVisible = true
     @AppStorage("newNoteWithBigFont") private var newNoteWithBigFont = true
+    @State private var customColor: Color
+
+    init() {
+        if let components = UserDefaults.standard.dictionary(forKey: "customAccentColor"),
+           let red = components["red"] as? Double,
+           let green = components["green"] as? Double,
+           let blue = components["blue"] as? Double,
+           let opacity = components["opacity"] as? Double {
+            self._customColor = State(initialValue: Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity))
+        } else {
+            self._customColor = State(initialValue: Color.accentColor)
+        }
+    }
 
     private var isDefaultSpacingRelated: Binding<Bool> {
         Binding<Bool>(
@@ -20,13 +33,32 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section(header: Text("Appearance")) {
-                Picker("Accent Color", selection: $settings.accentColor) {
-                    ForEach(AppSettings.availableColors.keys.sorted(), id: \.self) { colorName in
-                        Text(colorName).tag(colorName)
+                HStack {
+                    Text("Accent Color")
+                    Spacer()
+
+                    Picker("Accent Color", selection: $settings.accentColor) {
+                        Text("Default").tag("Default")
+                        Text("Custom").tag("Custom")
+                        Divider()
+                        ForEach(AppSettings.availableColors.keys.sorted().filter { $0 != "Default" && $0 != "Custom" }, id: \.self) { colorName in
+                            Text(colorName).tag(colorName)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                 }
-                .tint(color(from: settings.accentColor))
-                .id(settings.accentColor)
+
+                if settings.accentColor == "Custom" {
+                    ColorPicker("Custom Color", selection: $customColor)
+                        .onChange(of: customColor) { oldValue, newValue in
+                            if let components = newValue.cgColor?.components {
+                                let userDefaults = UserDefaults.standard
+                                userDefaults.set(["red": components[0], "green": components[1], "blue": components[2], "opacity": components[3]], forKey: "customAccentColor")
+                                settings.accentColor = "Custom"
+                            }
+                        }
+                }
 
                 Stepper("Recent notes: \(settings.recentsCount)", value: $settings.recentsCount, in: 1...10)
             }

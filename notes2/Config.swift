@@ -70,7 +70,8 @@ class AppSettings: ObservableObject {
         "Pink": .pink,
         "Purple": .purple,
         "Red": .red,
-        "Yellow": .yellow
+        "Yellow": .yellow,
+        "Custom": Color.accentColor,
     ]
 
     static func registerDefaults() {
@@ -116,5 +117,14 @@ class AppSettings: ObservableObject {
 }
 
 func color(from string: String) -> Color {
+    if string == "Custom" {
+        if let components = UserDefaults.standard.dictionary(forKey: "customAccentColor"),
+           let red = components["red"] as? Double,
+           let green = components["green"] as? Double,
+           let blue = components["blue"] as? Double,
+           let opacity = components["opacity"] as? Double {
+            return Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
+        }
+    }
     return AppSettings.availableColors[string] ?? .accentColor
 }
