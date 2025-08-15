@@ -10,7 +10,9 @@ import SwiftUI
 @available(iOS 26.0, *)
 struct GlassEffectModifier: ViewModifier {
     func body(content: Content) -> some View {
-        content.glassEffect()
+        // this won't compile in Xcode 16
+        // content.glassEffect()
+        content
     }
 }
 
