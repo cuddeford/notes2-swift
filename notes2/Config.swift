@@ -66,6 +66,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(accentColor, forKey: "accentColor") }
     }
 
+    @Published var glassEffectEnabled: Bool {
+        didSet { UserDefaults.standard.set(glassEffectEnabled, forKey: "glassEffectEnabled") }
+    }
+
     static let availableColors: [String: Color] = [
         "Default": Color.accentColor,
         "Blue": .blue,
@@ -96,6 +100,7 @@ class AppSettings: ObservableObject {
             "padding": 20.0,
             "overlayCornerRadius": 16.0,
             "accentColor": "Default",
+            "glassEffectEnabled": false,
         ]
         UserDefaults.standard.register(defaults: defaults)
     }
@@ -121,6 +126,7 @@ class AppSettings: ObservableObject {
         self.dismissNoteGestureEnabled = UserDefaults.standard.object(forKey: "dismissNoteGestureEnabled") as? Bool ?? true
         self.recentsCount = UserDefaults.standard.object(forKey: "recentsCount") as? Int ?? 2
         self.accentColor = UserDefaults.standard.string(forKey: "accentColor") ?? "Default"
+        self.glassEffectEnabled = UserDefaults.standard.object(forKey: "glassEffectEnabled") as? Bool ?? false
     }
 }
 

@@ -17,9 +17,15 @@ struct GlassEffectModifier: ViewModifier {
 }
 
 struct AnyVersionGlassEffect: ViewModifier {
+    @ObservedObject var settings = AppSettings.shared
+    
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.modifier(GlassEffectModifier())
+            if settings.glassEffectEnabled {
+                content.modifier(GlassEffectModifier())
+            } else {
+                content
+            }
         } else {
             content
         }

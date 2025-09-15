@@ -60,6 +60,10 @@ struct SettingsView: View {
                         }
                 }
 
+                if isIOS26 {
+                    Toggle("Liquid Glass", isOn: $settings.glassEffectEnabled)
+                }
+
                 Stepper("Recent notes: \(settings.recentsCount)", value: $settings.recentsCount, in: 1...10)
             }
 
