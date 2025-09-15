@@ -11,8 +11,8 @@ import SwiftUI
 struct GlassEffectModifier: ViewModifier {
     func body(content: Content) -> some View {
         // this won't compile in Xcode 16
-        // content.glassEffect()
-        content
+        content.glassEffect()
+    //    content
     }
 }
 

@@ -20,8 +20,8 @@ struct ScrollToBottomButton: View {
                 .font(.title)
                 .foregroundColor(.gray)
                 .padding()
+                .glassEffectIfAvailable()
                 .opacity(0.5)
         }
-        .glassEffectIfAvailable()
     }
 }

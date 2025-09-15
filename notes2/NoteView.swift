@@ -191,9 +191,9 @@ struct NoteView: View {
                                 .font(.title)
                                 .foregroundColor(.gray)
                                 .padding()
+                                .glassEffectIfAvailable()
                                 .opacity(0.5)
                         }
-                        .glassEffectIfAvailable()
                         .padding(16)
                     }
                     Spacer()

@@ -23,6 +23,7 @@ struct ScrollToTopButton: View {
                 .font(.title)
                 .foregroundColor(.gray)
                 .padding()
+                .glassEffectIfAvailable()
                 .opacity(0.5)
             } else {
                 Image(systemName: "arrow.right.to.line.compact")
@@ -33,7 +34,6 @@ struct ScrollToTopButton: View {
                     .opacity(0.5)
             }
         }
-        .glassEffectIfAvailable()
         .opacity((isAtTop || !canScroll) ? 0 : 1)
         .animation(.easeInOut, value: isAtTop)
         .animation(.easeInOut, value: canScroll)
